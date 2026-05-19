@@ -45,7 +45,7 @@ function parseCSV(text) {
     if (!row.some(c => c.trim())) continue
 
     if (row[0]?.trim()) currentCompany = row[0].trim()
-    if (row[1]?.trim()) currentBrand = row[1].trim()
+    if (row[1]?.trim()) currentBrand = row[1].trim().replace(/\n/g, ' ').replace(/\s+/g, ' ')
 
     const barcode = row[2]?.trim() || ''
     const product = row[4]?.trim() || ''
@@ -80,7 +80,7 @@ export default function App() {
   const [rawData, setRawData] = useState(fallbackData)
   const [loading, setLoading] = useState(true)
   const [lastUpdated, setLastUpdated] = useState(null)
-  const [dataSource, setDataSource] = useState('local') // 'local' | 'sheets'
+  const [dataSource, setDataSource] = useState('local')
 
   const [dark, setDark] = useState(true)
   const [tab, setTab] = useState('products')
@@ -89,22 +89,26 @@ export default function App() {
   const [selectedBrands, setSelectedBrands] = useState([])
   const [statusTab, setStatusTab] = useState('ALL')
 
-  // Fetch from Google Sheets on mount
   useEffect(() => {
     const fetchSheets = async () => {
       try {
         setLoading(true)
         const res = await fetch(SHEET_URL)
         if (!res.ok) throw new Error('Failed to fetch')
+        const lastMod = res.headers.get('Last-Modified') || res.headers.get('Date')
         const text = await res.text()
         const parsed = parseCSV(text)
         if (parsed.length > 0) {
           setRawData(parsed)
           setDataSource('sheets')
-          setLastUpdated(new Date().toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' }))
+          if (lastMod) {
+            setLastUpdated(new Date(lastMod).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' }))
+          } else {
+            setLastUpdated(new Date().toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' }))
+          }
         }
       } catch (e) {
-        console.warn('Google Sheets fetch failed, using local data:', e)
+        console.warn('Sheets fetch failed:', e)
         setDataSource('local')
         setLastUpdated(new Date().toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' }))
       } finally {
@@ -113,6 +117,33 @@ export default function App() {
     }
     fetchSheets()
   }, [])
+
+  const handleImportCSV = (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      try {
+        const parsed = parseCSV(ev.target.result)
+        if (parsed.length > 0) {
+          setRawData(parsed)
+          setDataSource('csv')
+          setSelectedBrands([])
+          setVendorFilter('ALL')
+          setStatusTab('ALL')
+          setSearch('')
+          setLastUpdated(new Date(file.lastModified).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' }))
+          alert('✅ Import สำเร็จ! พบ ' + parsed.length + ' รายการจาก "' + file.name + '"')
+        } else {
+          alert('❌ ไม่พบข้อมูลในไฟล์ กรุณาตรวจสอบ format ของ CSV')
+        }
+      } catch (err) {
+        alert('❌ เกิดข้อผิดพลาดในการอ่านไฟล์')
+      }
+    }
+    reader.readAsText(file, 'UTF-8')
+    e.target.value = ''
+  }
 
   const VENDOR_BRANDS = useMemo(() => ({
     ALL: [...new Set(rawData.map(p => p.brand.trim()))].filter(Boolean).sort(),
@@ -244,11 +275,11 @@ export default function App() {
               <span>⏱ UPDATED: {lastUpdated}</span>
               <span style={{
                 fontSize: 10, padding: '1px 7px', borderRadius: 10, fontWeight: 600,
-                background: dataSource === 'sheets' ? 'rgba(62,207,110,0.15)' : 'rgba(245,200,66,0.15)',
-                color: dataSource === 'sheets' ? t.green : t.yellow,
-                border: `1px solid ${dataSource === 'sheets' ? 'rgba(62,207,110,0.3)' : 'rgba(245,200,66,0.3)'}`,
+                background: dataSource === 'sheets' ? 'rgba(62,207,110,0.15)' : dataSource === 'csv' ? 'rgba(79,142,247,0.15)' : 'rgba(245,200,66,0.15)',
+                color: dataSource === 'sheets' ? t.green : dataSource === 'csv' ? t.blue : t.yellow,
+                border: `1px solid ${dataSource === 'sheets' ? 'rgba(62,207,110,0.3)' : dataSource === 'csv' ? 'rgba(79,142,247,0.3)' : 'rgba(245,200,66,0.3)'}`,
               }}>
-                {dataSource === 'sheets' ? '🟢 Live' : '🟡 Local'}
+                {dataSource === 'sheets' ? '🟢 Live' : dataSource === 'csv' ? '🔵 CSV' : '🟡 Local'}
               </span>
             </div>
           </div>
@@ -273,10 +304,14 @@ export default function App() {
             background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8,
             padding: '8px 14px', color: t.text, fontSize: 13, fontWeight: 500,
           }}>{dark ? '☀️ Light' : '🌙 Dark'}</button>
-          <button className="nav-btn" style={{
+          <label className="nav-btn" style={{
             background: t.blue, border: 'none', borderRadius: 8,
             padding: '8px 18px', color: '#fff', fontSize: 13, fontWeight: 600,
-          }}>⬆ Import CSV</button>
+            cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6,
+          }}>
+            ⬆ Import CSV
+            <input type="file" accept=".csv" onChange={handleImportCSV} style={{ display: 'none' }} />
+          </label>
         </div>
       </header>
 
