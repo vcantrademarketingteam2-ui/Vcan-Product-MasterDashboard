@@ -44,14 +44,17 @@ function parseCSV(text) {
     const row = parseCSVLine(lines[i])
     if (!row.some(c => c.trim())) continue
 
-    if (row[0]?.trim()) currentCompany = row[0].trim()
-    if (row[1]?.trim()) {
-      let b = row[1].trim().replace(/\n/g, ' ').replace(/\s+/g, ' ')
-      // Normalize brand names
-      if (b.toLowerCase().includes('dove men')) b = 'Dove Men'
+    // company: only update if it's a real vendor name
+    const rawCompany = row[0]?.trim() || ''
+    if (rawCompany === 'Vcan' || rawCompany === 'Moola') currentCompany = rawCompany
+
+    // brand: only update if col2 looks like a barcode (numeric 5+ digits)
+    const rawBrand = row[1]?.trim() || ''
+    if (rawBrand && /^\d{5,}/.test(row[2]?.trim() || '')) {
+      let b = rawBrand.replace(/\n/g, ' ').replace(/\s+/g, ' ')
+      if (b.toLowerCase().includes('dove men') || b.toLowerCase() === 'shampoo') b = 'Dove Men'
       currentBrand = b
     }
-
     const barcode = row[2]?.trim() || ''
     const product = row[4]?.trim() || ''
     const packSize = row[5]?.trim() || ''
