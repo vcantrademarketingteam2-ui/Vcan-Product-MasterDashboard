@@ -84,6 +84,14 @@ function parseCSV(text) {
       rsp = row[5]?.replace(/[^\d.]/g, '') || ''
       status = row[6]?.trim() || ''
       retailerOffset = 7
+    } else if (!c0 && !c1 && isBarcode(c2) && isBarcode(c3)) {
+      // Layout C — continuation row (col0 and col1 empty, brand same as previous)
+      barcode = c2
+      product = row[4]?.trim() || ''
+      packSize = row[5]?.trim() || ''
+      rsp = row[6]?.replace(/[^\d.]/g, '') || ''
+      status = row[7]?.trim() || ''
+      retailerOffset = 8
     } else {
       continue
     }
