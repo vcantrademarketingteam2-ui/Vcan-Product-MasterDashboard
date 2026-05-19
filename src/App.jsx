@@ -45,7 +45,12 @@ function parseCSV(text) {
     if (!row.some(c => c.trim())) continue
 
     if (row[0]?.trim()) currentCompany = row[0].trim()
-    if (row[1]?.trim()) currentBrand = row[1].trim().replace(/\n/g, ' ').replace(/\s+/g, ' ')
+    if (row[1]?.trim()) {
+      let b = row[1].trim().replace(/\n/g, ' ').replace(/\s+/g, ' ')
+      // Normalize brand names
+      if (b.toLowerCase().includes('dove men')) b = 'Dove Men'
+      currentBrand = b
+    }
 
     const barcode = row[2]?.trim() || ''
     const product = row[4]?.trim() || ''
