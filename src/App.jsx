@@ -39,35 +39,61 @@ function parseCSV(text) {
   let currentCompany = ''
   let currentBrand = ''
 
+  const VENDORS = ['Vcan', 'Moola']
+  const isBarcode = (s) => /^\d{8,}$/.test(s)
+  const normalizeBrand = (b) => {
+    b = b.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim()
+    if (/dove.?men/i.test(b) || /^shampoo$/i.test(b)) return 'Dove Men'
+    return b
+  }
+
   for (let i = 0; i < lines.length; i++) {
-    if (i < 3) continue // skip header rows
+    if (i < 3) continue
     const row = parseCSVLine(lines[i])
     if (!row.some(c => c.trim())) continue
 
-    // company: only update if it's a real vendor name
-    const rawCompany = row[0]?.trim() || ''
-    if (rawCompany === 'Vcan' || rawCompany === 'Moola') currentCompany = rawCompany
+    const c0 = row[0]?.trim() || ''
+    const c1 = row[1]?.trim() || ''
+    const c2 = row[2]?.trim() || ''
+    const c3 = row[3]?.trim() || ''
 
-    // brand: only update if col2 looks like a barcode (numeric 5+ digits)
-    const rawBrand = row[1]?.trim() || ''
-    if (rawBrand && /^\d{5,}/.test(row[2]?.trim() || '')) {
-      let b = rawBrand.replace(/\n/g, ' ').replace(/\s+/g, ' ')
-      if (b.toLowerCase().includes('dove men') || b.toLowerCase() === 'shampoo') b = 'Dove Men'
-      currentBrand = b
+    // Update company only if col0 is a known vendor
+    if (VENDORS.includes(c0)) currentCompany = c0
+
+    // Detect which layout this row uses:
+    // Layout A (normal): col0=vendor/empty, col1=brand/empty, col2=barcode, col3=barcode, col4=product
+    // Layout B (shifted): col0=brand-part, col1=barcode, col2=barcode, col3=product
+    let barcode = '', product = '', packSize = '', rsp = '', status = ''
+    let retailerOffset = 8
+
+    if (isBarcode(c2) && isBarcode(c3)) {
+      // Layout A — normal
+      if (c1 && !isBarcode(c1)) currentBrand = normalizeBrand(c1)
+      barcode = c2
+      product = row[4]?.trim() || ''
+      packSize = row[5]?.trim() || ''
+      rsp = row[6]?.replace(/[^\d.]/g, '') || ''
+      status = row[7]?.trim() || ''
+      retailerOffset = 8
+    } else if (isBarcode(c1) && isBarcode(c2)) {
+      // Layout B — shifted (e.g. Dove Men Shampoo rows)
+      if (c0 && !VENDORS.includes(c0)) currentBrand = normalizeBrand(c0)
+      barcode = c1
+      product = row[3]?.trim() || ''
+      packSize = row[4]?.trim() || ''
+      rsp = row[5]?.replace(/[^\d.]/g, '') || ''
+      status = row[6]?.trim() || ''
+      retailerOffset = 7
+    } else {
+      continue
     }
-    const barcode = row[2]?.trim() || ''
-    const product = row[4]?.trim() || ''
-    const packSize = row[5]?.trim() || ''
-    const rsp = row[6]?.replace(/[^\d.]/g, '') || ''
-    const status = row[7]?.trim() || ''
 
     if (!barcode || !product || product.toLowerCase().includes('total')) continue
-    // skip if barcode looks like a brand name (non-numeric)
-    if (!/\d{5,}/.test(barcode)) continue
+    if (!isBarcode(barcode)) continue
 
     const retailerStatus = {}
     RETAILERS.forEach((r, j) => {
-      retailerStatus[r] = row[8 + j]?.trim() || ''
+      retailerStatus[r] = row[retailerOffset + j]?.trim() || ''
     })
 
     rows.push({
@@ -278,7 +304,7 @@ export default function App() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 16, minWidth: 240 }}>
           <img src={vcanLogo} alt="VCAN" style={{ height: 38, objectFit: 'contain' }} />
           <div>
-            <div style={{ fontWeight: 800, fontSize: 16, letterSpacing: 1, textTransform: 'uppercase' }}>Product Master</div>
+            <div style={{ fontWeight: 800, fontSize: 16, letterSpacing: 1, textTransform: 'uppercase' }}>Product Master <span style={{ fontSize: 11, color: t.accent, fontWeight: 700, letterSpacing: 0 }}>v1.0</span></div>
             <div style={{ fontSize: 11, color: t.muted, display: 'flex', alignItems: 'center', gap: 6 }}>
               <span>⏱ UPDATED: {lastUpdated}</span>
               <span style={{
