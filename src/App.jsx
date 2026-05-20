@@ -85,7 +85,7 @@ function parseCSV(text) {
       rsp = row[5]?.replace(/[^\d.]/g, '') || ''
       status = row[6]?.trim() || ''
       retailerOffset = 7
-    } else if (!c0 && !c1 && isBarcode(c2) && isBarcode(c3)) {
+    } else if (!c0 && !c1 && isBarcode(c2)) {
       // Layout C — continuation row (col0 and col1 empty, brand same as previous)
       barcode = c2
       product = row[4]?.trim() || ''
