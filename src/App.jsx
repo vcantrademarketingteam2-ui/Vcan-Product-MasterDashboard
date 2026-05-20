@@ -40,7 +40,8 @@ function parseCSV(text) {
   let currentBrand = ''
 
   const VENDORS = ['Vcan', 'Moola']
-  const isBarcode = (s) => /^\d{8,}$/.test(s)
+  const stripQuotes = (s) => (s || '').replace(/^["']+|["']+$/g, '').trim()
+  const isBarcode = (s) => /^\d{8,}$/.test(stripQuotes(s))
   const normalizeBrand = (b) => {
     b = b.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim()
     if (/dove.?men/i.test(b) || /^shampoo$/i.test(b)) return 'Dove Men'
@@ -52,10 +53,10 @@ function parseCSV(text) {
     const row = parseCSVLine(lines[i])
     if (!row.some(c => c.trim())) continue
 
-    const c0 = row[0]?.trim() || ''
-    const c1 = row[1]?.trim() || ''
-    const c2 = row[2]?.trim() || ''
-    const c3 = row[3]?.trim() || ''
+    const c0 = stripQuotes(row[0])
+    const c1 = stripQuotes(row[1])
+    const c2 = stripQuotes(row[2])
+    const c3 = stripQuotes(row[3])
 
     // Update company only if col0 is a known vendor
     if (VENDORS.includes(c0)) currentCompany = c0
