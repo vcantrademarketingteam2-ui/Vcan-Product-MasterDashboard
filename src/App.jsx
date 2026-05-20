@@ -67,7 +67,7 @@ function parseCSV(text) {
     let barcode = '', product = '', packSize = '', rsp = '', status = ''
     let retailerOffset = 8
 
-    if (isBarcode(c2) && isBarcode(c3)) {
+    if (isBarcode(c2)) {
       // Layout A — normal
       if (c1 && !isBarcode(c1)) currentBrand = normalizeBrand(c1)
       barcode = c2
