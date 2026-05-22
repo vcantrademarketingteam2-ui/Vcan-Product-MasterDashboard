@@ -93,7 +93,7 @@ function parseCSV(text) {
       rsp = row[6]?.replace(/[^\d.]/g, '') || ''
       status = row[7]?.trim() || ''
       retailerOffset = 8
-    } else {
+    } else { //V2
       continue
     }
 
