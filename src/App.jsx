@@ -97,7 +97,7 @@ function parseCSV(text) {
       continue
     }
 
-    if (!barcode || !product || product.toLowerCase().includes('total')) continue
+    if (!barcode || !product || product.trim().toLowerCase() === 'total') continue
     if (!isBarcode(barcode)) continue
 
     const retailerStatus = {}
