@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Secret credentials — never commit
+credentials.json
+*.json.key
