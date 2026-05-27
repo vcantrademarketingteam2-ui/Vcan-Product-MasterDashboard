@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import fallbackData from './data.js'
 import vcanLogo from './VCAN.png'
 
@@ -98,14 +98,21 @@ function PackshotImg({ barcode, side = 'front', style = {}, placeholderSize = 40
 }
 
 // ── ProductPopup ────────────────────────────────────────────────────────────
-function ProductPopup({ product, onClose, t, dark }) {
+function ProductPopup({ product, onClose, t, dark, isMobile = false }) {
   const [side, setSide] = useState('front')
   const [loadedSrc, setLoadedSrc] = useState(null)
   const [zoomed, setZoomed] = useState(false)
+  const [zoomScale, setZoomScale] = useState(1)
+  const [panPos, setPanPos] = useState({ x: 0, y: 0 })
+  const [isDragging, setIsDragging] = useState(false)
+  const lbRef = useRef(null)
+  const dragRef = useRef(null)
   useEffect(() => {
     setSide('front')
     setLoadedSrc(null)
     setZoomed(false)
+    setZoomScale(1)
+    setPanPos({ x: 0, y: 0 })
     // Esc: close lightbox first, then popup
     const h = (e) => {
       if (e.key === 'Escape') {
@@ -115,6 +122,20 @@ function ProductPopup({ product, onClose, t, dark }) {
     document.addEventListener('keydown', h)
     return () => document.removeEventListener('keydown', h)
   }, [product, onClose])
+  // Reset zoom + pan whenever lightbox closes
+  useEffect(() => { if (!zoomed) { setZoomScale(1); setPanPos({ x: 0, y: 0 }) } }, [zoomed])
+  // Ctrl+Scroll zoom — must be non-passive to call preventDefault
+  useEffect(() => {
+    if (!zoomed) return
+    const el = lbRef.current; if (!el) return
+    const onWheel = (e) => {
+      if (!e.ctrlKey) return
+      e.preventDefault()
+      setZoomScale(prev => Math.max(0.25, Math.min(8, prev * (e.deltaY < 0 ? 1.12 : 1 / 1.12))))
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  }, [zoomed])
   if (!product) return null
   const statusColor = product.status === 'ขาย' ? t.green : product.status === 'รอขาย' ? t.yellow : t.red
   const statusLabel = product.status === 'ขาย' ? 'Active' : product.status === 'รอขาย' ? 'Pending' : 'Discontinued'
@@ -136,21 +157,68 @@ function ProductPopup({ product, onClose, t, dark }) {
   )
   return (
     <>
-      {/* ── Lightbox (zIndex above popup's backdrop, sibling not child so no stacking-context conflict) ── */}
+      {/* ── Lightbox ── */}
       {zoomed && loadedSrc && (
-        <div onClick={() => setZoomed(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.96)', zIndex: 4000, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'zoom-out', padding: 24 }}>
-          <img src={loadedSrc} alt="" onClick={e => e.stopPropagation()} style={{ maxWidth: '92vw', maxHeight: '88vh', objectFit: 'contain', borderRadius: 10, cursor: 'default', boxShadow: '0 0 80px rgba(0,0,0,0.7)' }} />
+        <div
+          ref={lbRef}
+          onClick={() => setZoomed(false)}
+          onMouseMove={(e) => {
+            if (!dragRef.current) return
+            setPanPos({ x: dragRef.current.ox + (e.clientX - dragRef.current.startX), y: dragRef.current.oy + (e.clientY - dragRef.current.startY) })
+          }}
+          onMouseUp={() => { dragRef.current = null; setIsDragging(false) }}
+          onMouseLeave={() => { dragRef.current = null; setIsDragging(false) }}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.96)', zIndex: 4000, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', padding: 24 }}
+        >
+          {/* Wrapper: handles pan (translate) + drag start */}
+          <div
+            onClick={e => e.stopPropagation()}
+            onDoubleClick={() => { setZoomScale(1); setPanPos({ x: 0, y: 0 }) }}
+            onMouseDown={(e) => {
+              if (zoomScale <= 1) return
+              e.preventDefault(); e.stopPropagation()
+              dragRef.current = { startX: e.clientX, startY: e.clientY, ox: panPos.x, oy: panPos.y }
+              setIsDragging(true)
+            }}
+            style={{ transform: `translate(${panPos.x}px, ${panPos.y}px)`, userSelect: 'none', cursor: isDragging ? 'grabbing' : (zoomScale > 1 ? 'grab' : 'default') }}
+          >
+            <img
+              src={loadedSrc} alt=""
+              style={{
+                maxWidth: '92vw', maxHeight: '88vh', objectFit: 'contain', borderRadius: 10,
+                boxShadow: '0 0 80px rgba(0,0,0,0.7)',
+                transform: `scale(${zoomScale})`, transformOrigin: 'center center',
+                transition: isDragging ? 'none' : 'transform 0.1s ease',
+                display: 'block', pointerEvents: 'none',
+              }}
+            />
+          </div>
+          {/* Close */}
           <button onClick={() => setZoomed(false)} style={{ position: 'absolute', top: 20, right: 20, background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.18)', borderRadius: '50%', color: '#fff', fontSize: 18, width: 40, height: 40, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}>✕</button>
-          <div style={{ position: 'absolute', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(4px)', borderRadius: 20, padding: '6px 18px', color: '#e6edf3', fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap', pointerEvents: 'none' }}>
-            {product.product} — {side === 'front' ? '▶ Front' : '◀ Back'}
+          {/* Zoom badge */}
+          {zoomScale !== 1 && (
+            <div onClick={e => { e.stopPropagation(); setZoomScale(1); setPanPos({ x: 0, y: 0 }) }} style={{ position: 'absolute', top: 20, left: '50%', transform: 'translateX(-50%)', background: 'rgba(255,255,255,0.14)', border: '1px solid rgba(255,255,255,0.22)', backdropFilter: 'blur(6px)', borderRadius: 20, padding: '5px 16px', color: '#fff', fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap', cursor: 'pointer' }}>
+              {Math.round(zoomScale * 100)}% — click to reset
+            </div>
+          )}
+          {/* Caption + hint */}
+          <div style={{ position: 'absolute', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(4px)', borderRadius: 20, padding: '7px 20px', color: '#e6edf3', fontSize: 12, fontWeight: 600, maxWidth: '90vw', pointerEvents: 'none', textAlign: 'center' }}>
+            <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{product.product} — {side === 'front' ? '▶ Front' : '◀ Back'}</div>
+            {!isMobile && <span style={{ opacity: 0.45, fontWeight: 400, fontSize: 10 }}>Ctrl+Scroll zoom · Drag to pan · Double-click reset</span>}
           </div>
         </div>
       )}
       {/* ── Popup backdrop + card ── */}
-      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.72)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, backdropFilter: 'blur(3px)' }}>
-        <div onClick={e => e.stopPropagation()} style={{ background: t.surface, borderRadius: 18, width: '100%', maxWidth: 860, maxHeight: '90vh', overflow: 'auto', boxShadow: '0 32px 80px rgba(0,0,0,0.5)', border: `1px solid ${t.border}` }}>
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.72)', zIndex: 2000, display: 'flex', alignItems: isMobile ? 'flex-end' : 'center', justifyContent: 'center', padding: isMobile ? 0 : 24, backdropFilter: 'blur(3px)' }}>
+        <div onClick={e => e.stopPropagation()} style={{ background: t.surface, borderRadius: isMobile ? '16px 16px 0 0' : 18, width: '100%', maxWidth: isMobile ? '100%' : 860, maxHeight: isMobile ? '95dvh' : '90vh', overflow: 'auto', boxShadow: '0 32px 80px rgba(0,0,0,0.5)', border: `1px solid ${t.border}` }}>
+          {/* Mobile drag handle */}
+          {isMobile && (
+            <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 10, paddingBottom: 6 }}>
+              <div style={{ width: 36, height: 4, borderRadius: 2, background: t.border }} />
+            </div>
+          )}
           {/* Header */}
-          <div style={{ padding: '16px 20px', borderBottom: `1px solid ${t.border}`, display: 'flex', alignItems: 'flex-start', gap: 12, background: t.surface2 }}>
+          <div style={{ padding: isMobile ? '10px 14px 14px' : '16px 20px', borderBottom: `1px solid ${t.border}`, display: 'flex', alignItems: 'flex-start', gap: 12, background: t.surface2 }}>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 15, fontWeight: 800, color: t.text, lineHeight: 1.4, marginBottom: 4 }}>{product.product}</div>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -164,10 +232,10 @@ function ProductPopup({ product, onClose, t, dark }) {
             <button onClick={onClose} style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 8, color: t.muted, fontSize: 20, width: 34, height: 34, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>✕</button>
           </div>
           {/* Body */}
-          <div style={{ display: 'flex', gap: 0, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 0, flexDirection: isMobile ? 'column' : 'row', flexWrap: 'nowrap' }}>
             {/* Left: Packshot */}
-            <div style={{ width: 260, minWidth: 220, flexShrink: 0, padding: '20px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, borderRight: `1px solid ${t.border}` }}>
-              <PackshotImg barcode={product.barcode} side={side} onSrcChange={setLoadedSrc} style={{ width: '100%', height: 220, borderRadius: 8, background: dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)' }} placeholderSize={56} />
+            <div style={{ width: isMobile ? '100%' : 260, minWidth: isMobile ? 'unset' : 220, flexShrink: 0, padding: isMobile ? '16px' : '20px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, borderRight: isMobile ? 'none' : `1px solid ${t.border}`, borderBottom: isMobile ? `1px solid ${t.border}` : 'none' }}>
+              <PackshotImg barcode={product.barcode} side={side} onSrcChange={setLoadedSrc} style={{ width: '100%', height: isMobile ? 180 : 220, borderRadius: 8, background: dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)' }} placeholderSize={56} />
               {/* Controls row: Front/Back · Zoom · Save */}
               <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
                 {['front', 'back'].map(s => (
@@ -193,9 +261,9 @@ function ProductPopup({ product, onClose, t, dark }) {
               </div>
             </div>
             {/* Right: Details */}
-            <div style={{ flex: 1, minWidth: 260, padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ flex: 1, minWidth: 0, padding: isMobile ? '16px' : '20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
               {/* Stats row */}
-              <div style={{ display: 'flex', gap: 10 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
                 {[
                   { label: 'RSP', value: product.rsp ? `฿${product.rsp}` : '—' },
                   { label: 'Pack Size', value: product.packSize || '—' },
@@ -209,7 +277,21 @@ function ProductPopup({ product, onClose, t, dark }) {
               </div>
               {/* Retailer coverage */}
               <div>
-                <div style={{ fontSize: 11, color: t.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 10 }}>Retailer Coverage</div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, flexWrap: 'wrap', gap: 6 }}>
+                  <div style={{ fontSize: 11, color: t.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.8 }}>Retailer Coverage</div>
+                  <div style={{ display: 'flex', gap: 10, flexShrink: 0 }}>
+                    {[
+                      { label: 'Active', bg: t.green },
+                      { label: 'Pending', bg: t.yellow },
+                      { label: 'On Process', bg: t.blue },
+                      { label: 'Discon', bg: t.red },
+                    ].map(({ label, bg }) => (
+                      <span key={label} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: t.muted, fontWeight: 600 }}>
+                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: bg, display: 'inline-block', flexShrink: 0 }} />{label}
+                      </span>
+                    ))}
+                  </div>
+                </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
                   {RETAILERS.map(r => {
                     const v = product.retailers[r] || ''
@@ -248,6 +330,19 @@ export default function App() {
   const [statusTab, setStatusTab] = useState('ALL')
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [selectedProduct, setSelectedProduct] = useState(null)
+  const [psSearch, setPsSearch] = useState('')
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768)
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
+
+  useEffect(() => {
+    const onResize = () => {
+      const mobile = window.innerWidth < 768
+      setIsMobile(mobile)
+      if (!mobile) setMobileNavOpen(false)
+    }
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
 
   const fmtTs = (d) => {
     const dt = new Date(d)
@@ -341,6 +436,17 @@ export default function App() {
     return true
   }), [rawData, vendorFilter, selectedBrands, statusTab, search])
 
+  const psFiltered = useMemo(() => rawData.filter(p => {
+    if (vendorFilter !== 'ALL' && p.company !== vendorFilter) return false
+    if (selectedBrands.length > 0 && !selectedBrands.includes(p.brand.trim())) return false
+    if (statusTab !== 'ALL' && p.status !== statusTab) return false
+    if (psSearch) {
+      const q = psSearch.toLowerCase()
+      return p.product.toLowerCase().includes(q) || p.brand.toLowerCase().includes(q) || p.barcode.includes(q)
+    }
+    return true
+  }), [rawData, vendorFilter, selectedBrands, statusTab, psSearch])
+
   const analyticsData = useMemo(() => {
     const brandMap = {}
     rawData.forEach(p => {
@@ -383,9 +489,9 @@ export default function App() {
 
   function StatCard({ label, value, sub, color }) {
     return (
-      <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 12, padding: '20px 24px', flex: 1, minWidth: 160, boxShadow: dark ? 'none' : '0 2px 6px rgba(0,0,0,0.07)' }}>
-        <div style={{ fontSize: 11, color: t.muted, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>{label}</div>
-        <div style={{ fontSize: 36, fontWeight: 800, color: color || t.text, lineHeight: 1, marginBottom: 4 }}>{value}</div>
+      <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 12, padding: isMobile ? '14px 16px' : '20px 24px', boxShadow: dark ? 'none' : '0 2px 6px rgba(0,0,0,0.07)' }}>
+        <div style={{ fontSize: 11, color: t.muted, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>{label}</div>
+        <div style={{ fontSize: isMobile ? 28 : 36, fontWeight: 800, color: color || t.text, lineHeight: 1, marginBottom: 4 }}>{value}</div>
         {sub && <div style={{ fontSize: 11, color: t.muted }}>{sub}</div>}
       </div>
     )
@@ -405,7 +511,7 @@ export default function App() {
     { key: 'promotion', icon: '☰', label: 'Promotion Plan' },
   ]
 
-  const SIDEBAR_W = sidebarOpen ? 244 : 164
+  const SIDEBAR_W = isMobile ? 0 : (sidebarOpen ? 244 : 164)
 
   if (loading) return (
     <div style={{ minHeight: '100vh', background: '#0d1117', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
@@ -436,14 +542,28 @@ export default function App() {
         .nav-item:hover{background:${t.surface2}!important;}
         .sb-btn{transition:background 0.15s;cursor:pointer;}
         .sb-btn:hover{background:${t.surface2}!important;}
+        @media(max-width:767px){
+          .rhover:hover{background:unset!important;}
+          .bpill:hover{background:unset!important;color:unset!important;border-color:unset!important;}
+          .bpill:active{background:${t.accent}!important;color:#000!important;border-color:${t.accent}!important;}
+        }
       `}</style>
+
+      {/* ── MOBILE BACKDROP ── */}
+      {isMobile && mobileNavOpen && (
+        <div onClick={() => setMobileNavOpen(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 150, backdropFilter: 'blur(2px)' }} />
+      )}
 
       {/* ── SIDEBAR ── */}
       <aside style={{
-        width: SIDEBAR_W, minHeight: '100vh', background: t.sidebarBg,
+        width: isMobile ? 260 : SIDEBAR_W,
+        minHeight: '100vh', background: t.sidebarBg,
         borderRight: `1px solid ${t.border}`, display: 'flex', flexDirection: 'column',
-        position: 'sticky', top: 0, height: '100vh', overflow: 'hidden',
-        transition: 'width 0.25s ease', flexShrink: 0, zIndex: 100,
+        position: isMobile ? 'fixed' : 'sticky',
+        top: 0, left: 0, height: '100vh', overflow: 'hidden',
+        transition: isMobile ? 'transform 0.28s cubic-bezier(0.4,0,0.2,1)' : 'width 0.25s ease',
+        transform: isMobile ? (mobileNavOpen ? 'translateX(0)' : 'translateX(-100%)') : 'none',
+        flexShrink: 0, zIndex: isMobile ? 200 : 100,
       }}>
         {/* Logo row */}
         <div style={{
@@ -453,7 +573,7 @@ export default function App() {
           borderBottom: `1px solid ${t.border}`, flexShrink: 0,
         }}>
           {/* Hamburger always on left */}
-          <button onClick={() => setSidebarOpen(o => !o)} className="sb-btn" style={{
+          <button onClick={() => isMobile ? setMobileNavOpen(false) : setSidebarOpen(o => !o)} className="sb-btn" style={{
             background: 'none', border: 'none', color: t.muted, padding: '7px',
             borderRadius: 6, display: 'flex', flexDirection: 'column', gap: 4,
             alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0,
@@ -473,7 +593,7 @@ export default function App() {
           {NAV_ITEMS.map(({ key, icon, label }) => {
             const active = tab === key
             return (
-              <button key={key} onClick={() => setTab(key)} className="nav-item" style={{
+              <button key={key} onClick={() => { setTab(key); if (isMobile) setMobileNavOpen(false) }} className="nav-item" style={{
                 background: active ? `${t.accent}18` : 'none', border: 'none',
                 color: active ? t.accent : t.text, display: 'flex', alignItems: 'center',
                 gap: 10, padding: '10px 12px',
@@ -490,8 +610,8 @@ export default function App() {
           })}
         </nav>
 
-        {/* Filters — only when sidebar open */}
-        {sidebarOpen && (
+        {/* Filters — show when sidebar open (desktop) or always on mobile */}
+        {(sidebarOpen || isMobile) && (
           <div style={{ flex: 1, overflowY: 'auto', padding: '4px 12px 16px' }}>
             <div style={{ height: 1, background: t.border, margin: '4px 0 12px' }} />
 
@@ -542,46 +662,59 @@ export default function App() {
         {/* Header */}
         <header style={{
           background: t.headerBg, borderBottom: `1px solid ${t.border}`,
-          padding: '0 24px', height: 56, display: 'flex', alignItems: 'center',
-          gap: 10, position: 'sticky', top: 0, zIndex: 50,
+          padding: isMobile ? '0 12px' : '0 24px', height: 56, display: 'flex', alignItems: 'center',
+          gap: isMobile ? 8 : 10, position: 'sticky', top: 0, zIndex: 50,
         }}>
+          {/* Mobile hamburger */}
+          {isMobile && (
+            <button onClick={() => setMobileNavOpen(o => !o)} className="sb-btn" style={{ background: 'none', border: 'none', color: t.muted, padding: '7px 6px', borderRadius: 6, display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
+              <span style={{ display: 'block', width: 16, height: 1.5, background: t.muted, borderRadius: 2 }} />
+              <span style={{ display: 'block', width: 16, height: 1.5, background: t.muted, borderRadius: 2 }} />
+              <span style={{ display: 'block', width: 16, height: 1.5, background: t.muted, borderRadius: 2 }} />
+            </button>
+          )}
           {/* Title + timestamp inline */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ fontWeight: 800, fontSize: 17, color: t.text, letterSpacing: 0.2, whiteSpace: 'nowrap' }}>
-              Product Master&nbsp;&nbsp;<span style={{ color: t.accent, fontSize: 14 }}>v2.0.9</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 6 : 10, minWidth: 0 }}>
+            <div style={{ fontWeight: 800, fontSize: isMobile ? 14 : 17, color: t.text, letterSpacing: 0.2, whiteSpace: 'nowrap' }}>
+              {isMobile ? 'Product Master' : <>Product Master&nbsp;&nbsp;<span style={{ color: t.accent, fontSize: 14 }}>v2.1.2</span></>}
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, padding: '5px 12px', whiteSpace: 'nowrap' }}>
+            {!isMobile && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, padding: '5px 12px', whiteSpace: 'nowrap' }}>
+                <span style={{ width: 7, height: 7, borderRadius: '50%', flexShrink: 0, background: dataSource === 'sheets' ? t.green : dataSource === 'csv' ? t.blue : t.yellow }} />
+                <span style={{ fontWeight: 800, color: dataSource === 'sheets' ? t.green : dataSource === 'csv' ? t.blue : t.yellow }}>{dataSource === 'sheets' ? 'Live' : dataSource === 'csv' ? 'CSV' : 'Local'}</span>
+                {lastUpdated && <span style={{ color: t.text, fontWeight: 500 }}>&nbsp;·&nbsp;{lastUpdated}</span>}
+              </div>
+            )}
+            {isMobile && (
               <span style={{ width: 7, height: 7, borderRadius: '50%', flexShrink: 0, background: dataSource === 'sheets' ? t.green : dataSource === 'csv' ? t.blue : t.yellow }} />
-              <span style={{ fontWeight: 800, color: dataSource === 'sheets' ? t.green : dataSource === 'csv' ? t.blue : t.yellow }}>{dataSource === 'sheets' ? 'Live' : dataSource === 'csv' ? 'CSV' : 'Local'}</span>
-              {lastUpdated && <span style={{ color: t.text, fontWeight: 500 }}>&nbsp;·&nbsp;{lastUpdated}</span>}
-            </div>
+            )}
           </div>
-          <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: isMobile ? 6 : 8, alignItems: 'center' }}>
             {/* Dark mode */}
             <button onClick={() => setDark(d => !d)} className="sb-btn" style={{
               background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8,
-              color: t.muted, fontSize: 15, padding: '5px 10px', cursor: 'pointer',
+              color: t.muted, fontSize: 15, padding: isMobile ? '5px 8px' : '5px 10px', cursor: 'pointer',
             }}>{dark ? '☀' : '🌙'}</button>
             {/* Import CSV */}
             <label style={{
               background: t.accent, border: 'none', borderRadius: 8,
-              padding: '7px 16px', color: '#000', fontSize: 12, fontWeight: 700,
+              padding: isMobile ? '7px 10px' : '7px 16px', color: '#000', fontSize: 12, fontWeight: 700,
               cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6,
             }}>
-              ↑ Import CSV
+              {isMobile ? '↑ CSV' : '↑ Import CSV'}
               <input type="file" accept=".csv" onChange={handleImportCSV} style={{ display: 'none' }} />
             </label>
           </div>
         </header>
 
         {/* Content */}
-        <main style={{ flex: 1, padding: '24px', overflowY: 'auto' }}>
+        <main style={{ flex: 1, padding: isMobile ? '16px 12px' : '24px', overflowY: 'auto' }}>
 
           {/* PRODUCTS */}
           {tab === 'products' && (
             <>
               {/* Stat cards */}
-              <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', gap: 12, marginBottom: 20 }}>
                 <StatCard label="Total SKUs" value={stats.total} sub="all products" />
                 <StatCard label="Active" value={stats.active} sub={`${stats.total ? Math.round(stats.active / stats.total * 100) : 0}% of total`} color={t.green} />
                 <StatCard label="Pending" value={stats.pending} sub="รอขาย" color={t.yellow} />
@@ -628,8 +761,9 @@ export default function App() {
                   background: t.surface, border: `1px solid ${t.border}`,
                   borderRadius: 12, padding: '10px 14px',
                   boxShadow: dark ? 'none' : '0 1px 4px rgba(0,0,0,0.06)',
+                  overflowX: isMobile ? 'auto' : 'visible',
                 }}>
-                  <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', gap: 7, flexWrap: isMobile ? 'nowrap' : 'wrap', alignItems: 'center' }}>
                     {visibleBrands.map(b => {
                       const sel = selectedBrands.includes(b)
                       return (
@@ -670,7 +804,7 @@ export default function App() {
                   </div>
                 </div>
                 {/* Scrollable table — thead frozen */}
-                <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: 'calc(100vh - 300px)' }}>
+                <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: isMobile ? 'calc(100dvh - 260px)' : 'calc(100vh - 300px)' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                     <thead>
                       <tr style={{ background: t.surface2, boxShadow: `0 2px 0 ${t.accent}` }}>
@@ -794,7 +928,7 @@ export default function App() {
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 16 }}>
                 {['Vcan', 'Moola'].map(vendor => {
                   const vd = rawData.filter(p => p.company === vendor)
                   if (vd.length === 0) return null
@@ -869,20 +1003,39 @@ export default function App() {
           {/* PACKSHOT GALLERY */}
           {tab === 'packshot' && (
             <>
-              {/* Filter bar */}
-              <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
-                <span style={{ fontSize: 13, color: t.muted, fontWeight: 600 }}>Brand:</span>
-                {['ALL', ...Object.keys(VENDOR_BRANDS.ALL.reduce((a, b) => { a[b] = 1; return a }, {}))].map((b, i) => {
-                  if (i === 0) return (
-                    <button key="ALL" className="bpill" onClick={() => setSelectedBrands([])} style={{ background: selectedBrands.length === 0 ? t.accent : t.surface2, color: selectedBrands.length === 0 ? '#000' : t.text, border: `1px solid ${selectedBrands.length === 0 ? t.accent : t.border}`, borderRadius: 20, padding: '5px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>All</button>
-                  )
+              {/* ── Search bar ── */}
+              <div style={{ position: 'relative', marginBottom: 10 }}>
+                <span style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', color: t.muted, fontSize: 15, pointerEvents: 'none' }}>⌕</span>
+                <input value={psSearch} onChange={e => setPsSearch(e.target.value)} placeholder="ค้นหา product, brand, barcode..." style={{ width: '100%', background: t.surface, border: `1px solid ${t.border}`, borderRadius: 10, color: t.text, padding: '9px 36px 9px 38px', fontSize: 13, outline: 'none', boxShadow: dark ? 'none' : '0 1px 4px rgba(0,0,0,0.06)' }} />
+                {psSearch && <button onClick={() => setPsSearch('')} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: t.muted, cursor: 'pointer', fontSize: 18, lineHeight: 1 }}>×</button>}
+              </div>
+              {/* ── Brand pills ── */}
+              <div style={{ display: 'flex', gap: 7, marginBottom: 10, flexWrap: isMobile ? 'nowrap' : 'wrap', alignItems: 'center', overflowX: isMobile ? 'auto' : 'visible', paddingBottom: isMobile ? 4 : 0 }}>
+                <span style={{ fontSize: 12, color: t.muted, fontWeight: 600, flexShrink: 0 }}>Brand:</span>
+                <button key="ALL" className="bpill" onClick={() => setSelectedBrands([])} style={{ background: selectedBrands.length === 0 ? t.accent : t.surface2, color: selectedBrands.length === 0 ? '#000' : t.text, border: `1px solid ${selectedBrands.length === 0 ? t.accent : t.border}`, borderRadius: 20, padding: '5px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>All</button>
+                {VENDOR_BRANDS.ALL.map(b => {
                   const sel = selectedBrands.includes(b)
                   return <button key={b} className="bpill" onClick={() => toggleBrand(b)} style={{ background: sel ? t.accent : t.surface2, color: sel ? '#000' : t.text, border: `1px solid ${sel ? t.accent : t.border}`, borderRadius: 20, padding: '5px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{b}</button>
                 })}
               </div>
-              {/* Grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 12 }}>
-                {(selectedBrands.length > 0 ? rawData.filter(p => selectedBrands.includes(p.brand)) : rawData).map((p, i) => (
+              {/* ── Legend + count bar ── */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 14, padding: '8px 14px', background: t.surface, border: `1px solid ${t.border}`, borderRadius: 10, flexWrap: 'wrap' }}>
+                {[
+                  { label: 'Active', color: t.green },
+                  { label: 'Pending', color: t.yellow },
+                  { label: 'Discontinued', color: t.red },
+                ].map(({ label, color }) => (
+                  <span key={label} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: t.muted, fontWeight: 600 }}>
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, display: 'inline-block', flexShrink: 0 }} />{label}
+                  </span>
+                ))}
+                <span style={{ marginLeft: 'auto', fontSize: 12, color: t.muted }}>
+                  Showing <strong style={{ color: t.text, fontWeight: 700 }}>{psFiltered.length}</strong> of {rawData.length} products
+                </span>
+              </div>
+              {/* ── Grid ── */}
+              <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill, minmax(${isMobile ? '130px' : '160px'}, 1fr))`, gap: isMobile ? 10 : 12 }}>
+                {psFiltered.map((p, i) => (
                   <div key={p.barcode + i} onClick={() => setSelectedProduct(p)} style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 12, overflow: 'hidden', cursor: 'pointer', transition: 'transform 0.18s, box-shadow 0.18s' }}
                     onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-5px) scale(1.02)'; e.currentTarget.style.boxShadow = `0 16px 40px rgba(0,0,0,0.28), 0 0 0 2px ${t.accent}66` }}
                     onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '' }}
@@ -899,6 +1052,12 @@ export default function App() {
                   </div>
                 ))}
               </div>
+              {psFiltered.length === 0 && (
+                <div style={{ textAlign: 'center', padding: '60px 0', color: t.muted }}>
+                  <div style={{ fontSize: 32, marginBottom: 10 }}>🔍</div>
+                  <div style={{ fontWeight: 600 }}>ไม่พบสินค้าที่ตรงกับ filter</div>
+                </div>
+              )}
             </>
           )}
 
@@ -930,6 +1089,7 @@ export default function App() {
           onClose={() => setSelectedProduct(null)}
           t={t}
           dark={dark}
+          isMobile={isMobile}
         />
       )}
     </div>
