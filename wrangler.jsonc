@@ -1,5 +1,5 @@
 {
-  "name": "vcan-product-masterdashboard",
+  "name": "vcanproductmasterdashboard",
   "compatibility_date": "2024-12-01",
   "assets": {
     "directory": "./dist",
