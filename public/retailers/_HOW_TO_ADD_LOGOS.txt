@@ -1,0 +1,20 @@
+Drop retailer logo image files into THIS folder (public/retailers/) using these
+EXACT file names. PNG with transparent background looks best; .jpg/.webp also work
+if you change the extension in RETAILER_LOGOS (src/App.jsx). Until a file exists,
+the dashboard shows the text label instead — nothing breaks.
+
+  tops.png         -> Tops
+  villa.png        -> Villa Market
+  the-mall.png     -> The Mall
+  lotus.png        -> Lotus's
+  homepro.png      -> HomePro
+  bigc.png         -> Big C
+  twd.png          -> TWD   (red "n" / NocNoc logo if that's the one)
+  boots.png        -> Boots
+  foodland.png     -> Foodland
+  central.png      -> Central
+  petnme.png       -> Pet'n me
+  fuji.png         -> UFM Fuji Super
+
+Recommended: square-ish or wordmark logos, ~200px tall, trimmed of extra whitespace.
+After adding files, just refresh the page (no rebuild needed in dev).

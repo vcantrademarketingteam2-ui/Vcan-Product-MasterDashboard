@@ -15,6 +15,48 @@ const RETAILER_SHORT = {
   'Homepro': 'HOMEPRO', 'Big C': 'BIG C', 'TWD': 'TWD', 'Boots': 'BOOTS',
   'Foodland': 'FOODLAND', 'Central Department': 'CENTRAL', "Pet'n me": "PET'N ME", 'Fuji': 'FUJI'
 }
+// Drop logo files into public/retailers/ with these exact names to replace the text labels.
+const RETAILER_LOGOS = {
+  'Tops': '/retailers/tops.jpg',
+  'Villa': '/retailers/villa.png',
+  'The Mall': '/retailers/the-mall.png',
+  'Lotus': '/retailers/lotus.png',
+  'Homepro': '/retailers/homepro.png',
+  'Big C': '/retailers/bigc.png',
+  'TWD': '/retailers/twd.png',
+  'Boots': '/retailers/boots.png',
+  'Foodland': '/retailers/foodland.png',
+  'Central Department': '/retailers/central.jpg',
+  "Pet'n me": '/retailers/petnme.jpg',
+  'Fuji': '/retailers/fuji.png',
+}
+
+// Wide wordmark logos (ratio ≫ 1) get a bigger width budget so they aren't capped
+// down to a tiny height. Multiplies maxW only — rendered height stays uniform.
+const RETAILER_LOGO_SCALE = {
+  'Central Department': 2.4, // "CENTRAL RETAIL" wordmark, ~4:1
+  "Pet'n me": 1.9,           // ~3.75:1
+}
+
+// Renders a retailer's logo on a white chip (so dark/transparent logos never blend
+// into the row), falling back to the short text label if the image is missing.
+function RetailerLogo({ name, h = 28, maxW = 76, fallbackStyle = {} }) {
+  const [err, setErr] = useState(false)
+  const src = RETAILER_LOGOS[name]
+  if (err || !src) return <span style={{ whiteSpace: 'nowrap', ...fallbackStyle }}>{RETAILER_SHORT[name] || name}</span>
+  const mw = maxW * (RETAILER_LOGO_SCALE[name] || 1)
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: '#fff', borderRadius: 4, padding: '1px 2px', lineHeight: 0, boxShadow: '0 0 0 1px rgba(0,0,0,0.06)' }}>
+      <img
+        src={src}
+        alt={RETAILER_SHORT[name] || name}
+        title={name}
+        onError={() => setErr(true)}
+        style={{ height: h, width: 'auto', maxWidth: mw, objectFit: 'contain', display: 'block' }}
+      />
+    </span>
+  )
+}
 
 function parseCSVToRows(text) {
   // Parses the full CSV text at once, correctly handling multi-line quoted fields
@@ -207,25 +249,31 @@ function ProductPopup({ product, onClose, t, dark, isMobile = false, pricing = {
     </div>
   )
 
-  const pricingBlock = (cols) => Object.keys(pricing).length > 0 ? (
+  const pricingBlock = () => Object.keys(pricing).length > 0 ? (
     <div>
       <div style={{ fontSize: 11, color: t.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8 }}>Retailer Pricing</div>
-      <div style={{ display: 'grid', gridTemplateColumns: cols, gap: 5 }}>
-        {RETAILERS.filter(r => pricing[r]).map(r => {
-          const d = pricing[r]
-          const gpPct = d.gp != null ? Math.round(d.gp * 100) + '%' : null
-          const gpColor = d.gp >= 0.30 ? t.green : d.gp >= 0.20 ? t.yellow : t.red
-          return (
-            <div key={r} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', borderRadius: 8, background: t.surface2, border: `1px solid ${t.border}`, gap: 8 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: t.text, whiteSpace: 'nowrap' }}>{r}</span>
-              <span style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
-                {d.costUnit != null && <span style={{ fontSize: 11, color: t.muted }}>฿{d.costUnit.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>}
-                {gpPct && <span style={{ fontSize: 11, fontWeight: 700, color: gpColor }}>{gpPct}</span>}
-              </span>
-            </div>
-          )
-        })}
-      </div>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5 }}>
+        <thead>
+          <tr style={{ borderBottom: `1px solid ${t.border}` }}>
+            <th style={{ textAlign: 'left', padding: '4px 8px', color: t.muted, fontWeight: 700, fontSize: 9.5, textTransform: 'uppercase', letterSpacing: 0.5 }}>Retailer</th>
+            <th style={{ textAlign: 'right', padding: '4px 8px', color: t.muted, fontWeight: 700, fontSize: 9.5, textTransform: 'uppercase', letterSpacing: 0.5 }}>Cost/Unit</th>
+            <th style={{ textAlign: 'right', padding: '4px 8px', color: t.muted, fontWeight: 700, fontSize: 9.5, textTransform: 'uppercase', letterSpacing: 0.5 }}>GP</th>
+          </tr>
+        </thead>
+        <tbody>
+          {RETAILERS.filter(r => pricing[r]).map(r => {
+            const d = pricing[r]
+            const gpColor = d.gp >= 0.30 ? t.green : d.gp >= 0.20 ? t.yellow : t.red
+            return (
+              <tr key={r} style={{ borderBottom: `1px solid ${t.dim}` }}>
+                <td style={{ padding: '5px 8px', fontWeight: 700, color: t.text, whiteSpace: 'nowrap' }}>{r}</td>
+                <td style={{ padding: '5px 8px', textAlign: 'right', color: t.text, whiteSpace: 'nowrap' }}>{d.costUnit != null ? '฿' + d.costUnit.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}</td>
+                <td style={{ padding: '5px 8px', textAlign: 'right', fontWeight: 700, color: d.gp != null ? gpColor : t.muted }}>{d.gp != null ? Math.round(d.gp * 100) + '%' : '—'}</td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
     </div>
   ) : null
 
@@ -350,7 +398,7 @@ function ProductPopup({ product, onClose, t, dark, isMobile = false, pricing = {
               <div style={{ padding: '18px 24px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
                 {statsRow}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 22, alignItems: 'start' }}>
-                  {pricingBlock('1fr')}
+                  {pricingBlock()}
                   {coverageBlock('repeat(2, 1fr)')}
                 </div>
               </div>
@@ -360,7 +408,7 @@ function ProductPopup({ product, onClose, t, dark, isMobile = false, pricing = {
               {imagePanel(false)}
               <div style={{ flex: 1, minWidth: 0, padding: isMobile ? '16px' : '20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
                 {statsRow}
-                {pricingBlock(isMobile ? '1fr' : 'repeat(2, 1fr)')}
+                {pricingBlock()}
                 {coverageBlock('repeat(3, 1fr)')}
               </div>
             </div>
@@ -384,6 +432,7 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [selectedProduct, setSelectedProduct] = useState(null)
   const [psSearch, setPsSearch] = useState('')
+  const [psRetailer, setPsRetailer] = useState(null)
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [sortCol, setSortCol] = useState(null)
@@ -488,12 +537,17 @@ export default function App() {
     if (vendorFilter !== 'ALL' && p.company !== vendorFilter) return false
     if (selectedBrands.length > 0 && !selectedBrands.includes(p.brand.trim())) return false
     if (statusTab !== 'ALL' && p.status !== statusTab) return false
+    if (psRetailer) {
+      // "listed at this customer" = has a relationship that isn't discontinued/empty
+      const v = p.retailers[psRetailer]
+      if (!v || v === 'ยกเลิกขาย') return false
+    }
     if (psSearch) {
       const q = psSearch.toLowerCase()
       return p.product.toLowerCase().includes(q) || p.brand.toLowerCase().includes(q) || p.barcode.includes(q)
     }
     return true
-  }), [rawData, vendorFilter, selectedBrands, statusTab, psSearch])
+  }), [rawData, vendorFilter, selectedBrands, statusTab, psSearch, psRetailer])
 
   // ── Market intelligence — actionable analytics (whitespace, GP, health, scorecard) ──
   const intel = useMemo(() => {
@@ -776,7 +830,7 @@ export default function App() {
             <div style={{ fontWeight: 800, fontSize: isMobile ? 14 : 17, color: t.text, letterSpacing: 0.2, whiteSpace: 'nowrap', flexShrink: 0 }}>
               Product Master
             </div>
-            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v2.2.0</span>
+            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v2.4.3</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: isMobile ? 11 : 13, background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, padding: isMobile ? '3px 8px' : '5px 12px', overflow: 'hidden', minWidth: 0, flexShrink: 1 }}>
               <span style={{ width: isMobile ? 6 : 7, height: isMobile ? 6 : 7, borderRadius: '50%', flexShrink: 0, background: dataSource === 'csv' ? t.blue : t.green }} />
               <span style={{ fontWeight: 800, color: dataSource === 'csv' ? t.blue : t.green, flexShrink: 0 }}>
@@ -933,11 +987,11 @@ export default function App() {
                           ))}
                           {RETAILERS.map(r => (
                             <th key={r} style={{
-                              padding: '12px 5px', textAlign: 'center', color: t.text,
+                              padding: '10px 5px', textAlign: 'center', color: t.text,
                               fontWeight: 700, fontSize: 10.5, whiteSpace: 'nowrap',
                               borderBottom: `2px solid ${t.border}`,
                               position: 'sticky', top: 0, background: t.surface2, zIndex: 1,
-                            }}>{RETAILER_SHORT[r]}</th>
+                            }}><RetailerLogo name={r} h={28} maxW={74} fallbackStyle={{ fontSize: 10.5 }} /></th>
                           ))}
                         </tr>
                       )}
@@ -1042,7 +1096,7 @@ export default function App() {
                     <thead>
                       <tr style={{ borderBottom: `2px solid ${t.border}` }}>
                         <th style={{ padding: '9px 12px', textAlign: 'left', color: t.muted, fontWeight: 700, fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5, position: 'sticky', left: 0, background: t.surface, zIndex: 1 }}>Brand</th>
-                        {RETAILERS.map(r => <th key={r} style={{ padding: '9px 4px', textAlign: 'center', color: t.muted, fontWeight: 700, fontSize: 9.5, whiteSpace: 'nowrap' }}>{RETAILER_SHORT[r]}</th>)}
+                        {RETAILERS.map(r => <th key={r} style={{ padding: '9px 4px', textAlign: 'center', color: t.muted, fontWeight: 700, fontSize: 9.5, whiteSpace: 'nowrap' }}><RetailerLogo name={r} h={24} maxW={60} fallbackStyle={{ fontSize: 9.5 }} /></th>)}
                         <th style={{ padding: '9px 10px', textAlign: 'center', color: t.muted, fontWeight: 700, fontSize: 11, textTransform: 'uppercase' }}>Cov.</th>
                       </tr>
                     </thead>
@@ -1095,8 +1149,8 @@ export default function App() {
                           {intel.coreRetailers.map(r => {
                             const inStore = g.present.includes(r)
                             return (
-                              <span key={r} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10.5, fontWeight: 700, padding: '3px 9px', borderRadius: 6, background: inStore ? `${t.green}1e` : 'transparent', color: inStore ? t.green : t.muted, border: `1px solid ${inStore ? t.green + '44' : t.border}`, opacity: inStore ? 1 : 0.85 }}>
-                                {inStore ? '✓' : '+'} {RETAILER_SHORT[r]}
+                              <span key={r} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 10.5, fontWeight: 700, padding: '3px 9px', borderRadius: 6, background: inStore ? `${t.green}1e` : 'transparent', color: inStore ? t.green : t.muted, border: `1px solid ${inStore ? t.green + '44' : t.border}`, opacity: inStore ? 1 : 0.85 }}>
+                                <span>{inStore ? '✓' : '+'}</span><RetailerLogo name={r} h={20} maxW={56} fallbackStyle={{ fontSize: 10.5 }} />
                               </span>
                             )
                           })}
@@ -1126,7 +1180,10 @@ export default function App() {
                         return (
                           <tr key={r.name} className="rhover" style={{ borderBottom: `1px solid ${t.dim}` }}>
                             <td style={{ padding: '9px 10px', fontWeight: 700, color: t.text, whiteSpace: 'nowrap' }}>
-                              {r.name}{isCore && <span style={{ marginLeft: 6, fontSize: 9, fontWeight: 700, color: t.accent, border: `1px solid ${t.accent}66`, borderRadius: 4, padding: '1px 5px' }}>CORE</span>}
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+                                <RetailerLogo name={r.name} h={30} maxW={88} fallbackStyle={{ fontWeight: 700, color: t.text }} />
+                                {isCore && <span style={{ fontSize: 9, fontWeight: 700, color: t.accent, border: `1px solid ${t.accent}66`, borderRadius: 4, padding: '1px 5px' }}>CORE</span>}
+                              </span>
                             </td>
                             <td style={{ padding: '9px 10px' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -1159,8 +1216,21 @@ export default function App() {
                 <input value={psSearch} onChange={e => setPsSearch(e.target.value)} placeholder="ค้นหา product, brand, barcode..." style={{ width: '100%', background: t.surface, border: `1px solid ${t.border}`, borderRadius: 10, color: t.text, padding: '9px 36px 9px 38px', fontSize: 13, outline: 'none', boxShadow: dark ? 'none' : '0 1px 4px rgba(0,0,0,0.06)' }} />
                 {psSearch && <button onClick={() => setPsSearch('')} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: t.muted, cursor: 'pointer', fontSize: 18, lineHeight: 1 }}>×</button>}
               </div>
-              {/* ── Brand pills ── */}
+              {/* ── Customer (retailer) pills — logos (above brand) ── */}
               <div style={{ display: 'flex', gap: 7, marginBottom: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+                <span style={{ fontSize: 12, color: t.muted, fontWeight: 600, flexShrink: 0 }}>Customer:</span>
+                <button onClick={() => setPsRetailer(null)} style={{ background: psRetailer === null ? t.accent : t.surface2, color: psRetailer === null ? '#000' : t.text, border: `1.5px solid ${psRetailer === null ? t.accent : t.border}`, borderRadius: 20, padding: '6px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>All</button>
+                {RETAILERS.map(r => {
+                  const sel = psRetailer === r
+                  return (
+                    <button key={r} onClick={() => setPsRetailer(sel ? null : r)} title={r} style={{ display: 'inline-flex', alignItems: 'center', background: t.surface2, border: `2px solid ${sel ? t.accent : t.border}`, borderRadius: 10, padding: '4px 7px', cursor: 'pointer', boxShadow: sel ? `0 0 0 3px ${t.accent}33` : 'none' }}>
+                      <RetailerLogo name={r} h={22} maxW={58} fallbackStyle={{ fontSize: 11, fontWeight: 700, color: t.text }} />
+                    </button>
+                  )
+                })}
+              </div>
+              {/* ── Brand pills ── */}
+              <div style={{ display: 'flex', gap: 7, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
                 <span style={{ fontSize: 12, color: t.muted, fontWeight: 600, flexShrink: 0 }}>Brand:</span>
                 <button key="ALL" className="bpill" onClick={() => setSelectedBrands([])} style={{ background: selectedBrands.length === 0 ? t.accent : t.surface2, color: selectedBrands.length === 0 ? '#000' : t.text, border: `1px solid ${selectedBrands.length === 0 ? t.accent : t.border}`, borderRadius: 20, padding: '5px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>All</button>
                 {VENDOR_BRANDS.ALL.map(b => {
