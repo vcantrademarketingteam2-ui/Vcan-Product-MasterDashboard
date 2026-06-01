@@ -23,8 +23,8 @@ Get-ChildItem $src -Recurse -File | Where-Object { $exts -contains $_.Extension.
     $name = $_.BaseName   # filename without extension
     $ext  = $_.Extension.ToLower()
 
-    # Pattern 1: "{barcode} Front" or "{barcode} Back" (with space)
-    if ($name -match '^(\d{8,})\s+(Front|Back)$') {
+    # Pattern 1: "{barcode} Front", "{barcode} Back", "{barcode} (Front)", "{barcode} (Back)"
+    if ($name -match '^(\d{8,})\s+\(?(Front|Back)\)?$') {
         $barcode = $Matches[1]
         $side    = $Matches[2].ToLower()
     }

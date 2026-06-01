@@ -1,8 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import fallbackData from './data.js'
+import retailerData from './retailer_data.js'
 import vcanLogo from './VCAN.png'
-
-const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQtX4UZ3RyNrtCyyMv9ToJZAI0oiKxl02COO0C0ozo-1c-03EXiyeVaTJpZHqjdWLflM7ZEBDTsZjpx/pub?gid=1166843080&single=true&output=csv"
 
 const RETAILERS = ['Tops', 'Villa', 'The Mall', 'Lotus', 'Homepro', 'Big C', 'TWD', 'Boots', 'Foodland', 'Central Department', "Pet'n me", 'Fuji']
 const RETAILER_SHORT = {
@@ -63,6 +62,8 @@ function parseCSV(text) {
       barcode = c2; product = row[4] || ''; packSize = row[5] || ''
       rsp = (row[6] || '').replace(/[^\d.]/g, ''); status = row[7] || ''; retailerOffset = 8
     } else continue
+    // Google Sheets strips leading zeros from numeric UPC-A barcodes (12-digit → 11-digit)
+    if (barcode.length === 11) barcode = '0' + barcode
     if (!barcode || !product || product.trim().toLowerCase() === 'total') continue
     if (!isBarcode(barcode)) continue
     const retailerStatus = {}
@@ -98,7 +99,7 @@ function PackshotImg({ barcode, side = 'front', style = {}, placeholderSize = 40
 }
 
 // ── ProductPopup ────────────────────────────────────────────────────────────
-function ProductPopup({ product, onClose, t, dark, isMobile = false }) {
+function ProductPopup({ product, onClose, t, dark, isMobile = false, pricing = {} }) {
   const [side, setSide] = useState('front')
   const [loadedSrc, setLoadedSrc] = useState(null)
   const [zoomed, setZoomed] = useState(false)
@@ -275,6 +276,29 @@ function ProductPopup({ product, onClose, t, dark, isMobile = false }) {
                   </div>
                 ))}
               </div>
+              {/* Retailer Pricing — Cost/Unit & GP% from xlsx */}
+              {Object.keys(pricing).length > 0 && (
+                <div>
+                  <div style={{ fontSize: 11, color: t.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8 }}>Retailer Pricing</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)', gap: 5 }}>
+                    {RETAILERS.filter(r => pricing[r]).map(r => {
+                      const d = pricing[r]
+                      const gpPct = d.gp != null ? Math.round(d.gp * 100) + '%' : null
+                      const gpColor = d.gp >= 0.30 ? t.green : d.gp >= 0.20 ? t.yellow : t.red
+                      return (
+                        <div key={r} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', borderRadius: 8, background: t.surface2, border: `1px solid ${t.border}`, gap: 8 }}>
+                          <span style={{ fontSize: 11, fontWeight: 700, color: t.text, whiteSpace: 'nowrap' }}>{r}</span>
+                          <span style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
+                            {d.costUnit != null && <span style={{ fontSize: 11, color: t.muted }}>฿{d.costUnit.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>}
+                            {gpPct && <span style={{ fontSize: 11, fontWeight: 700, color: gpColor }}>{gpPct}</span>}
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
               {/* Retailer coverage */}
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, flexWrap: 'wrap', gap: 6 }}>
@@ -319,9 +343,8 @@ function ProductPopup({ product, onClose, t, dark, isMobile = false }) {
 
 export default function App() {
   const [rawData, setRawData] = useState(fallbackData)
-  const [loading, setLoading] = useState(true)
   const [lastUpdated, setLastUpdated] = useState(null)
-  const [dataSource, setDataSource] = useState('local')
+  const [dataSource, setDataSource] = useState('xlsx')
   const [dark, setDark] = useState(true)
   const [tab, setTab] = useState('products')
   const [vendorFilter, setVendorFilter] = useState('ALL')
@@ -333,6 +356,8 @@ export default function App() {
   const [psSearch, setPsSearch] = useState('')
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const [sortCol, setSortCol] = useState(null)
+  const [sortDir, setSortDir] = useState('asc')
 
   useEffect(() => {
     const onResize = () => {
@@ -349,29 +374,6 @@ export default function App() {
     return dt.toLocaleDateString('th-TH', { dateStyle: 'short' }) + '  ' + dt.toLocaleTimeString('th-TH', { timeStyle: 'short' })
   }
 
-  useEffect(() => {
-    const fetchSheets = async () => {
-      try {
-        setLoading(true)
-        const res = await fetch(SHEET_URL)
-        if (!res.ok) throw new Error('Failed to fetch')
-        const lastMod = res.headers.get('Last-Modified') || res.headers.get('Date')
-        const text = await res.text()
-        const parsed = parseCSV(text)
-        if (parsed.length > 0) {
-          setRawData(parsed)
-          setDataSource('sheets')
-          setLastUpdated(fmtTs(lastMod || Date.now()))
-        }
-      } catch (e) {
-        setDataSource('local')
-        setLastUpdated(fmtTs(Date.now()))
-      } finally {
-        setLoading(false)
-      }
-    }
-    fetchSheets()
-  }, [])
 
   const handleImportCSV = (e) => {
     const file = e.target.files[0]
@@ -415,7 +417,13 @@ export default function App() {
   const visibleBrands = VENDOR_BRANDS[vendorFilter] || VENDOR_BRANDS.ALL
   const handleVendorChange = (v) => { setVendorFilter(v); setSelectedBrands([]) }
   const toggleBrand = (b) => setSelectedBrands(prev => prev.includes(b) ? prev.filter(x => x !== b) : [...prev, b])
-  const clearAll = () => { setSearch(''); setSelectedBrands([]); setStatusTab('ALL'); setVendorFilter('ALL') }
+  const clearAll = () => { setSearch(''); setSelectedBrands([]); setStatusTab('ALL'); setVendorFilter('ALL'); setSortCol(null); setSortDir('asc') }
+  const handleSort = (col) => {
+    if (sortCol === col) {
+      if (sortDir === 'asc') setSortDir('desc')
+      else { setSortCol(null); setSortDir('asc') }
+    } else { setSortCol(col); setSortDir('asc') }
+  }
   const hasActiveFilters = search || selectedBrands.length > 0 || statusTab !== 'ALL' || vendorFilter !== 'ALL'
 
   const stats = useMemo(() => ({
@@ -435,6 +443,22 @@ export default function App() {
     }
     return true
   }), [rawData, vendorFilter, selectedBrands, statusTab, search])
+
+  const sortedFiltered = useMemo(() => {
+    if (!sortCol) return filtered
+    const STATUS_ORDER = { 'ขาย': 0, 'รอขาย': 1, 'ยกเลิกขาย': 2 }
+    return [...filtered].sort((a, b) => {
+      let cmp = 0
+      if (sortCol === 'barcode') cmp = Number(a.barcode) - Number(b.barcode)
+      else if (sortCol === 'rsp') cmp = (a.rsp || 0) - (b.rsp || 0)
+      else if (sortCol === 'status') cmp = (STATUS_ORDER[a.status] ?? 3) - (STATUS_ORDER[b.status] ?? 3)
+      else if (sortCol === 'vendor') cmp = a.company.localeCompare(b.company)
+      else if (sortCol === 'brand') cmp = a.brand.localeCompare(b.brand, undefined, { sensitivity: 'base' })
+      else if (sortCol === 'product') cmp = a.product.localeCompare(b.product, undefined, { sensitivity: 'base' })
+      else if (sortCol === 'pack') cmp = (a.packSize || '').localeCompare(b.packSize || '', undefined, { numeric: true })
+      return sortDir === 'asc' ? cmp : -cmp
+    })
+  }, [filtered, sortCol, sortDir])
 
   const psFiltered = useMemo(() => rawData.filter(p => {
     if (vendorFilter !== 'ALL' && p.company !== vendorFilter) return false
@@ -513,17 +537,20 @@ export default function App() {
 
   const SIDEBAR_W = isMobile ? 0 : (sidebarOpen ? 244 : 164)
 
-  if (loading) return (
-    <div style={{ minHeight: '100vh', background: '#0d1117', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
-      <img src={vcanLogo} alt="VCAN" style={{ height: 52, objectFit: 'contain', display: 'block' }} />
-      <div style={{ color: '#7d8590', fontSize: 13 }}>กำลังดึงข้อมูลจาก Google Sheets...</div>
-      <div style={{ display: 'flex', gap: 6 }}>
-        {[0, 1, 2].map(i => (
-          <div key={i} style={{ width: 7, height: 7, borderRadius: '50%', background: '#f0c040', animation: `bounce 1s ease-in-out ${i * 0.2}s infinite` }} />
-        ))}
-      </div>
-      <style>{`@keyframes bounce{0%,100%{opacity:0.2;transform:scale(0.8)}50%{opacity:1;transform:scale(1.2)}}`}</style>
-    </div>
+  const TABLE_COLS = [
+    { label: 'No.', key: null,       align: 'center', w: 44 },
+    { label: 'Vendor', key: 'vendor', align: 'center', w: 64 },
+    { label: 'Brand',  key: 'brand',  align: 'left' },
+    { label: 'Barcode', key: 'barcode', align: 'left' },
+    { label: 'Product Name', key: 'product', align: 'left' },
+    { label: 'Pack',   key: 'pack',   align: 'center', w: 52 },
+    { label: 'RSP',    key: 'rsp',    align: 'center', w: 72 },
+    { label: 'Status', key: 'status', align: 'center', w: 84 },
+  ]
+  const SortIcon = ({ col }) => (
+    <span style={{ fontSize: 9, marginLeft: 3, opacity: sortCol === col ? 1 : 0.3, color: sortCol === col ? t.accent : 'inherit' }}>
+      {sortCol === col ? (sortDir === 'asc' ? '▲' : '▼') : '⇅'}
+    </span>
   )
 
   return (
@@ -673,23 +700,25 @@ export default function App() {
               <span style={{ display: 'block', width: 16, height: 1.5, background: t.muted, borderRadius: 2 }} />
             </button>
           )}
-          {/* Title + timestamp inline */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 6 : 10, minWidth: 0 }}>
-            <div style={{ fontWeight: 800, fontSize: isMobile ? 14 : 17, color: t.text, letterSpacing: 0.2, whiteSpace: 'nowrap' }}>
-              {isMobile ? 'Product Master' : <>Product Master&nbsp;&nbsp;<span style={{ color: t.accent, fontSize: 14 }}>v2.1.2</span></>}
+          {/* Title + version + timestamp — shown on both mobile and desktop */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, minWidth: 0, overflow: 'hidden' }}>
+            <div style={{ fontWeight: 800, fontSize: isMobile ? 14 : 17, color: t.text, letterSpacing: 0.2, whiteSpace: 'nowrap', flexShrink: 0 }}>
+              Product Master
             </div>
-            {!isMobile && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, padding: '5px 12px', whiteSpace: 'nowrap' }}>
-                <span style={{ width: 7, height: 7, borderRadius: '50%', flexShrink: 0, background: dataSource === 'sheets' ? t.green : dataSource === 'csv' ? t.blue : t.yellow }} />
-                <span style={{ fontWeight: 800, color: dataSource === 'sheets' ? t.green : dataSource === 'csv' ? t.blue : t.yellow }}>{dataSource === 'sheets' ? 'Live' : dataSource === 'csv' ? 'CSV' : 'Local'}</span>
-                {lastUpdated && <span style={{ color: t.text, fontWeight: 500 }}>&nbsp;·&nbsp;{lastUpdated}</span>}
-              </div>
-            )}
-            {isMobile && (
-              <span style={{ width: 7, height: 7, borderRadius: '50%', flexShrink: 0, background: dataSource === 'sheets' ? t.green : dataSource === 'csv' ? t.blue : t.yellow }} />
-            )}
+            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v2.1.3</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: isMobile ? 11 : 13, background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, padding: isMobile ? '3px 8px' : '5px 12px', overflow: 'hidden', minWidth: 0, flexShrink: 1 }}>
+              <span style={{ width: isMobile ? 6 : 7, height: isMobile ? 6 : 7, borderRadius: '50%', flexShrink: 0, background: dataSource === 'csv' ? t.blue : t.green }} />
+              <span style={{ fontWeight: 800, color: dataSource === 'csv' ? t.blue : t.green, flexShrink: 0 }}>
+                {dataSource === 'csv' ? 'CSV' : 'XLSX'}
+              </span>
+              {lastUpdated && (
+                <span style={{ color: t.text, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  &nbsp;·&nbsp;{isMobile ? lastUpdated.split('  ')[0] : lastUpdated}
+                </span>
+              )}
+            </div>
           </div>
-          <div style={{ marginLeft: 'auto', display: 'flex', gap: isMobile ? 6 : 8, alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: isMobile ? 6 : 8, alignItems: 'center', flexShrink: 0 }}>
             {/* Dark mode */}
             <button onClick={() => setDark(d => !d)} className="sb-btn" style={{
               background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8,
@@ -761,9 +790,8 @@ export default function App() {
                   background: t.surface, border: `1px solid ${t.border}`,
                   borderRadius: 12, padding: '10px 14px',
                   boxShadow: dark ? 'none' : '0 1px 4px rgba(0,0,0,0.06)',
-                  overflowX: isMobile ? 'auto' : 'visible',
                 }}>
-                  <div style={{ display: 'flex', gap: 7, flexWrap: isMobile ? 'nowrap' : 'wrap', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', alignItems: 'center' }}>
                     {visibleBrands.map(b => {
                       const sel = selectedBrands.includes(b)
                       return (
@@ -784,60 +812,86 @@ export default function App() {
               {/* Table */}
               <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 12, overflow: 'hidden' }}>
                 {/* Table info bar */}
-                <div style={{ padding: '13px 18px', borderBottom: `1px solid ${t.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: t.surface }}>
+                <div style={{ padding: '10px 18px', borderBottom: `1px solid ${t.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: t.surface, flexWrap: 'wrap', gap: 8 }}>
                   <span style={{ fontSize: 13, color: t.muted, fontWeight: 500 }}>
                     Showing <strong style={{ color: t.text, fontWeight: 700 }}>{filtered.length}</strong> of {rawData.length} products
+                    {isMobile && <span style={{ color: t.muted, fontSize: 11 }}> · แตะแถวเพื่อดูรายละเอียด</span>}
                   </span>
-                  <div style={{ display: 'flex', gap: 16, fontSize: 13, color: t.muted, alignItems: 'center', fontWeight: 600 }}>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                      <span style={{ width: 9, height: 9, borderRadius: '50%', background: t.green, display: 'inline-block' }} />Active
-                    </span>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                      <span style={{ display: 'inline-block', width: 9, height: 9, borderRadius: '50%', background: `linear-gradient(to left,${t.yellow} 50%,transparent 50%)`, border: `1.5px solid ${t.yellow}` }} />Pending
-                    </span>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                      <span style={{ display: 'inline-block', width: 9, height: 9, borderRadius: '50%', background: `linear-gradient(to left,${t.blue} 50%,transparent 50%)`, border: `1.5px solid ${t.blue}` }} />On Process
-                    </span>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                      <span style={{ width: 9, height: 9, borderRadius: '50%', background: t.red, display: 'inline-block' }} />Discon
-                    </span>
-                  </div>
+                  {!isMobile && (
+                    <div style={{ display: 'flex', gap: 16, fontSize: 13, color: t.muted, alignItems: 'center', fontWeight: 600 }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                        <span style={{ width: 9, height: 9, borderRadius: '50%', background: t.green, display: 'inline-block' }} />Active
+                      </span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                        <span style={{ display: 'inline-block', width: 9, height: 9, borderRadius: '50%', background: `linear-gradient(to left,${t.yellow} 50%,transparent 50%)`, border: `1.5px solid ${t.yellow}` }} />Pending
+                      </span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                        <span style={{ display: 'inline-block', width: 9, height: 9, borderRadius: '50%', background: `linear-gradient(to left,${t.blue} 50%,transparent 50%)`, border: `1.5px solid ${t.blue}` }} />On Process
+                      </span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                        <span style={{ width: 9, height: 9, borderRadius: '50%', background: t.red, display: 'inline-block' }} />Discon
+                      </span>
+                    </div>
+                  )}
                 </div>
                 {/* Scrollable table — thead frozen */}
                 <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: isMobile ? 'calc(100dvh - 260px)' : 'calc(100vh - 300px)' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                     <thead>
-                      <tr style={{ background: t.surface2, boxShadow: `0 2px 0 ${t.accent}` }}>
-                        {[
-                          { label: 'No.', align: 'center', w: 44 },
-                          { label: 'Vendor', align: 'center', w: 64 },
-                          { label: 'Brand', align: 'left' },
-                          { label: 'Barcode', align: 'left' },
-                          { label: 'Product Name', align: 'left' },
-                          { label: 'Pack', align: 'center', w: 52 },
-                          { label: 'RSP', align: 'center', w: 72 },
-                          { label: 'Status', align: 'center', w: 84 },
-                        ].map(({ label, align, w }) => (
-                          <th key={label} style={{
-                            padding: '12px 12px', textAlign: align, color: t.text,
-                            fontWeight: 700, fontSize: 12, letterSpacing: 0.5,
-                            textTransform: 'uppercase', borderBottom: `2px solid ${t.border}`,
-                            width: w, whiteSpace: 'nowrap',
-                            position: 'sticky', top: 0, background: t.surface2, zIndex: 1,
-                          }}>{label}</th>
-                        ))}
-                        {RETAILERS.map(r => (
-                          <th key={r} style={{
-                            padding: '12px 5px', textAlign: 'center', color: t.text,
-                            fontWeight: 700, fontSize: 10.5, whiteSpace: 'nowrap',
-                            borderBottom: `2px solid ${t.border}`,
-                            position: 'sticky', top: 0, background: t.surface2, zIndex: 1,
-                          }}>{RETAILER_SHORT[r]}</th>
-                        ))}
-                      </tr>
+                      {isMobile ? (
+                        <tr style={{ background: t.surface2, boxShadow: `0 2px 0 ${t.accent}` }}>
+                          <th style={{ padding: '10px 8px', textAlign: 'center', color: t.text, fontWeight: 700, fontSize: 11, textTransform: 'uppercase', borderBottom: `2px solid ${t.border}`, position: 'sticky', top: 0, background: t.surface2, zIndex: 1, width: 52 }}>#</th>
+                          <th onClick={() => handleSort('product')} style={{ padding: '10px 12px', textAlign: 'left', color: sortCol === 'product' ? t.accent : t.text, fontWeight: 700, fontSize: 11, textTransform: 'uppercase', borderBottom: `2px solid ${t.border}`, position: 'sticky', top: 0, background: t.surface2, zIndex: 1, cursor: 'pointer', userSelect: 'none' }}>
+                            Brand / Product <SortIcon col="product" />
+                          </th>
+                          <th onClick={() => handleSort('status')} style={{ padding: '10px 8px', textAlign: 'center', color: sortCol === 'status' ? t.accent : t.text, fontWeight: 700, fontSize: 11, textTransform: 'uppercase', borderBottom: `2px solid ${t.border}`, position: 'sticky', top: 0, background: t.surface2, zIndex: 1, width: 82, cursor: 'pointer', userSelect: 'none' }}>
+                            Status <SortIcon col="status" />
+                          </th>
+                        </tr>
+                      ) : (
+                        <tr style={{ background: t.surface2, boxShadow: `0 2px 0 ${t.accent}` }}>
+                          {TABLE_COLS.map(({ label, key, align, w }) => (
+                            <th key={label} onClick={() => key && handleSort(key)} style={{
+                              padding: '12px 12px', textAlign: align, color: sortCol === key && key ? t.accent : t.text,
+                              fontWeight: 700, fontSize: 12, letterSpacing: 0.5,
+                              textTransform: 'uppercase', borderBottom: `2px solid ${t.border}`,
+                              width: w, whiteSpace: 'nowrap',
+                              position: 'sticky', top: 0, background: t.surface2, zIndex: 1,
+                              cursor: key ? 'pointer' : 'default', userSelect: 'none',
+                            }}>{label}{key && <SortIcon col={key} />}</th>
+                          ))}
+                          {RETAILERS.map(r => (
+                            <th key={r} style={{
+                              padding: '12px 5px', textAlign: 'center', color: t.text,
+                              fontWeight: 700, fontSize: 10.5, whiteSpace: 'nowrap',
+                              borderBottom: `2px solid ${t.border}`,
+                              position: 'sticky', top: 0, background: t.surface2, zIndex: 1,
+                            }}>{RETAILER_SHORT[r]}</th>
+                          ))}
+                        </tr>
+                      )}
                     </thead>
                     <tbody>
-                      {filtered.map((p, i) => (
+                      {isMobile ? sortedFiltered.map((p, i) => (
+                        <tr key={p.barcode + i} className="rhover" onClick={() => setSelectedProduct(p)} style={{ borderBottom: `1px solid ${t.dim}`, cursor: 'pointer' }}>
+                          <td style={{ padding: '10px 8px', textAlign: 'center', verticalAlign: 'middle' }}>
+                            <div style={{ fontSize: 11, color: t.muted, fontWeight: 500 }}>{i + 1}</div>
+                            <div style={{ fontSize: 10, fontWeight: 800, color: p.company === 'Vcan' ? t.vcanClr : t.moolaClr, marginTop: 2 }}>{p.company}</div>
+                          </td>
+                          <td style={{ padding: '10px 12px', verticalAlign: 'middle' }}>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: p.company === 'Vcan' ? t.vcanClr : t.moolaClr, marginBottom: 2 }}>{p.brand}</div>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: t.text, lineHeight: 1.35 }}>{p.product}</div>
+                            <div style={{ fontSize: 10, fontFamily: 'monospace', color: t.muted, marginTop: 2 }}>
+                              {p.barcode}{p.rsp ? ` · ฿${p.rsp}` : ''}
+                            </div>
+                          </td>
+                          <td style={{ padding: '10px 8px', textAlign: 'center', verticalAlign: 'middle' }}>
+                            <span style={{ fontSize: 11, padding: '3px 8px', borderRadius: 20, fontWeight: 700, whiteSpace: 'nowrap', background: p.status === 'ขาย' ? `${t.green}28` : p.status === 'รอขาย' ? `${t.yellow}28` : `${t.red}28`, color: p.status === 'ขาย' ? t.green : p.status === 'รอขาย' ? t.yellow : t.red, border: `1px solid ${p.status === 'ขาย' ? t.green : p.status === 'รอขาย' ? t.yellow : t.red}44` }}>
+                              {p.status === 'ขาย' ? 'Active' : p.status === 'รอขาย' ? 'Pending' : 'Discon'}
+                            </span>
+                          </td>
+                        </tr>
+                      )) : sortedFiltered.map((p, i) => (
                         <tr key={p.barcode + i} className="rhover" onClick={() => setSelectedProduct(p)} style={{ borderBottom: `1px solid ${t.dim}`, cursor: 'pointer' }}>
                           <td style={{ padding: '9px 12px', color: t.muted, fontSize: 12, textAlign: 'center', fontWeight: 500 }}>{i + 1}</td>
                           <td style={{ padding: '9px 8px', textAlign: 'center', whiteSpace: 'nowrap' }}>
@@ -853,12 +907,7 @@ export default function App() {
                             {p.rsp ? <span style={{ color: t.text, fontSize: 13 }}>฿{p.rsp}</span> : <span style={{ color: t.dim }}>—</span>}
                           </td>
                           <td style={{ padding: '9px 8px', textAlign: 'center' }}>
-                            <span style={{
-                              fontSize: 11.5, padding: '3px 10px', borderRadius: 20, fontWeight: 700,
-                              background: p.status === 'ขาย' ? `${t.green}28` : p.status === 'รอขาย' ? `${t.yellow}28` : `${t.red}28`,
-                              color: p.status === 'ขาย' ? t.green : p.status === 'รอขาย' ? t.yellow : t.red,
-                              border: `1px solid ${p.status === 'ขาย' ? t.green : p.status === 'รอขาย' ? t.yellow : t.red}44`,
-                            }}>
+                            <span style={{ fontSize: 11.5, padding: '3px 10px', borderRadius: 20, fontWeight: 700, background: p.status === 'ขาย' ? `${t.green}28` : p.status === 'รอขาย' ? `${t.yellow}28` : `${t.red}28`, color: p.status === 'ขาย' ? t.green : p.status === 'รอขาย' ? t.yellow : t.red, border: `1px solid ${p.status === 'ขาย' ? t.green : p.status === 'รอขาย' ? t.yellow : t.red}44` }}>
                               {p.status === 'ขาย' ? 'Active' : p.status === 'รอขาย' ? 'Pending' : 'Discon'}
                             </span>
                           </td>
@@ -871,7 +920,7 @@ export default function App() {
                       ))}
                       {filtered.length === 0 && (
                         <tr>
-                          <td colSpan={8 + RETAILERS.length} style={{ padding: 56, textAlign: 'center', color: t.muted }}>
+                          <td colSpan={isMobile ? 3 : 8 + RETAILERS.length} style={{ padding: 56, textAlign: 'center', color: t.muted }}>
                             <div style={{ fontSize: 32, marginBottom: 10 }}>🔍</div>
                             <div style={{ fontWeight: 600 }}>ไม่พบสินค้าที่ตรงกับ filter</div>
                           </td>
@@ -1010,7 +1059,7 @@ export default function App() {
                 {psSearch && <button onClick={() => setPsSearch('')} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: t.muted, cursor: 'pointer', fontSize: 18, lineHeight: 1 }}>×</button>}
               </div>
               {/* ── Brand pills ── */}
-              <div style={{ display: 'flex', gap: 7, marginBottom: 10, flexWrap: isMobile ? 'nowrap' : 'wrap', alignItems: 'center', overflowX: isMobile ? 'auto' : 'visible', paddingBottom: isMobile ? 4 : 0 }}>
+              <div style={{ display: 'flex', gap: 7, marginBottom: 10, flexWrap: 'wrap', alignItems: 'center' }}>
                 <span style={{ fontSize: 12, color: t.muted, fontWeight: 600, flexShrink: 0 }}>Brand:</span>
                 <button key="ALL" className="bpill" onClick={() => setSelectedBrands([])} style={{ background: selectedBrands.length === 0 ? t.accent : t.surface2, color: selectedBrands.length === 0 ? '#000' : t.text, border: `1px solid ${selectedBrands.length === 0 ? t.accent : t.border}`, borderRadius: 20, padding: '5px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>All</button>
                 {VENDOR_BRANDS.ALL.map(b => {
@@ -1090,6 +1139,7 @@ export default function App() {
           t={t}
           dark={dark}
           isMobile={isMobile}
+          pricing={retailerData[selectedProduct.barcode] || {}}
         />
       )}
     </div>
