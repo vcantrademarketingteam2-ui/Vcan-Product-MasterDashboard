@@ -1,9 +1,15 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
-import fallbackData from './data.js'
+import fallbackData, { GENERATED_AT } from './data.js'
 import retailerData from './retailer_data.js'
 import vcanLogo from './VCAN.png'
 
 const RETAILERS = ['Tops', 'Villa', 'The Mall', 'Lotus', 'Homepro', 'Big C', 'TWD', 'Boots', 'Foodland', 'Central Department', "Pet'n me", 'Fuji']
+
+const fmtTs = (d) => {
+  const dt = new Date(d)
+  if (isNaN(dt)) return null
+  return dt.toLocaleDateString('th-TH', { dateStyle: 'short' }) + '  ' + dt.toLocaleTimeString('th-TH', { timeStyle: 'short' })
+}
 const RETAILER_SHORT = {
   'Tops': 'TOPS', 'Villa': 'VILLA', 'The Mall': 'THE MALL', 'Lotus': 'LOTUS',
   'Homepro': 'HOMEPRO', 'Big C': 'BIG C', 'TWD': 'TWD', 'Boots': 'BOOTS',
@@ -99,7 +105,7 @@ function PackshotImg({ barcode, side = 'front', style = {}, placeholderSize = 40
 }
 
 // ── ProductPopup ────────────────────────────────────────────────────────────
-function ProductPopup({ product, onClose, t, dark, isMobile = false, pricing = {} }) {
+function ProductPopup({ product, onClose, t, dark, isMobile = false, pricing = {}, variant = 'products' }) {
   const [side, setSide] = useState('front')
   const [loadedSrc, setLoadedSrc] = useState(null)
   const [zoomed, setZoomed] = useState(false)
@@ -156,6 +162,111 @@ function ProductPopup({ product, onClose, t, dark, isMobile = false, pricing = {
       <path d="M1 12h12"/>
     </svg>
   )
+
+  // ── Reusable popup pieces — arranged differently per `variant` ──
+  // hero=true → big centered image (Packshot view); hero=false → narrow side panel (Products view)
+  const imagePanel = (hero) => (
+    <div style={{ width: hero ? '100%' : (isMobile ? '100%' : 260), minWidth: hero ? 'unset' : (isMobile ? 'unset' : 220), flexShrink: 0, padding: hero ? '24px 16px 18px' : (isMobile ? '16px' : '20px 16px'), display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, borderRight: hero || isMobile ? 'none' : `1px solid ${t.border}`, borderBottom: isMobile || hero ? `1px solid ${t.border}` : 'none', background: hero ? (dark ? 'rgba(255,255,255,0.015)' : 'rgba(0,0,0,0.015)') : 'transparent' }}>
+      <PackshotImg barcode={product.barcode} side={side} onSrcChange={setLoadedSrc} style={{ width: hero ? 'auto' : '100%', maxWidth: hero ? 420 : 'unset', height: hero ? 320 : (isMobile ? 180 : 220), borderRadius: 8, background: dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)' }} placeholderSize={56} />
+      {/* Controls row: Front/Back · Zoom · Save */}
+      <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
+        {['front', 'back'].map(s => (
+          <button key={s} onClick={() => { setSide(s); setLoadedSrc(null) }} style={{ padding: '5px 13px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', background: side === s ? t.accent : t.surface2, color: side === s ? '#000' : t.muted, border: `1px solid ${side === s ? t.accent : t.border}` }}>
+            {s === 'front' ? '▶ Front' : '◀ Back'}
+          </button>
+        ))}
+        <span style={{ width: 1, height: 22, background: t.border, flexShrink: 0 }} />
+        <button onClick={() => loadedSrc && setZoomed(true)} title="ขยายดูรูป (Zoom)" style={{ padding: '5px 10px', borderRadius: 8, cursor: loadedSrc ? 'zoom-in' : 'default', background: t.surface2, color: loadedSrc ? t.text : t.muted, border: `1px solid ${loadedSrc ? t.border : 'transparent'}`, opacity: loadedSrc ? 1 : 0.35, display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600 }}>
+          <IconZoom /> Zoom
+        </button>
+        {loadedSrc ? (
+          <a href={loadedSrc} download={dlName} title="ดาวน์โหลดรูป" style={{ padding: '5px 10px', borderRadius: 8, cursor: 'pointer', background: t.surface2, color: t.text, border: `1px solid ${t.border}`, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600 }}>
+            <IconDl /> Save
+          </a>
+        ) : (
+          <span style={{ padding: '5px 10px', borderRadius: 8, background: 'transparent', color: t.muted, border: '1px solid transparent', display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, opacity: 0.35 }}>
+            <IconDl /> Save
+          </span>
+        )}
+      </div>
+    </div>
+  )
+
+  const statsRow = (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+      {[
+        { label: 'RSP', value: product.rsp ? `฿${product.rsp}` : '—' },
+        { label: 'Pack Size', value: product.packSize || '—' },
+        { label: 'Status', value: statusLabel, color: statusColor },
+      ].map(({ label, value, color }) => (
+        <div key={label} style={{ flex: 1, background: t.surface2, borderRadius: 10, padding: '10px 14px', textAlign: 'center' }}>
+          <div style={{ fontSize: 10, color: t.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 }}>{label}</div>
+          <div style={{ fontSize: 18, fontWeight: 800, color: color || t.text }}>{value}</div>
+        </div>
+      ))}
+    </div>
+  )
+
+  const pricingBlock = (cols) => Object.keys(pricing).length > 0 ? (
+    <div>
+      <div style={{ fontSize: 11, color: t.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8 }}>Retailer Pricing</div>
+      <div style={{ display: 'grid', gridTemplateColumns: cols, gap: 5 }}>
+        {RETAILERS.filter(r => pricing[r]).map(r => {
+          const d = pricing[r]
+          const gpPct = d.gp != null ? Math.round(d.gp * 100) + '%' : null
+          const gpColor = d.gp >= 0.30 ? t.green : d.gp >= 0.20 ? t.yellow : t.red
+          return (
+            <div key={r} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', borderRadius: 8, background: t.surface2, border: `1px solid ${t.border}`, gap: 8 }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: t.text, whiteSpace: 'nowrap' }}>{r}</span>
+              <span style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
+                {d.costUnit != null && <span style={{ fontSize: 11, color: t.muted }}>฿{d.costUnit.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>}
+                {gpPct && <span style={{ fontSize: 11, fontWeight: 700, color: gpColor }}>{gpPct}</span>}
+              </span>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  ) : null
+
+  const coverageBlock = (cols) => (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, flexWrap: 'wrap', gap: 6 }}>
+        <div style={{ fontSize: 11, color: t.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.8 }}>Retailer Coverage</div>
+        <div style={{ display: 'flex', gap: 10, flexShrink: 0 }}>
+          {[
+            { label: 'Active', bg: t.green },
+            { label: 'Pending', bg: t.yellow },
+            { label: 'On Process', bg: t.blue },
+            { label: 'Discon', bg: t.red },
+          ].map(({ label, bg }) => (
+            <span key={label} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: t.muted, fontWeight: 600 }}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: bg, display: 'inline-block', flexShrink: 0 }} />{label}
+            </span>
+          ))}
+        </div>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: cols, gap: 6 }}>
+        {RETAILERS.map(r => {
+          const v = product.retailers[r] || ''
+          const isActive = v === 'A'
+          const isPending = v === 'รอขาย' || v === 'On Process'
+          const isDiscon = v === 'ยกเลิกขาย'
+          const dotColor = isActive ? t.green : isPending ? t.yellow : isDiscon ? t.red : t.dim
+          const dotBg = isActive ? `${t.green}22` : isPending ? `${t.yellow}22` : isDiscon ? `${t.red}22` : 'transparent'
+          return (
+            <div key={r} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '6px 10px', borderRadius: 8, background: dotBg, border: `1px solid ${isActive || isPending || isDiscon ? dotColor + '44' : t.border}` }}>
+              <span style={{ width: 7, height: 7, borderRadius: '50%', background: dotColor, flexShrink: 0, display: 'inline-block' }} />
+              <span style={{ fontSize: 11.5, fontWeight: isActive ? 700 : 400, color: isActive || isPending || isDiscon ? t.text : t.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r}</span>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+
+  const isPackshotView = variant === 'packshot' && !isMobile
+
   return (
     <>
       {/* ── Lightbox ── */}
@@ -232,109 +343,28 @@ function ProductPopup({ product, onClose, t, dark, isMobile = false, pricing = {
             </div>
             <button onClick={onClose} style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 8, color: t.muted, fontSize: 20, width: 34, height: 34, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>✕</button>
           </div>
-          {/* Body */}
-          <div style={{ display: 'flex', gap: 0, flexDirection: isMobile ? 'column' : 'row', flexWrap: 'nowrap' }}>
-            {/* Left: Packshot */}
-            <div style={{ width: isMobile ? '100%' : 260, minWidth: isMobile ? 'unset' : 220, flexShrink: 0, padding: isMobile ? '16px' : '20px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, borderRight: isMobile ? 'none' : `1px solid ${t.border}`, borderBottom: isMobile ? `1px solid ${t.border}` : 'none' }}>
-              <PackshotImg barcode={product.barcode} side={side} onSrcChange={setLoadedSrc} style={{ width: '100%', height: isMobile ? 180 : 220, borderRadius: 8, background: dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)' }} placeholderSize={56} />
-              {/* Controls row: Front/Back · Zoom · Save */}
-              <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
-                {['front', 'back'].map(s => (
-                  <button key={s} onClick={() => { setSide(s); setLoadedSrc(null) }} style={{ padding: '5px 13px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', background: side === s ? t.accent : t.surface2, color: side === s ? '#000' : t.muted, border: `1px solid ${side === s ? t.accent : t.border}` }}>
-                    {s === 'front' ? '▶ Front' : '◀ Back'}
-                  </button>
-                ))}
-                <span style={{ width: 1, height: 22, background: t.border, flexShrink: 0 }} />
-                {/* Zoom button */}
-                <button onClick={() => loadedSrc && setZoomed(true)} title="ขยายดูรูป (Zoom)" style={{ padding: '5px 10px', borderRadius: 8, cursor: loadedSrc ? 'zoom-in' : 'default', background: t.surface2, color: loadedSrc ? t.text : t.muted, border: `1px solid ${loadedSrc ? t.border : 'transparent'}`, opacity: loadedSrc ? 1 : 0.35, display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600 }}>
-                  <IconZoom /> Zoom
-                </button>
-                {/* Download / Save button */}
-                {loadedSrc ? (
-                  <a href={loadedSrc} download={dlName} title="ดาวน์โหลดรูป" style={{ padding: '5px 10px', borderRadius: 8, cursor: 'pointer', background: t.surface2, color: t.text, border: `1px solid ${t.border}`, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600 }}>
-                    <IconDl /> Save
-                  </a>
-                ) : (
-                  <span style={{ padding: '5px 10px', borderRadius: 8, background: 'transparent', color: t.muted, border: '1px solid transparent', display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, opacity: 0.35 }}>
-                    <IconDl /> Save
-                  </span>
-                )}
-              </div>
-            </div>
-            {/* Right: Details */}
-            <div style={{ flex: 1, minWidth: 0, padding: isMobile ? '16px' : '20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
-              {/* Stats row */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
-                {[
-                  { label: 'RSP', value: product.rsp ? `฿${product.rsp}` : '—' },
-                  { label: 'Pack Size', value: product.packSize || '—' },
-                  { label: 'Status', value: statusLabel, color: statusColor },
-                ].map(({ label, value, color }) => (
-                  <div key={label} style={{ flex: 1, background: t.surface2, borderRadius: 10, padding: '10px 14px', textAlign: 'center' }}>
-                    <div style={{ fontSize: 10, color: t.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 }}>{label}</div>
-                    <div style={{ fontSize: 18, fontWeight: 800, color: color || t.text }}>{value}</div>
-                  </div>
-                ))}
-              </div>
-              {/* Retailer Pricing — Cost/Unit & GP% from xlsx */}
-              {Object.keys(pricing).length > 0 && (
-                <div>
-                  <div style={{ fontSize: 11, color: t.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8 }}>Retailer Pricing</div>
-                  <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)', gap: 5 }}>
-                    {RETAILERS.filter(r => pricing[r]).map(r => {
-                      const d = pricing[r]
-                      const gpPct = d.gp != null ? Math.round(d.gp * 100) + '%' : null
-                      const gpColor = d.gp >= 0.30 ? t.green : d.gp >= 0.20 ? t.yellow : t.red
-                      return (
-                        <div key={r} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', borderRadius: 8, background: t.surface2, border: `1px solid ${t.border}`, gap: 8 }}>
-                          <span style={{ fontSize: 11, fontWeight: 700, color: t.text, whiteSpace: 'nowrap' }}>{r}</span>
-                          <span style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
-                            {d.costUnit != null && <span style={{ fontSize: 11, color: t.muted }}>฿{d.costUnit.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>}
-                            {gpPct && <span style={{ fontSize: 11, fontWeight: 700, color: gpColor }}>{gpPct}</span>}
-                          </span>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Retailer coverage */}
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, flexWrap: 'wrap', gap: 6 }}>
-                  <div style={{ fontSize: 11, color: t.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.8 }}>Retailer Coverage</div>
-                  <div style={{ display: 'flex', gap: 10, flexShrink: 0 }}>
-                    {[
-                      { label: 'Active', bg: t.green },
-                      { label: 'Pending', bg: t.yellow },
-                      { label: 'On Process', bg: t.blue },
-                      { label: 'Discon', bg: t.red },
-                    ].map(({ label, bg }) => (
-                      <span key={label} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: t.muted, fontWeight: 600 }}>
-                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: bg, display: 'inline-block', flexShrink: 0 }} />{label}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
-                  {RETAILERS.map(r => {
-                    const v = product.retailers[r] || ''
-                    const isActive = v === 'A'
-                    const isPending = v === 'รอขาย' || v === 'On Process'
-                    const isDiscon = v === 'ยกเลิกขาย'
-                    const dotColor = isActive ? t.green : isPending ? t.yellow : isDiscon ? t.red : t.dim
-                    const dotBg = isActive ? `${t.green}22` : isPending ? `${t.yellow}22` : isDiscon ? `${t.red}22` : 'transparent'
-                    return (
-                      <div key={r} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '6px 10px', borderRadius: 8, background: dotBg, border: `1px solid ${isActive || isPending || isDiscon ? dotColor + '44' : t.border}` }}>
-                        <span style={{ width: 7, height: 7, borderRadius: '50%', background: dotColor, flexShrink: 0, display: 'inline-block' }} />
-                        <span style={{ fontSize: 11.5, fontWeight: isActive ? 700 : 400, color: isActive || isPending || isDiscon ? t.text : t.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r}</span>
-                      </div>
-                    )
-                  })}
+          {/* Body — Packshot view = image-forward (hero on top); Products view = data-forward (image left) */}
+          {isPackshotView ? (
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              {imagePanel(true)}
+              <div style={{ padding: '18px 24px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+                {statsRow}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 22, alignItems: 'start' }}>
+                  {pricingBlock('1fr')}
+                  {coverageBlock('repeat(2, 1fr)')}
                 </div>
               </div>
             </div>
-          </div>
+          ) : (
+            <div style={{ display: 'flex', gap: 0, flexDirection: isMobile ? 'column' : 'row', flexWrap: 'nowrap' }}>
+              {imagePanel(false)}
+              <div style={{ flex: 1, minWidth: 0, padding: isMobile ? '16px' : '20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+                {statsRow}
+                {pricingBlock(isMobile ? '1fr' : 'repeat(2, 1fr)')}
+                {coverageBlock('repeat(3, 1fr)')}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </>
@@ -343,7 +373,7 @@ function ProductPopup({ product, onClose, t, dark, isMobile = false, pricing = {
 
 export default function App() {
   const [rawData, setRawData] = useState(fallbackData)
-  const [lastUpdated, setLastUpdated] = useState(null)
+  const [lastUpdated, setLastUpdated] = useState(() => fmtTs(GENERATED_AT))
   const [dataSource, setDataSource] = useState('xlsx')
   const [dark, setDark] = useState(true)
   const [tab, setTab] = useState('products')
@@ -368,12 +398,6 @@ export default function App() {
     window.addEventListener('resize', onResize)
     return () => window.removeEventListener('resize', onResize)
   }, [])
-
-  const fmtTs = (d) => {
-    const dt = new Date(d)
-    return dt.toLocaleDateString('th-TH', { dateStyle: 'short' }) + '  ' + dt.toLocaleTimeString('th-TH', { timeStyle: 'short' })
-  }
-
 
   const handleImportCSV = (e) => {
     const file = e.target.files[0]
@@ -471,29 +495,76 @@ export default function App() {
     return true
   }), [rawData, vendorFilter, selectedBrands, statusTab, psSearch])
 
-  const analyticsData = useMemo(() => {
-    const brandMap = {}
+  // ── Market intelligence — actionable analytics (whitespace, GP, health, scorecard) ──
+  const intel = useMemo(() => {
+    const isActive = (v) => v === 'A'
+    const isPending = (v) => v === 'รอขาย' || v === 'On Process'
+
+    // Retailer-level aggregates
+    const retailers = RETAILERS.map(r => {
+      const skus = rawData.filter(p => isActive(p.retailers[r]))
+      const pending = rawData.filter(p => isPending(p.retailers[r])).length
+      const brandsSet = new Set(skus.map(p => p.brand.trim()))
+      let gpSum = 0, gpN = 0
+      skus.forEach(p => {
+        const g = retailerData[p.barcode]?.[r]?.gp
+        if (g != null) { gpSum += g; gpN++ }
+      })
+      return { name: r, active: skus.length, pending, brands: brandsSet.size, avgGp: gpN ? gpSum / gpN : null }
+    })
+    const totalActiveSlots = retailers.reduce((s, r) => s + r.active, 0) || 1
+    retailers.forEach(r => { r.sharePct = Math.round(r.active / totalActiveSlots * 100) })
+    const retailersByActive = [...retailers].sort((a, b) => b.active - a.active)
+    // Core retailers = top 6 by active SKU coverage (the high-traffic doors worth chasing)
+    const coreRetailers = retailersByActive.slice(0, 6).map(r => r.name)
+
+    // Brand-level aggregates
+    const map = {}
     rawData.forEach(p => {
       const b = p.brand.trim()
-      if (!brandMap[b]) brandMap[b] = { brand: b, company: p.company, total: 0, active: 0, activeRetailers: {} }
-      brandMap[b].total++
-      if (p.status === 'ขาย') brandMap[b].active++
+      if (!map[b]) map[b] = { brand: b, company: p.company, total: 0, active: 0, pending: 0, discon: 0, activeRetailers: {}, gpSum: 0, gpN: 0 }
+      const m = map[b]
+      m.total++
+      if (p.status === 'ขาย') m.active++
+      else if (p.status === 'รอขาย') m.pending++
+      else if (p.status === 'ยกเลิกขาย') m.discon++
       RETAILERS.forEach(r => {
-        if (!brandMap[b].activeRetailers[r]) brandMap[b].activeRetailers[r] = 0
-        if (p.retailers[r] === 'A') brandMap[b].activeRetailers[r]++
+        if (!m.activeRetailers[r]) m.activeRetailers[r] = 0
+        if (isActive(p.retailers[r])) m.activeRetailers[r]++
       })
+      const rd = retailerData[p.barcode]
+      if (rd) Object.values(rd).forEach(d => { if (d.gp != null) { m.gpSum += d.gp; m.gpN++ } })
     })
-    const brands = Object.values(brandMap).sort((a, b) => b.active - a.active)
-    const retailerMap = RETAILERS.map(r => ({
-      name: r,
-      count: rawData.filter(p => p.retailers[r] === 'A').length,
-      pending: rawData.filter(p => p.retailers[r] === 'รอขาย' || p.retailers[r] === 'On Process').length,
-    })).sort((a, b) => b.count - a.count)
-    return { brands, retailerMap }
+
+    const brands = Object.values(map).map(m => {
+      const coverage = RETAILERS.filter(r => m.activeRetailers[r] > 0).length
+      const activeRatio = m.total ? m.active / m.total : 0
+      const avgGp = m.gpN ? m.gpSum / m.gpN : null
+      const missingCore = coreRetailers.filter(r => !(m.activeRetailers[r] > 0))
+      // "Live" = the brand is genuinely still being sold (majority of its SKUs active),
+      // so we don't surface gaps for brands that are mostly discontinued.
+      const isLive = m.active >= 2 && activeRatio >= 0.5
+      return { ...m, coverage, activeRatio, avgGp, missingCore, isLive }
+    }).sort((a, b) => b.coverage - a.coverage || b.active - a.active)
+
+    // Distribution gaps — live brands present in most core doors but missing a few
+    const gaps = brands
+      .filter(b => b.isLive && b.missingCore.length > 0 && b.missingCore.length < coreRetailers.length)
+      .map(b => ({ brand: b.brand, company: b.company, active: b.active, coverage: b.coverage, present: coreRetailers.filter(r => b.activeRetailers[r] > 0), missing: b.missingCore }))
+      .sort((a, b) => a.missing.length - b.missing.length || b.active - a.active)
+
+    const activeBrandCount = brands.filter(b => b.active > 0).length
+    const summary = {
+      totalActive: rawData.filter(p => p.status === 'ขาย').length,
+      totalPending: rawData.filter(p => p.status === 'รอขาย').length,
+      brandCount: activeBrandCount,
+      avgCoverage: activeBrandCount ? brands.filter(b => b.active > 0).reduce((s, b) => s + b.coverage, 0) / activeBrandCount : 0,
+    }
+    return { brands, retailers, retailersByActive, coreRetailers, gaps, summary }
   }, [rawData])
 
-  const maxRetailer = Math.max(...analyticsData.retailerMap.map(r => r.count), 1)
-  const maxBrandActive = analyticsData.brands[0]?.active || 1
+  const maxRetailerActive = Math.max(...intel.retailers.map(r => r.active), 1)
+  const gpTone = (g) => g == null ? t.muted : g >= 0.30 ? t.green : g >= 0.20 ? t.yellow : t.red
 
   function RetailerDot({ value }) {
     if (value === 'A') return (
@@ -705,7 +776,7 @@ export default function App() {
             <div style={{ fontWeight: 800, fontSize: isMobile ? 14 : 17, color: t.text, letterSpacing: 0.2, whiteSpace: 'nowrap', flexShrink: 0 }}>
               Product Master
             </div>
-            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v2.1.3</span>
+            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v2.2.0</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: isMobile ? 11 : 13, background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, padding: isMobile ? '3px 8px' : '5px 12px', overflow: 'hidden', minWidth: 0, flexShrink: 1 }}>
               <span style={{ width: isMobile ? 6 : 7, height: isMobile ? 6 : 7, borderRadius: '50%', flexShrink: 0, background: dataSource === 'csv' ? t.blue : t.green }} />
               <span style={{ fontWeight: 800, color: dataSource === 'csv' ? t.blue : t.green, flexShrink: 0 }}>
@@ -936,109 +1007,139 @@ export default function App() {
           {/* ANALYTICS */}
           {tab === 'analytics' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-              <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 12, padding: 24 }}>
-                <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 4 }}>🏆 Brand Ranking — Active SKUs</div>
-                <div style={{ color: t.muted, fontSize: 12, marginBottom: 20 }}>เรียงตามจำนวน SKU ที่วางขายอยู่จริง</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {analyticsData.brands.slice(0, 20).map((b, i) => {
-                    const pct = Math.round((b.active / b.total) * 100)
-                    return (
-                      <div key={b.brand} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <div style={{ width: 24, fontSize: 11, color: t.muted, textAlign: 'right', fontWeight: 700 }}>#{i + 1}</div>
-                        <div style={{ width: 7, height: 7, borderRadius: '50%', background: b.company === 'Vcan' ? t.vcanClr : t.moolaClr, flexShrink: 0 }} />
-                        <div style={{ width: 160, fontSize: 12, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.brand}</div>
-                        <div style={{ flex: 1, height: 8, background: t.surface2, borderRadius: 4, overflow: 'hidden' }}>
-                          <div style={{ height: '100%', borderRadius: 4, width: `${Math.round((b.active / maxBrandActive) * 100)}%`, background: b.company === 'Vcan' ? `linear-gradient(90deg,${t.vcanClr},#f5874f)` : `linear-gradient(90deg,${t.moolaClr},#c0392b)` }} />
-                        </div>
-                        <div style={{ width: 90, fontSize: 11, color: t.muted, textAlign: 'right' }}>
-                          <span style={{ color: t.green, fontWeight: 700 }}>{b.active}</span> / {b.total} SKU
-                        </div>
-                        <div style={{ width: 44, textAlign: 'center', fontSize: 11, fontWeight: 700, borderRadius: 20, padding: '2px 6px', background: pct === 100 ? `${t.green}22` : pct >= 70 ? `${t.blue}22` : `${t.red}22`, color: pct === 100 ? t.green : pct >= 70 ? t.blue : t.red }}>{pct}%</div>
-                      </div>
-                    )
-                  })}
+              {/* ── Portfolio overview ── */}
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', gap: 12 }}>
+                {[
+                  { label: 'Active SKUs', val: intel.summary.totalActive, sub: 'currently on shelf', c: t.green },
+                  { label: 'Active Brands', val: intel.summary.brandCount, sub: 'with ≥1 live SKU', c: t.blue },
+                  { label: 'Avg Coverage', val: intel.summary.avgCoverage.toFixed(1), sub: `of ${RETAILERS.length} retailers / brand`, c: t.accent },
+                  { label: 'Pending Pipeline', val: intel.summary.totalPending, sub: 'awaiting listing', c: t.yellow },
+                ].map(({ label, val, sub, c }) => (
+                  <div key={label} style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 12, padding: isMobile ? '14px 16px' : '18px 20px' }}>
+                    <div style={{ fontSize: 11, color: t.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 6 }}>{label}</div>
+                    <div style={{ fontSize: isMobile ? 26 : 32, fontWeight: 800, color: c, lineHeight: 1 }}>{val}</div>
+                    <div style={{ fontSize: 11, color: t.muted, marginTop: 4 }}>{sub}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* ── Brand Distribution Matrix ── */}
+              <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 12, padding: isMobile ? 16 : 24 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', flexWrap: 'wrap', gap: 8, marginBottom: 4 }}>
+                  <div style={{ fontWeight: 700, fontSize: 15 }}>Brand Distribution Matrix</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 14, fontSize: 11, color: t.muted }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                      <span style={{ width: 12, height: 12, borderRadius: '50%', background: t.green, display: 'inline-block' }} />Listed
+                    </span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: t.dim, display: 'inline-block' }} />Not listed
+                    </span>
+                  </div>
                 </div>
-              </div>
-
-              <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 12, padding: 24 }}>
-                <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 4 }}>🏪 Retailer Coverage</div>
-                <div style={{ color: t.muted, fontSize: 12, marginBottom: 20 }}>Active SKUs per retailer</div>
-                <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', height: 140 }}>
-                  {analyticsData.retailerMap.map(({ name, count, pending }) => (
-                    <div key={name} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-                      <div style={{ fontSize: 11, fontWeight: 700 }}>{count}</div>
-                      <div style={{ width: '100%' }}>
-                        <div style={{ width: '100%', borderRadius: '3px 3px 0 0', height: `${Math.max(4, Math.round((count / maxRetailer) * 100))}px`, background: 'linear-gradient(180deg,#58a6ff,#7c3aed)' }} />
-                        {pending > 0 && <div style={{ width: '100%', height: 3, background: t.yellow, opacity: 0.7 }} />}
-                      </div>
-                      <div style={{ fontSize: 9, color: t.muted, textAlign: 'center', lineHeight: 1.3 }}>{RETAILER_SHORT[name]}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 16 }}>
-                {['Vcan', 'Moola'].map(vendor => {
-                  const vd = rawData.filter(p => p.company === vendor)
-                  if (vd.length === 0) return null
-                  const va = vd.filter(p => p.status === 'ขาย').length
-                  const vp = vd.filter(p => p.status === 'รอขาย').length
-                  const vx = vd.filter(p => p.status === 'ยกเลิกขาย').length
-                  const vb = [...new Set(vd.map(p => p.brand.trim()))].length
-                  const clr = vendor === 'Vcan' ? t.vcanClr : t.moolaClr
-                  return (
-                    <div key={vendor} style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 12, padding: 20 }}>
-                      <div style={{ fontWeight: 800, fontSize: 20, color: clr, marginBottom: 14 }}>{vendor}</div>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 14 }}>
-                        {[
-                          { label: 'Total SKUs', val: vd.length, c: t.text },
-                          { label: 'Brands', val: vb, c: t.blue },
-                          { label: 'Active', val: va, c: t.green },
-                          { label: 'Pending', val: vp, c: t.yellow },
-                          { label: 'Discontinued', val: vx, c: t.red },
-                          { label: 'Active %', val: `${Math.round(va / vd.length * 100)}%`, c: t.green },
-                        ].map(({ label, val, c }) => (
-                          <div key={label} style={{ background: t.surface2, borderRadius: 8, padding: '10px 14px' }}>
-                            <div style={{ fontSize: 10, color: t.muted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 3 }}>{label}</div>
-                            <div style={{ fontSize: 22, fontWeight: 800, color: c }}>{val}</div>
-                          </div>
-                        ))}
-                      </div>
-                      <div style={{ height: 6, background: t.surface2, borderRadius: 3, overflow: 'hidden' }}>
-                        <div style={{ height: '100%', width: `${Math.round(va / vd.length * 100)}%`, background: clr, borderRadius: 3 }} />
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-
-              <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 12, padding: 24 }}>
-                <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 16 }}>📊 Retailer Penetration by Brand (Top 10)</div>
+                <div style={{ color: t.muted, fontSize: 12, marginBottom: 16 }}>Where each active brand is currently on shelf, by retailer — sorted by coverage. Hover a dot for SKU count.</div>
                 <div style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, minWidth: 740 }}>
                     <thead>
-                      <tr style={{ borderBottom: `1px solid ${t.border}` }}>
-                        <th style={{ padding: '8px 10px', textAlign: 'left', color: t.muted, fontWeight: 600 }}>Brand</th>
-                        <th style={{ padding: '8px 10px', textAlign: 'left', color: t.muted, fontWeight: 600 }}>Vendor</th>
-                        {RETAILERS.map(r => <th key={r} style={{ padding: '8px 6px', textAlign: 'center', color: t.muted, fontWeight: 600, fontSize: 10, whiteSpace: 'nowrap' }}>{RETAILER_SHORT[r]}</th>)}
-                        <th style={{ padding: '8px 10px', textAlign: 'center', color: t.muted, fontWeight: 600 }}>Coverage</th>
+                      <tr style={{ borderBottom: `2px solid ${t.border}` }}>
+                        <th style={{ padding: '9px 12px', textAlign: 'left', color: t.muted, fontWeight: 700, fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5, position: 'sticky', left: 0, background: t.surface, zIndex: 1 }}>Brand</th>
+                        {RETAILERS.map(r => <th key={r} style={{ padding: '9px 4px', textAlign: 'center', color: t.muted, fontWeight: 700, fontSize: 9.5, whiteSpace: 'nowrap' }}>{RETAILER_SHORT[r]}</th>)}
+                        <th style={{ padding: '9px 10px', textAlign: 'center', color: t.muted, fontWeight: 700, fontSize: 11, textTransform: 'uppercase' }}>Cov.</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {analyticsData.brands.slice(0, 10).map((b) => {
-                        const covered = RETAILERS.filter(r => b.activeRetailers[r] > 0).length
-                        return (
-                          <tr key={b.brand} style={{ borderBottom: `1px solid ${t.border}` }} className="rhover">
-                            <td style={{ padding: '9px 10px', fontWeight: 700 }}>{b.brand}</td>
-                            <td style={{ padding: '9px 10px' }}><span style={{ color: b.company === 'Vcan' ? t.vcanClr : t.moolaClr, fontWeight: 700, fontSize: 11 }}>{b.company}</span></td>
-                            {RETAILERS.map(r => (
-                              <td key={r} style={{ padding: '9px 6px', textAlign: 'center' }}>
-                                {b.activeRetailers[r] > 0 ? <span style={{ color: t.green, fontWeight: 700 }}>{b.activeRetailers[r]}</span> : <span style={{ color: t.dim }}>—</span>}
+                      {intel.brands.filter(b => b.active > 0).map(b => (
+                        <tr key={b.brand} className="rhover" style={{ borderBottom: `1px solid ${t.dim}` }}>
+                          <td style={{ padding: '7px 12px', fontWeight: 600, color: t.text, whiteSpace: 'nowrap', position: 'sticky', left: 0, background: t.surface, zIndex: 1 }}>
+                            <span style={{ width: 6, height: 6, borderRadius: '50%', background: b.company === 'Vcan' ? t.vcanClr : t.moolaClr, display: 'inline-block', marginRight: 8, verticalAlign: 'middle' }} />{b.brand}
+                          </td>
+                          {RETAILERS.map(r => {
+                            const n = b.activeRetailers[r] || 0
+                            return (
+                              <td key={r} style={{ padding: '7px 4px', textAlign: 'center' }} title={n > 0 ? `${b.brand} — ${RETAILER_SHORT[r]}: ${n} active SKU${n > 1 ? 's' : ''}` : `${b.brand} — not listed at ${RETAILER_SHORT[r]}`}>
+                                <span style={{ display: 'inline-block', width: n > 0 ? 13 : 6, height: n > 0 ? 13 : 6, borderRadius: '50%', background: n > 0 ? t.green : t.dim, boxShadow: n > 0 ? `0 0 0 3px ${t.green}1e` : 'none', verticalAlign: 'middle' }} />
                               </td>
-                            ))}
-                            <td style={{ padding: '9px 10px', textAlign: 'center' }}>
-                              <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 20, fontWeight: 700, fontSize: 11, background: covered >= 8 ? `${t.green}22` : covered >= 5 ? `${t.blue}22` : `${t.red}22`, color: covered >= 8 ? t.green : covered >= 5 ? t.blue : t.red }}>{covered}/{RETAILERS.length}</span>
+                            )
+                          })}
+                          <td style={{ padding: '7px 10px', textAlign: 'center' }}>
+                            <span style={{ display: 'inline-block', padding: '2px 9px', borderRadius: 20, fontWeight: 700, fontSize: 11, background: b.coverage >= 8 ? `${t.green}22` : b.coverage >= 4 ? `${t.blue}22` : t.surface2, color: b.coverage >= 8 ? t.green : b.coverage >= 4 ? t.blue : t.muted }}>{b.coverage}/{RETAILERS.length}</span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* ── Distribution Gaps ── */}
+              <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 12, padding: isMobile ? 16 : 24 }}>
+                <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 4 }}>Distribution Gaps</div>
+                <div style={{ color: t.muted, fontSize: 12, marginBottom: 16 }}>
+                  Live brands (≥2 active SKUs) not yet in every core door — measured against {intel.coreRetailers.map(r => RETAILER_SHORT[r]).join(' · ')}
+                </div>
+                {intel.gaps.length === 0 ? (
+                  <div style={{ color: t.muted, fontSize: 13, padding: '20px 0', textAlign: 'center' }}>✓ All live brands are present across every core retailer</div>
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(300px, 1fr))', gap: 12 }}>
+                    {intel.gaps.map(g => (
+                      <div key={g.brand} style={{ padding: '14px 16px', borderRadius: 12, background: t.surface2, border: `1px solid ${t.border}` }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 10 }}>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontSize: 13.5, fontWeight: 800, color: t.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g.brand}</div>
+                            <div style={{ fontSize: 11, color: t.muted, marginTop: 1 }}>
+                              <span style={{ color: g.company === 'Vcan' ? t.vcanClr : t.moolaClr, fontWeight: 700 }}>{g.company}</span> · {g.active} active SKUs
+                            </div>
+                          </div>
+                          <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 700, color: t.yellow, background: `${t.yellow}1e`, border: `1px solid ${t.yellow}44`, borderRadius: 20, padding: '3px 10px' }}>{g.missing.length} gap{g.missing.length > 1 ? 's' : ''}</span>
+                        </div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                          {intel.coreRetailers.map(r => {
+                            const inStore = g.present.includes(r)
+                            return (
+                              <span key={r} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10.5, fontWeight: 700, padding: '3px 9px', borderRadius: 6, background: inStore ? `${t.green}1e` : 'transparent', color: inStore ? t.green : t.muted, border: `1px solid ${inStore ? t.green + '44' : t.border}`, opacity: inStore ? 1 : 0.85 }}>
+                                {inStore ? '✓' : '+'} {RETAILER_SHORT[r]}
+                              </span>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* ── Retailer Scorecard ── */}
+              <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 12, padding: isMobile ? 16 : 24 }}>
+                <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 4 }}>Retailer Scorecard</div>
+                <div style={{ color: t.muted, fontSize: 12, marginBottom: 16 }}>Channel size at a glance — active SKUs, brands carried, pending listings, and the agreed average GP.</div>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, minWidth: 560 }}>
+                    <thead>
+                      <tr style={{ borderBottom: `2px solid ${t.border}` }}>
+                        {['Retailer', 'Active SKUs', 'Brands', 'Pending', 'Avg GP', 'Share'].map((h, i) => (
+                          <th key={h} style={{ padding: '9px 10px', textAlign: i <= 1 ? 'left' : 'center', color: t.muted, fontWeight: 700, fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5, whiteSpace: 'nowrap' }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {intel.retailersByActive.map(r => {
+                        const isCore = intel.coreRetailers.includes(r.name)
+                        return (
+                          <tr key={r.name} className="rhover" style={{ borderBottom: `1px solid ${t.dim}` }}>
+                            <td style={{ padding: '9px 10px', fontWeight: 700, color: t.text, whiteSpace: 'nowrap' }}>
+                              {r.name}{isCore && <span style={{ marginLeft: 6, fontSize: 9, fontWeight: 700, color: t.accent, border: `1px solid ${t.accent}66`, borderRadius: 4, padding: '1px 5px' }}>CORE</span>}
                             </td>
+                            <td style={{ padding: '9px 10px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <div style={{ flex: 1, minWidth: 60, height: 8, background: t.surface2, borderRadius: 4, overflow: 'hidden' }}>
+                                  <div style={{ height: '100%', width: `${Math.round(r.active / maxRetailerActive * 100)}%`, background: 'linear-gradient(90deg,#58a6ff,#7c3aed)', borderRadius: 4 }} />
+                                </div>
+                                <span style={{ fontSize: 12, fontWeight: 700, color: t.text, width: 26, textAlign: 'right' }}>{r.active}</span>
+                              </div>
+                            </td>
+                            <td style={{ padding: '9px 10px', textAlign: 'center', fontWeight: 600 }}>{r.brands}</td>
+                            <td style={{ padding: '9px 10px', textAlign: 'center', color: r.pending > 0 ? t.yellow : t.muted, fontWeight: r.pending > 0 ? 700 : 400 }}>{r.pending || '—'}</td>
+                            <td style={{ padding: '9px 10px', textAlign: 'center', fontWeight: 700, color: gpTone(r.avgGp) }}>{r.avgGp != null ? Math.round(r.avgGp * 100) + '%' : '—'}</td>
+                            <td style={{ padding: '9px 10px', textAlign: 'center', color: t.muted, fontWeight: 600 }}>{r.sharePct}%</td>
                           </tr>
                         )
                       })}
@@ -1140,6 +1241,7 @@ export default function App() {
           dark={dark}
           isMobile={isMobile}
           pricing={retailerData[selectedProduct.barcode] || {}}
+          variant={tab === 'packshot' ? 'packshot' : 'products'}
         />
       )}
     </div>

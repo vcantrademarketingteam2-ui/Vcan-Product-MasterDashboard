@@ -32,3 +32,6 @@ credentials.json
 public/packshots/*.jpg
 public/packshots/*.jpeg
 public/packshots/*.png
+
+# Local backups — keep out of git
+backups/
