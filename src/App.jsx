@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import fallbackData, { GENERATED_AT } from './data.js'
 import retailerData from './retailer_data.js'
+import promoData, { PROMO_META, PROMO_ACTIVITY, PROMO_RETAILERS } from './promo_data.js'
 import vcanLogo from './VCAN.png'
 
 const RETAILERS = ['Tops', 'Villa', 'The Mall', 'Lotus', 'Homepro', 'Big C', 'TWD', 'Boots', 'Foodland', 'Central Department', "Pet'n me", 'Fuji']
@@ -366,7 +367,7 @@ function ProductPopup({ product, onClose, t, dark, isMobile = false, pricing = {
           const dotBg = isActive ? `${t.green}22` : isPending ? `${t.yellow}22` : isDiscon ? `${t.red}22` : 'transparent'
           return (
             <div key={r} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '6px 10px', borderRadius: 8, background: dotBg, border: `1px solid ${isActive || isPending || isDiscon ? dotColor + '44' : t.border}` }}>
-              <span style={{ width: 7, height: 7, borderRadius: '50%', background: dotColor, flexShrink: 0, display: 'inline-block' }} />
+              <span style={{ width: 7, height: 7, borderRadius: '50%', background: dotColor, flexShrink: 0, display: 'inline-block', boxShadow: isActive ? `0 0 5px 1px rgba(63,185,80,0.55)` : isPending ? `0 0 5px 1px rgba(210,153,34,0.45)` : isDiscon ? `0 0 5px 1px rgba(248,81,73,0.45)` : 'none' }} />
               <span style={{ fontSize: 11.5, fontWeight: isActive ? 700 : 400, color: isActive || isPending || isDiscon ? t.text : t.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r}</span>
             </div>
           )
@@ -501,6 +502,18 @@ export default function App() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [sortCol, setSortCol] = useState(null)
   const [sortDir, setSortDir] = useState('asc')
+  const [matrixPopover, setMatrixPopover] = useState(null)
+  const [promoRetailers, setPromoRetailers] = useState([])
+  const togglePromoRetailer = (r) => setPromoRetailers(prev => prev.includes(r) ? prev.filter(x => x !== r) : [...prev, r])
+  const [promoBrands, setPromoBrands] = useState([])
+  const togglePromoBrand = (b) => setPromoBrands(prev => prev.includes(b) ? prev.filter(x => x !== b) : [...prev, b])
+  const [promoUnlocked, setPromoUnlocked] = useState(() => sessionStorage.getItem('pu') === '1')
+  const [promoUnlockedDept, setPromoUnlockedDept] = useState(() => sessionStorage.getItem('puDept') || '')
+  const [promoPwInput, setPromoPwInput] = useState('')
+  const [promoPwError, setPromoPwError] = useState(false)
+  const [calcRsp, setCalcRsp] = useState('')
+  const [calcSale, setCalcSale] = useState('')
+  const [calcQty, setCalcQty] = useState('1')
 
   useEffect(() => {
     const onResize = () => {
@@ -686,21 +699,51 @@ export default function App() {
     return { brands, retailers, retailersByActive, coreRetailers, gaps, summary }
   }, [rawData])
 
+  // Promo tab derived data — enriches promoData with brand/company from product master
+  const enrichedPromoData = useMemo(() => promoData.map(p => {
+    if (p.brand) return p
+    const m = rawData.find(r => r.barcode === p.barcode)
+    return m ? { ...p, brand: m.brand, company: m.company } : p
+  }), [rawData])
+
+  const promoFiltered = useMemo(() => {
+    let d = enrichedPromoData
+    if (promoRetailers.length > 0) d = d.filter(p => promoRetailers.includes(p.retailer))
+    if (promoBrands.length > 0) d = d.filter(p => promoBrands.includes(p.brand))
+    return d
+  }, [enrichedPromoData, promoRetailers, promoBrands])
+
+  const promoGrouped = useMemo(() => {
+    const retailers = promoRetailers.length > 0 ? promoRetailers : PROMO_RETAILERS
+    return retailers
+      .map(r => ({
+        retailer: r,
+        periods: PROMO_META[r]?.periods || [],
+        items: promoFiltered.filter(p => p.retailer === r),
+      }))
+      .filter(g => g.items.length > 0)
+  }, [promoFiltered, promoRetailers])
+
+  const promoBrandList = useMemo(() => {
+    const base = promoRetailers.length > 0 ? enrichedPromoData.filter(p => promoRetailers.includes(p.retailer)) : enrichedPromoData
+    return [...new Set(base.map(p => p.brand))].filter(Boolean).sort()
+  }, [enrichedPromoData, promoRetailers])
+
   const maxRetailerActive = Math.max(...intel.retailers.map(r => r.active), 1)
   const gpTone = (g) => g == null ? t.muted : g >= 0.30 ? t.green : g >= 0.20 ? t.yellow : t.red
 
   function RetailerDot({ value }) {
     if (value === 'A') return (
-      <div style={{ width: 10, height: 10, borderRadius: '50%', background: t.green, margin: 'auto', boxShadow: `0 0 5px ${t.green}88` }} />
+      <div style={{ width: 10, height: 10, borderRadius: '50%', background: t.green, margin: 'auto', boxShadow: `0 0 7px 2px rgba(63,185,80,0.6)` }} />
     )
     if (value === 'รอขาย') return (
-      <div style={{ width: 10, height: 10, borderRadius: '50%', margin: 'auto', background: `linear-gradient(to left, ${t.yellow} 50%, transparent 50%)`, border: `1.5px solid ${t.yellow}` }} />
+      <div style={{ width: 10, height: 10, borderRadius: '50%', margin: 'auto', background: `linear-gradient(to left, ${t.yellow} 50%, transparent 50%)`, border: `1.5px solid ${t.yellow}`, boxShadow: `0 0 6px 2px rgba(210,153,34,0.5)` }} />
     )
     if (value === 'On Process') return (
-      <div style={{ width: 10, height: 10, borderRadius: '50%', margin: 'auto', background: `linear-gradient(to left, ${t.blue} 50%, transparent 50%)`, border: `1.5px solid ${t.blue}` }} />
+      <div style={{ width: 10, height: 10, borderRadius: '50%', margin: 'auto', background: `linear-gradient(to left, ${t.blue} 50%, transparent 50%)`, border: `1.5px solid ${t.blue}`, boxShadow: `0 0 6px 2px rgba(88,166,255,0.5)` }} />
     )
     if (value === 'ยกเลิกขาย') return (
-      <div style={{ width: 10, height: 10, borderRadius: '50%', background: t.red, margin: 'auto' }} />
+      <div style={{ width: 10, height: 10, borderRadius: '50%', background: t.red, margin: 'auto', boxShadow: `0 0 5px 1px rgba(248,81,73,0.5)` }} />
     )
     return <div style={{ width: 6, height: 1, background: t.dim, margin: 'auto' }} />
   }
@@ -905,7 +948,7 @@ export default function App() {
             <div style={{ fontWeight: 800, fontSize: isMobile ? 14 : 17, color: t.text, letterSpacing: 0.2, whiteSpace: 'nowrap', flexShrink: 0 }}>
               Product Master
             </div>
-            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v2.5.2</span>
+            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v2.6.0</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: isMobile ? 11 : 13, background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, padding: isMobile ? '3px 8px' : '5px 12px', overflow: 'hidden', minWidth: 0, flexShrink: 1 }}>
               <span style={{ width: isMobile ? 6 : 7, height: isMobile ? 6 : 7, borderRadius: '50%', flexShrink: 0, background: dataSource === 'csv' ? t.blue : t.green }} />
               <span style={{ fontWeight: 800, color: dataSource === 'csv' ? t.blue : t.green, flexShrink: 0 }}>
@@ -1193,7 +1236,7 @@ export default function App() {
                     </span>
                   </div>
                 </div>
-                <div style={{ color: t.muted, fontSize: 12, marginBottom: 16 }}>Where each active brand is currently on shelf, by retailer — sorted by coverage. Hover a dot for SKU count.</div>
+                <div style={{ color: t.muted, fontSize: 12, marginBottom: 16 }}>Where each active brand is currently on shelf, by retailer — sorted by coverage. Click a dot to see which SKUs are listed.</div>
                 <div style={{ overflowX: 'auto' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, minWidth: 740 }}>
                     <thead>
@@ -1212,8 +1255,14 @@ export default function App() {
                           {RETAILERS.map(r => {
                             const n = b.activeRetailers[r] || 0
                             return (
-                              <td key={r} style={{ padding: '7px 4px', textAlign: 'center' }} title={n > 0 ? `${b.brand} — ${RETAILER_SHORT[r]}: ${n} active SKU${n > 1 ? 's' : ''}` : `${b.brand} — not listed at ${RETAILER_SHORT[r]}`}>
-                                <span style={{ display: 'inline-block', width: n > 0 ? 13 : 6, height: n > 0 ? 13 : 6, borderRadius: '50%', background: n > 0 ? t.green : t.dim, boxShadow: n > 0 ? `0 0 0 3px ${t.green}1e` : 'none', verticalAlign: 'middle' }} />
+                              <td key={r} style={{ padding: '7px 4px', textAlign: 'center', cursor: n > 0 ? 'pointer' : 'default' }}
+                                onClick={n > 0 ? (e) => {
+                                  const rect = e.currentTarget.getBoundingClientRect()
+                                  const prods = rawData.filter(p => p.brand === b.brand && p.status === 'ขาย' && p.retailers[r] === 'A')
+                                  setMatrixPopover({ brand: b.brand, retailer: r, x: rect.left, y: rect.bottom + 6, products: prods })
+                                } : undefined}
+                              >
+                                <span style={{ display: 'inline-block', width: n > 0 ? 13 : 6, height: n > 0 ? 13 : 6, borderRadius: '50%', background: n > 0 ? t.green : t.dim, boxShadow: n > 0 ? `0 0 7px 2px rgba(63,185,80,0.6)` : 'none', verticalAlign: 'middle' }} />
                               </td>
                             )
                           })}
@@ -1389,24 +1438,245 @@ export default function App() {
 
           {/* PROMOTION PLAN */}
           {tab === 'promotion' && (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', gap: 20 }}>
-              <div style={{ background: t.surface, border: `2px dashed ${t.border}`, borderRadius: 20, padding: '60px 100px', textAlign: 'center' }}>
-                <div style={{ fontSize: 56, marginBottom: 16 }}>☰</div>
-                <div style={{ fontSize: 28, fontWeight: 800, marginBottom: 10 }}>Promotion Plan</div>
-                <div style={{ display: 'inline-block', background: 'linear-gradient(135deg,#58a6ff,#7c3aed)', color: '#fff', fontWeight: 800, fontSize: 14, padding: '8px 24px', borderRadius: 40, marginBottom: 16 }}>
-                  COMING SOON — Version 2.5
-                </div>
-                <div style={{ color: t.muted, fontSize: 13, lineHeight: 1.8 }}>
-                  ระบบวางแผน Promotion รายห้าง<br />
-                  ต้องทำ standard template ก่อนเพราะแต่ละห้างมี format ต่างกัน<br />
-                  <span style={{ color: t.blue, fontWeight: 600 }}>อยู่ระหว่างการพัฒนาในเวอร์ชัน 2.5</span>
-                </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+              {/* Customer filter */}
+              <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', alignItems: 'center' }}>
+                <span style={{ fontSize: 12, color: t.muted, fontWeight: 600, flexShrink: 0 }}>Customer:</span>
+                <button onClick={() => setPromoRetailers([])} style={{ background: promoRetailers.length === 0 ? t.accent : t.surface2, color: promoRetailers.length === 0 ? '#000' : t.text, border: `1.5px solid ${promoRetailers.length === 0 ? t.accent : t.border}`, borderRadius: 20, padding: '6px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>All</button>
+                {(PROMO_RETAILERS.length > 0 ? PROMO_RETAILERS : RETAILERS).map(r => {
+                  const sel = promoRetailers.includes(r)
+                  return (
+                    <button key={r} onClick={() => togglePromoRetailer(r)} title={r} style={{ display: 'inline-flex', alignItems: 'center', background: sel ? `${t.accent}18` : t.surface2, border: `2px solid ${sel ? t.accent : t.border}`, borderRadius: 10, padding: isMobile ? '6px 9px' : '4px 7px', cursor: 'pointer', boxShadow: sel ? `0 0 0 3px ${t.accent}22` : 'none', minHeight: isMobile ? 40 : 'unset' }}>
+                      <RetailerLogo name={r} h={isMobile ? 26 : 22} maxW={isMobile ? 68 : 58} fallbackStyle={{ fontSize: 11, fontWeight: 700, color: t.text }} />
+                    </button>
+                  )
+                })}
               </div>
+
+              {/* Brand filter */}
+              {promoBrandList.length > 0 && (
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <span style={{ fontSize: 12, color: t.muted, fontWeight: 600, flexShrink: 0 }}>Brand:</span>
+                  <button onClick={() => setPromoBrands([])} className="bpill" style={{ background: promoBrands.length === 0 ? t.accent : t.surface2, color: promoBrands.length === 0 ? '#000' : t.text, border: `1.5px solid ${promoBrands.length === 0 ? t.accent : t.border}`, borderRadius: 20, padding: '4px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>All</button>
+                  {promoBrandList.map(b => (
+                    <button key={b} onClick={() => togglePromoBrand(b)} className="bpill" style={{ background: promoBrands.includes(b) ? t.accent : t.surface2, color: promoBrands.includes(b) ? '#000' : t.text, border: `1.5px solid ${promoBrands.includes(b) ? t.accent : t.border}`, borderRadius: 20, padding: '4px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>{b}</button>
+                  ))}
+                </div>
+              )}
+
+              {/* Activity legend */}
+              <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 11, color: t.muted, fontWeight: 600 }}>Activity:</span>
+                {Object.entries(PROMO_ACTIVITY).map(([key, { label, color }]) => (
+                  <span key={key} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, color: t.muted }}>
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, display: 'inline-block', boxShadow: `0 0 5px 1px ${color}99` }} />{label}
+                  </span>
+                ))}
+              </div>
+
+              {/* Promo table or no-data placeholder */}
+              {promoData.length === 0 ? (
+                <div style={{ display: 'flex', justifyContent: 'center', padding: '40px 0' }}>
+                  <div style={{ background: t.surface, border: `2px dashed ${t.border}`, borderRadius: 20, padding: isMobile ? '32px 24px' : '48px 64px', textAlign: 'center', maxWidth: 480 }}>
+                    <div style={{ fontSize: 40, marginBottom: 14 }}>📊</div>
+                    <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 8, color: t.text }}>ยังไม่มีข้อมูล Promotion Plan</div>
+                    <div style={{ fontSize: 13, color: t.muted, lineHeight: 1.9, marginBottom: 4 }}>
+                      รัน <code style={{ background: t.surface2, padding: '2px 8px', borderRadius: 4, fontFamily: 'monospace', color: t.blue }}>python convert_promo.py</code><br />
+                      เพื่อ generate ข้อมูลจากไฟล์ xlsx ก่อน<br />
+                      จากนั้น npm run build และ push เพื่อ deploy
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  {promoGrouped.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '40px 0', color: t.muted }}>
+                      <div style={{ fontSize: 28, marginBottom: 8 }}>🔍</div>
+                      <div style={{ fontWeight: 600 }}>ไม่พบข้อมูลที่ตรงกับ filter</div>
+                    </div>
+                  ) : promoGrouped.map(group => (
+                    <div key={group.retailer} style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 12 }}>
+                      {/* Retailer header */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 18px', borderBottom: `1px solid ${t.border}`, background: dark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.015)', borderRadius: '12px 12px 0 0' }}>
+                        <RetailerLogo name={group.retailer} h={26} maxW={76} fallbackStyle={{ fontSize: 13, fontWeight: 800, color: t.text }} />
+                        <span style={{ fontSize: 11, color: t.muted, fontWeight: 600 }}>{group.items.length} products · {group.periods.length} periods</span>
+                      </div>
+                      {/* Period table */}
+                      <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, minWidth: Math.max(400, 200 + group.periods.length * 110) }}>
+                          <thead>
+                            <tr style={{ borderBottom: `1px solid ${t.border}` }}>
+                              <th style={{ padding: '10px 16px', textAlign: 'left', color: t.muted, fontWeight: 700, fontSize: 10.5, textTransform: 'uppercase', letterSpacing: 0.5, position: 'sticky', left: 0, background: t.surface, zIndex: 1, minWidth: 200 }}>Product</th>
+                              {group.periods.map(period => (
+                                <th key={period.name} style={{ padding: '8px 10px', textAlign: 'center', minWidth: 110 }}>
+                                  <div style={{ fontWeight: 800, fontSize: 12, color: t.text }}>{period.name}</div>
+                                  {period.dateRange && <div style={{ fontSize: 9.5, color: t.muted, marginTop: 1 }}>{period.dateRange}</div>}
+                                </th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {group.items.map(item => (
+                              <tr key={item.barcode + item.retailer} style={{ borderBottom: `1px solid ${t.dim}` }}>
+                                <td style={{ padding: '10px 16px', position: 'sticky', left: 0, background: t.surface, zIndex: 1 }}>
+                                  <div style={{ fontWeight: 700, fontSize: 12, color: t.text }}>{item.product}</div>
+                                  <div style={{ fontSize: 10, color: t.muted, fontFamily: 'monospace', marginTop: 2 }}>{item.barcode}{item.packSize ? ` · ${item.packSize}` : ''}</div>
+                                  {item.brand && <div style={{ fontSize: 10, fontWeight: 700, color: item.company === 'Vcan' ? t.vcanClr : t.moolaClr, marginTop: 1 }}>{item.brand}</div>}
+                                </td>
+                                {group.periods.map(period => {
+                                  const pd = item.periods[period.name]
+                                  const hasPromo = pd && (pd.salePrice != null || pd.saleLabel)
+                                  const acts = pd?.activities || []
+                                  return (
+                                    <td key={period.name} style={{ padding: '6px 8px', textAlign: 'center', verticalAlign: 'middle', background: hasPromo ? (dark ? 'rgba(6,182,212,0.07)' : 'rgba(6,182,212,0.05)') : 'transparent' }}>
+                                      {hasPromo ? (
+                                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                                          <div style={{ fontWeight: 800, fontSize: 13, color: t.text }}>
+                                            {pd.salePrice != null ? `฿${pd.salePrice.toLocaleString('th-TH')}` : pd.saleLabel}
+                                          </div>
+                                          {acts.length > 0 && (
+                                            <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
+                                              {acts.map(a => {
+                                                const ac = PROMO_ACTIVITY[a]
+                                                return ac ? (
+                                                  <span key={a} title={ac.label} style={{ width: 8, height: 8, borderRadius: '50%', background: ac.color, display: 'inline-block', boxShadow: `0 0 5px 1px ${ac.color}99` }} />
+                                                ) : null
+                                              })}
+                                            </div>
+                                          )}
+                                        </div>
+                                      ) : (
+                                        <span style={{ color: t.dim, fontSize: 16, lineHeight: 1 }}>—</span>
+                                      )}
+                                    </td>
+                                  )
+                                })}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* ── Compensate Calculator ── */}
+              <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 12, padding: isMobile ? 16 : 20 }}>
+                <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>Compensate Calculator</div>
+                <div style={{ fontSize: 11, color: t.muted, marginBottom: 14 }}>คำนวณค่า compensate ที่ต้องจ่ายห้าง — <code style={{ fontFamily: 'monospace', fontSize: 10.5 }}>RSP(ex) − Sale(inc) ÷ 1.07</code></div>
+                {!promoUnlocked ? (
+                  <div style={{ background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 10, padding: '18px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+                    <div style={{ fontSize: 24, lineHeight: 1 }}>🔒</div>
+                    <div style={{ fontSize: 12, color: t.muted, fontWeight: 600, textAlign: 'center' }}>Cost & Compensate is confidential<br/>Enter department PIN to unlock</div>
+                    <form onSubmit={e => {
+                      e.preventDefault()
+                      const dept = DEPT_PINS[promoPwInput]
+                      if (dept) {
+                        setPromoUnlocked(true); setPromoUnlockedDept(dept)
+                        sessionStorage.setItem('pu', '1'); sessionStorage.setItem('puDept', dept)
+                        logPricingAccess(dept, 'Compensate Calculator'); setPromoPwInput('')
+                      } else { setPromoPwError(true); setPromoPwInput('') }
+                    }} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <input type="password" inputMode="numeric" maxLength={10} value={promoPwInput}
+                        onChange={e => { setPromoPwInput(e.target.value); setPromoPwError(false) }}
+                        placeholder="PIN"
+                        style={{ width: isMobile ? 110 : 90, background: t.surface, border: `1.5px solid ${promoPwError ? '#f85149' : t.border}`, borderRadius: 8, color: t.text, padding: isMobile ? '10px 14px' : '8px 12px', fontSize: isMobile ? 18 : 14, textAlign: 'center', outline: 'none', letterSpacing: 4 }}
+                      />
+                      <button type="submit" style={{ background: t.accent, border: 'none', borderRadius: 8, color: '#000', fontWeight: 700, fontSize: 13, padding: isMobile ? '10px 20px' : '8px 16px', cursor: 'pointer', minHeight: isMobile ? 44 : 'unset' }}>Unlock</button>
+                    </form>
+                    {promoPwError && <div style={{ fontSize: 11, color: '#f85149', fontWeight: 600 }}>Incorrect PIN</div>}
+                  </div>
+                ) : (
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+                      <span style={{ fontSize: 10, color: t.muted, marginRight: 8 }}>{promoUnlockedDept} dept</span>
+                      <button onClick={() => { setPromoUnlocked(false); setPromoUnlockedDept(''); sessionStorage.removeItem('pu'); sessionStorage.removeItem('puDept') }} style={{ background: 'none', border: 'none', fontSize: 10, color: t.muted, cursor: 'pointer', padding: '2px 6px', opacity: 0.6 }}>🔒 Lock</button>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(3, 1fr)', gap: 12 }}>
+                      {[
+                        { label: 'RSP (ex-VAT) ฿', value: calcRsp, set: setCalcRsp, ph: 'เช่น 93.46' },
+                        { label: 'Sale Price (inc-VAT) ฿', value: calcSale, set: setCalcSale, ph: 'เช่น 89.00' },
+                        { label: 'Quantity', value: calcQty, set: setCalcQty, ph: '1' },
+                      ].map(({ label, value, set, ph }) => (
+                        <div key={label}>
+                          <div style={{ fontSize: 10, color: t.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>{label}</div>
+                          <input type="number" inputMode="decimal" value={value} onChange={e => set(e.target.value)} placeholder={ph}
+                            style={{ width: '100%', background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, color: t.text, padding: '9px 12px', fontSize: 14, outline: 'none', boxSizing: 'border-box' }} />
+                        </div>
+                      ))}
+                    </div>
+                    {calcRsp && calcSale && (() => {
+                      const rsp = parseFloat(calcRsp), sale = parseFloat(calcSale), qty = parseFloat(calcQty) || 1
+                      if (isNaN(rsp) || isNaN(sale)) return null
+                      const compUnit = rsp - (sale / 1.07)
+                      const compTotal = compUnit * qty
+                      const saleEx = sale / 1.07
+                      const pct = ((compUnit / rsp) * 100)
+                      const isNeg = compUnit < 0
+                      return (
+                        <div style={{ marginTop: 14, padding: '14px 18px', borderRadius: 10, background: isNeg ? `${t.red}14` : `${t.green}14`, border: `1px solid ${isNeg ? t.red + '44' : t.green + '44'}` }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', gap: 14 }}>
+                            {[
+                              { label: 'Sale (ex-VAT)', value: `฿${saleEx.toFixed(2)}`, color: t.muted },
+                              { label: 'Compensate / unit', value: `฿${compUnit.toFixed(2)}`, color: isNeg ? t.red : t.green, big: true },
+                              { label: `Total (×${qty})`, value: `฿${compTotal.toFixed(2)}`, color: isNeg ? t.red : t.green, big: true },
+                              { label: 'Discount %', value: `${pct.toFixed(1)}%`, color: t.muted },
+                            ].map(({ label, value, color, big }) => (
+                              <div key={label}>
+                                <div style={{ fontSize: 9.5, color: t.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>{label}</div>
+                                <div style={{ fontSize: big ? 20 : 15, fontWeight: 800, color }}>{value}</div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )
+                    })()}
+                  </div>
+                )}
+              </div>
+
             </div>
           )}
 
         </main>
       </div>
+
+      {/* ── MATRIX POPOVER ── */}
+      {matrixPopover && (
+        <div onClick={() => setMatrixPopover(null)} style={{ position: 'fixed', inset: 0, zIndex: 2000 }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            position: 'fixed',
+            left: Math.min(matrixPopover.x, window.innerWidth - 310),
+            top: Math.min(matrixPopover.y, window.innerHeight - 300),
+            background: t.surface,
+            border: `1px solid ${t.border}`,
+            borderRadius: 12,
+            minWidth: 240,
+            maxWidth: 310,
+            maxHeight: 300,
+            overflowY: 'auto',
+            boxShadow: dark ? '0 8px 32px rgba(0,0,0,0.55)' : '0 8px 32px rgba(0,0,0,0.18)',
+            zIndex: 2001,
+          }}>
+            <div style={{ padding: '12px 16px 10px', borderBottom: `1px solid ${t.border}`, position: 'sticky', top: 0, background: t.surface, zIndex: 1 }}>
+              <div style={{ fontWeight: 800, fontSize: 13, color: t.text }}>{matrixPopover.brand}</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: t.muted, marginTop: 3 }}>
+                <RetailerLogo name={matrixPopover.retailer} h={18} maxW={56} fallbackStyle={{ fontSize: 11 }} />
+                <span>· {matrixPopover.products.length} active SKU{matrixPopover.products.length !== 1 ? 's' : ''}</span>
+              </div>
+            </div>
+            {matrixPopover.products.map(p => (
+              <div key={p.barcode} className="rhover" onClick={() => { setSelectedProduct(p); setMatrixPopover(null) }}
+                style={{ padding: '9px 16px', cursor: 'pointer', borderBottom: `1px solid ${t.dim}` }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: t.text, lineHeight: 1.35 }}>{p.product}</div>
+                <div style={{ fontSize: 10, color: t.muted, fontFamily: 'monospace', marginTop: 2 }}>{p.barcode}{p.packSize ? ` · ${p.packSize}` : ''}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ── PRODUCT POPUP ── */}
       {selectedProduct && (
