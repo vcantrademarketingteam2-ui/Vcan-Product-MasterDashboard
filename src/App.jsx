@@ -878,7 +878,7 @@ export default function App() {
         )}
         {/* Credit */}
         <div style={{ padding: '12px 14px', borderTop: `1px solid ${t.border}`, flexShrink: 0 }}>
-          <div style={{ fontSize: 9.5, color: t.muted, opacity: 0.55, lineHeight: 1.5, textAlign: 'center' }}>
+          <div style={{ fontSize: 11, color: dark ? '#8d96a3' : t.muted, lineHeight: 1.6, textAlign: 'center', fontWeight: 500 }}>
             Made by Meth<br />Trade Marketing
           </div>
         </div>
@@ -905,7 +905,7 @@ export default function App() {
             <div style={{ fontWeight: 800, fontSize: isMobile ? 14 : 17, color: t.text, letterSpacing: 0.2, whiteSpace: 'nowrap', flexShrink: 0 }}>
               Product Master
             </div>
-            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v2.5.1</span>
+            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v2.5.2</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: isMobile ? 11 : 13, background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, padding: isMobile ? '3px 8px' : '5px 12px', overflow: 'hidden', minWidth: 0, flexShrink: 1 }}>
               <span style={{ width: isMobile ? 6 : 7, height: isMobile ? 6 : 7, borderRadius: '50%', flexShrink: 0, background: dataSource === 'csv' ? t.blue : t.green }} />
               <span style={{ fontWeight: 800, color: dataSource === 'csv' ? t.blue : t.green, flexShrink: 0 }}>
