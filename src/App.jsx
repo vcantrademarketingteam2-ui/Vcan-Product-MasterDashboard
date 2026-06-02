@@ -433,7 +433,8 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [selectedProduct, setSelectedProduct] = useState(null)
   const [psSearch, setPsSearch] = useState('')
-  const [psRetailer, setPsRetailer] = useState(null)
+  const [psRetailers, setPsRetailers] = useState([])
+  const togglePsRetailer = (r) => setPsRetailers(prev => prev.includes(r) ? prev.filter(x => x !== r) : [...prev, r])
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [sortCol, setSortCol] = useState(null)
@@ -544,17 +545,16 @@ export default function App() {
     if (vendorFilter !== 'ALL' && p.company !== vendorFilter) return false
     if (selectedBrands.length > 0 && !selectedBrands.includes(p.brand.trim())) return false
     if (statusTab !== 'ALL' && p.status !== statusTab) return false
-    if (psRetailer) {
-      // "listed at this customer" = has a relationship that isn't discontinued/empty
-      const v = p.retailers[psRetailer]
-      if (!v || v === 'ยกเลิกขาย') return false
+    if (psRetailers.length > 0) {
+      // keep product only if listed at ≥1 selected retailer (not discontinued/empty)
+      if (!psRetailers.some(r => { const v = p.retailers[r]; return v && v !== 'ยกเลิกขาย' })) return false
     }
     if (psSearch) {
       const q = psSearch.toLowerCase()
       return p.product.toLowerCase().includes(q) || p.brand.toLowerCase().includes(q) || p.barcode.includes(q)
     }
     return true
-  }), [rawData, vendorFilter, selectedBrands, statusTab, psSearch, psRetailer])
+  }), [rawData, vendorFilter, selectedBrands, statusTab, psSearch, psRetailers])
 
   // ── Market intelligence — actionable analytics (whitespace, GP, health, scorecard) ──
   const intel = useMemo(() => {
@@ -837,7 +837,7 @@ export default function App() {
             <div style={{ fontWeight: 800, fontSize: isMobile ? 14 : 17, color: t.text, letterSpacing: 0.2, whiteSpace: 'nowrap', flexShrink: 0 }}>
               Product Master
             </div>
-            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v2.4.4</span>
+            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v2.4.5</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: isMobile ? 11 : 13, background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, padding: isMobile ? '3px 8px' : '5px 12px', overflow: 'hidden', minWidth: 0, flexShrink: 1 }}>
               <span style={{ width: isMobile ? 6 : 7, height: isMobile ? 6 : 7, borderRadius: '50%', flexShrink: 0, background: dataSource === 'csv' ? t.blue : t.green }} />
               <span style={{ fontWeight: 800, color: dataSource === 'csv' ? t.blue : t.green, flexShrink: 0 }}>
@@ -1254,15 +1254,18 @@ export default function App() {
               {/* ── Customer (retailer) pills — logos (above brand) ── */}
               <div style={{ display: 'flex', gap: 7, marginBottom: 10, flexWrap: 'wrap', alignItems: 'center' }}>
                 <span style={{ fontSize: 12, color: t.muted, fontWeight: 600, flexShrink: 0 }}>Customer:</span>
-                <button onClick={() => setPsRetailer(null)} style={{ background: psRetailer === null ? t.accent : t.surface2, color: psRetailer === null ? '#000' : t.text, border: `1.5px solid ${psRetailer === null ? t.accent : t.border}`, borderRadius: 20, padding: '6px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>All</button>
+                <button onClick={() => setPsRetailers([])} style={{ background: psRetailers.length === 0 ? t.accent : t.surface2, color: psRetailers.length === 0 ? '#000' : t.text, border: `1.5px solid ${psRetailers.length === 0 ? t.accent : t.border}`, borderRadius: 20, padding: '6px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>All</button>
                 {RETAILERS.map(r => {
-                  const sel = psRetailer === r
+                  const sel = psRetailers.includes(r)
                   return (
-                    <button key={r} onClick={() => setPsRetailer(sel ? null : r)} title={r} style={{ display: 'inline-flex', alignItems: 'center', background: t.surface2, border: `2px solid ${sel ? t.accent : t.border}`, borderRadius: 10, padding: '4px 7px', cursor: 'pointer', boxShadow: sel ? `0 0 0 3px ${t.accent}33` : 'none' }}>
+                    <button key={r} onClick={() => togglePsRetailer(r)} title={r} style={{ display: 'inline-flex', alignItems: 'center', background: sel ? `${t.accent}18` : t.surface2, border: `2px solid ${sel ? t.accent : t.border}`, borderRadius: 10, padding: '4px 7px', cursor: 'pointer', boxShadow: sel ? `0 0 0 3px ${t.accent}22` : 'none' }}>
                       <RetailerLogo name={r} h={22} maxW={58} fallbackStyle={{ fontSize: 11, fontWeight: 700, color: t.text }} />
                     </button>
                   )
                 })}
+                {psRetailers.length > 0 && (
+                  <button onClick={() => setPsRetailers([])} style={{ background: 'none', border: 'none', color: t.muted, fontSize: 11, fontWeight: 600, cursor: 'pointer', padding: '4px 6px', flexShrink: 0 }}>✕ Clear</button>
+                )}
               </div>
               {/* ── Brand pills ── */}
               <div style={{ display: 'flex', gap: 7, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
