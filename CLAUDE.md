@@ -54,3 +54,14 @@ The `t` object (computed from `dark` state) provides all colors used in inline s
 - **Analytics** — portfolio KPIs, brand distribution dot-matrix, distribution gaps, retailer scorecard (driven by the `intel` memo; factual, no auto-recommendations)
 - **Packshot** — image gallery; card click opens `ProductPopup` (image-forward `variant`). Images live in `public/packshots/<barcode>_<front|back>.webp`; `.jpg/.png` originals are git-ignored, only `.webp` is committed/deployed
 - **Promotion Plan** — placeholder, coming in v2.5
+
+### Mobile UI rules (IMPORTANT)
+
+The app supports mobile (`isMobile` = `window.innerWidth < 768`). **Every UI change must be checked against both desktop and mobile.** Key differences:
+
+- **Products table** — mobile shows only 3 columns (No., Brand/Product, Status); no retailer dot columns. The retailer logo filter pills are **hidden on mobile** (`{!isMobile && ...}`) since they filter columns that don't exist there. Row filtering by retailer still applies (products are filtered, just not the columns).
+- **Packshot customer filter** — visible on mobile; buttons use larger padding (`6px 9px`) and `minHeight: 40px` for touch targets. Logo height increases to `h={26}` on mobile.
+- **Popup** — mobile variant slides up from bottom (`alignItems: flex-end`, `borderRadius: 16px 16px 0 0`, `maxHeight: 95dvh`). Packshot hero layout (`isPackshotView`) is desktop-only (`variant === 'packshot' && !isMobile`).
+- **Scrollable tables** (Analytics matrix, Retailer Scorecard, Popup pricing) — always wrapped in `overflowX: 'auto'` with `WebkitOverflowScrolling: 'touch'` and a `minWidth` so they scroll horizontally on small screens.
+- **Touch targets** — interactive elements on mobile should be at least 40px tall. Use `isMobile ? '...mobile...' : '...desktop...'` inline for padding/size adjustments.
+- Sidebar is a slide-in drawer on mobile (fixed, `transform: translateX`). Filters inside it are always accessible via the hamburger menu.
