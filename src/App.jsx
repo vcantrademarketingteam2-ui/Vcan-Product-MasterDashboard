@@ -466,7 +466,7 @@ function ProductPopup({ product, onClose, t, dark, isMobile = false, pricing = {
 
 export default function App() {
   const [rawData, setRawData] = useState(fallbackData)
-  const [lastUpdated, setLastUpdated] = useState(() => fmtTs(GENERATED_AT))
+  const [lastUpdated, setLastUpdated] = useState(() => fmtTs(__BUILD_TIME__))
   const [dataSource, setDataSource] = useState('xlsx')
   const [dark, setDark] = useState(true)
   const [tab, setTab] = useState('products')
