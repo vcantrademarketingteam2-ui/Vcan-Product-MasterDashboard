@@ -283,31 +283,31 @@ function ProductPopup({ product, onClose, t, dark, isMobile = false, pricing = {
         <div style={{ background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 10, padding: '18px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
           <div style={{ fontSize: 28, lineHeight: 1 }}>🔒</div>
           <div style={{ fontSize: 12, color: t.muted, fontWeight: 600, textAlign: 'center' }}>Cost & GP data is confidential<br/>Enter PIN to view</div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {/* form onSubmit handles both Enter key and button tap reliably on mobile */}
+          <form onSubmit={e => {
+            e.preventDefault()
+            const dept = DEPT_PINS[pwInput]
+            if (dept) {
+              setPricingUnlocked(true); setUnlockedDept(dept)
+              sessionStorage.setItem('pu', '1'); sessionStorage.setItem('puDept', dept)
+              logPricingAccess(dept, product.product); setPwInput('')
+            } else { setPwError(true); setPwInput('') }
+          }} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <input
               type="password"
               inputMode="numeric"
               maxLength={10}
               value={pwInput}
               onChange={e => { setPwInput(e.target.value); setPwError(false) }}
-              onKeyDown={e => {
-                if (e.key === 'Enter') {
-                  const dept = DEPT_PINS[pwInput]; if (dept) { setPricingUnlocked(true); setUnlockedDept(dept); sessionStorage.setItem('pu', '1'); sessionStorage.setItem('puDept', dept); logPricingAccess(dept, product.product); setPwInput('') }
-                  else { setPwError(true); setPwInput('') }
-                }
-              }}
               placeholder="PIN"
-              style={{ width: 90, background: t.surface, border: `1.5px solid ${pwError ? '#f85149' : t.border}`, borderRadius: 8, color: t.text, padding: '8px 12px', fontSize: 14, textAlign: 'center', outline: 'none', letterSpacing: 4 }}
+              style={{ width: isMobile ? 110 : 90, background: t.surface, border: `1.5px solid ${pwError ? '#f85149' : t.border}`, borderRadius: 8, color: t.text, padding: isMobile ? '10px 14px' : '8px 12px', fontSize: isMobile ? 18 : 14, textAlign: 'center', outline: 'none', letterSpacing: 4 }}
               autoFocus
             />
             <button
-              onClick={() => {
-                if (pwInput === PRICING_PASSWORD) { setPricingUnlocked(true); sessionStorage.setItem('pu', '1'); setPwInput('') }
-                else { setPwError(true); setPwInput('') }
-              }}
-              style={{ background: t.accent, border: 'none', borderRadius: 8, color: '#000', fontWeight: 700, fontSize: 12, padding: '8px 16px', cursor: 'pointer' }}
+              type="submit"
+              style={{ background: t.accent, border: 'none', borderRadius: 8, color: '#000', fontWeight: 700, fontSize: 13, padding: isMobile ? '10px 20px' : '8px 16px', cursor: 'pointer', minHeight: isMobile ? 44 : 'unset' }}
             >Unlock</button>
-          </div>
+          </form>
           {pwError && <div style={{ fontSize: 11, color: '#f85149', fontWeight: 600 }}>Incorrect PIN</div>}
         </div>
       ) : (
@@ -905,7 +905,7 @@ export default function App() {
             <div style={{ fontWeight: 800, fontSize: isMobile ? 14 : 17, color: t.text, letterSpacing: 0.2, whiteSpace: 'nowrap', flexShrink: 0 }}>
               Product Master
             </div>
-            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v2.5.0</span>
+            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v2.5.1</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: isMobile ? 11 : 13, background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, padding: isMobile ? '3px 8px' : '5px 12px', overflow: 'hidden', minWidth: 0, flexShrink: 1 }}>
               <span style={{ width: isMobile ? 6 : 7, height: isMobile ? 6 : 7, borderRadius: '50%', flexShrink: 0, background: dataSource === 'csv' ? t.blue : t.green }} />
               <span style={{ fontWeight: 800, color: dataSource === 'csv' ? t.blue : t.green, flexShrink: 0 }}>
