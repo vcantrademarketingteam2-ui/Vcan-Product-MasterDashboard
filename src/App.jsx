@@ -53,6 +53,14 @@ const RETAILER_LOGO_SCALE = {
   "Pet'n me": 1.9,           // ~3.75:1
 }
 
+// Activity badge colors for Promotion Plan — defined here (not imported) so colors are
+// independent of the generated promo_data.js
+const PROMO_ACTIVITY_DISPLAY = {
+  field: { label: 'ลงพื้นที่', color: '#06B6D4' },
+  media: { label: 'ลงสื่อ', color: '#A855F7' },
+  looks: { label: 'LOOKS Magazine', color: '#F59E0B' },  // gold, matches LOOKS logo
+}
+
 // Renders a retailer's logo on a white chip (so dark/transparent logos never blend
 // into the row), falling back to the short text label if the image is missing.
 function RetailerLogo({ name, h = 28, maxW = 76, fallbackStyle = {} }) {
@@ -174,8 +182,36 @@ function ProductPopup({ product, onClose, t, dark, isMobile = false, pricing = {
   const [unlockedDept, setUnlockedDept] = useState(() => sessionStorage.getItem('puDept') || '')
   const [pwInput, setPwInput] = useState('')
   const [pwError, setPwError] = useState(false)
+  const [dlMaxPx, setDlMaxPx] = useState(null)  // null=original, 800, 1200, 2000
   const lbRef = useRef(null)
   const dragRef = useRef(null)
+
+  const downloadAs = (format) => {
+    if (!loadedSrc) return
+    const ext = format  // 'jpg' | 'png' | 'webp'
+    if (ext === 'webp' && !dlMaxPx) {
+      const a = document.createElement('a'); a.href = loadedSrc; a.download = dlName; a.click(); return
+    }
+    const img = new Image(); img.crossOrigin = 'anonymous'
+    img.onload = () => {
+      const aspect = img.height / img.width
+      const w = dlMaxPx && img.width > dlMaxPx ? dlMaxPx : img.width
+      const h = Math.round(w * aspect)
+      const canvas = document.createElement('canvas'); canvas.width = w; canvas.height = h
+      const ctx = canvas.getContext('2d')
+      if (ext === 'jpg') { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h) }
+      ctx.drawImage(img, 0, 0, w, h)
+      const mime = ext === 'jpg' ? 'image/jpeg' : ext === 'png' ? 'image/png' : 'image/webp'
+      const q = ext === 'jpg' ? 0.92 : undefined
+      canvas.toBlob(blob => {
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url; a.download = `${product.barcode}_${side}.${ext}`; a.click()
+        URL.revokeObjectURL(url)
+      }, mime, q)
+    }
+    img.src = loadedSrc
+  }
   useEffect(() => {
     setSide('front')
     setLoadedSrc(null)
@@ -242,9 +278,24 @@ function ProductPopup({ product, onClose, t, dark, isMobile = false, pricing = {
           <IconZoom /> Zoom
         </button>
         {loadedSrc ? (
-          <a href={loadedSrc} download={dlName} title="ดาวน์โหลดรูป" style={{ padding: '5px 10px', borderRadius: 8, cursor: 'pointer', background: t.surface2, color: t.text, border: `1px solid ${t.border}`, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600 }}>
-            <IconDl /> Save
-          </a>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}>
+            <div style={{ display: 'flex', gap: 4 }}>
+              {[{ fmt: 'webp', label: 'WebP' }, { fmt: 'jpg', label: 'JPG' }, { fmt: 'png', label: 'PNG' }].map(({ fmt, label }) => (
+                <button key={fmt} onClick={() => downloadAs(fmt)} title={`Download as ${label}`}
+                  style={{ padding: '5px 9px', borderRadius: 7, cursor: 'pointer', background: t.surface2, color: t.text, border: `1px solid ${t.border}`, display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600 }}>
+                  {fmt === 'webp' && <IconDl />}{label}
+                </button>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: 3 }}>
+              {[{ px: null, label: 'Orig' }, { px: 800, label: '800px' }, { px: 1200, label: '1200px' }, { px: 2000, label: '2000px' }].map(({ px, label }) => (
+                <button key={label} onClick={() => setDlMaxPx(px)}
+                  style={{ padding: '3px 7px', borderRadius: 5, cursor: 'pointer', fontSize: 10, fontWeight: 600, background: dlMaxPx === px ? t.accent : t.surface2, color: dlMaxPx === px ? '#000' : t.muted, border: `1px solid ${dlMaxPx === px ? t.accent : t.border}` }}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
         ) : (
           <span style={{ padding: '5px 10px', borderRadius: 8, background: 'transparent', color: t.muted, border: '1px solid transparent', display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, opacity: 0.35 }}>
             <IconDl /> Save
@@ -503,17 +554,27 @@ export default function App() {
   const [sortCol, setSortCol] = useState(null)
   const [sortDir, setSortDir] = useState('asc')
   const [matrixPopover, setMatrixPopover] = useState(null)
-  const [promoRetailers, setPromoRetailers] = useState([])
-  const togglePromoRetailer = (r) => setPromoRetailers(prev => prev.includes(r) ? prev.filter(x => x !== r) : [...prev, r])
+  const [promoRetailer, setPromoRetailer] = useState(null)  // single-select
   const [promoBrands, setPromoBrands] = useState([])
   const togglePromoBrand = (b) => setPromoBrands(prev => prev.includes(b) ? prev.filter(x => x !== b) : [...prev, b])
+  const selectPromoRetailer = (r, enriched) => {
+    setPromoRetailer(r)
+    setExpandedCostRows(new Set())
+    if (r) {
+      const avail = new Set(enriched.filter(p => p.retailer === r).map(p => p.brand))
+      setPromoBrands(prev => prev.filter(b => avail.has(b)))
+    } else {
+      setPromoBrands([])
+    }
+  }
   const [promoUnlocked, setPromoUnlocked] = useState(() => sessionStorage.getItem('pu') === '1')
   const [promoUnlockedDept, setPromoUnlockedDept] = useState(() => sessionStorage.getItem('puDept') || '')
   const [promoPwInput, setPromoPwInput] = useState('')
   const [promoPwError, setPromoPwError] = useState(false)
-  const [calcRsp, setCalcRsp] = useState('')
-  const [calcSale, setCalcSale] = useState('')
-  const [calcQty, setCalcQty] = useState('1')
+  const [expandedCostRows, setExpandedCostRows] = useState(new Set())
+  const toggleCostRow = (key) => setExpandedCostRows(prev => { const s = new Set(prev); s.has(key) ? s.delete(key) : s.add(key); return s })
+  const [calcRspInc, setCalcRspInc] = useState('')
+  const [calcSaleInc, setCalcSaleInc] = useState('')
 
   useEffect(() => {
     const onResize = () => {
@@ -708,26 +769,24 @@ export default function App() {
 
   const promoFiltered = useMemo(() => {
     let d = enrichedPromoData
-    if (promoRetailers.length > 0) d = d.filter(p => promoRetailers.includes(p.retailer))
+    if (promoRetailer) d = d.filter(p => p.retailer === promoRetailer)
     if (promoBrands.length > 0) d = d.filter(p => promoBrands.includes(p.brand))
     return d
-  }, [enrichedPromoData, promoRetailers, promoBrands])
+  }, [enrichedPromoData, promoRetailer, promoBrands])
 
-  const promoGrouped = useMemo(() => {
-    const retailers = promoRetailers.length > 0 ? promoRetailers : PROMO_RETAILERS
-    return retailers
-      .map(r => ({
-        retailer: r,
-        periods: PROMO_META[r]?.periods || [],
-        items: promoFiltered.filter(p => p.retailer === r),
-      }))
-      .filter(g => g.items.length > 0)
-  }, [promoFiltered, promoRetailers])
+  const promoCurrentGroup = useMemo(() => {
+    if (!promoRetailer) return null
+    return {
+      retailer: promoRetailer,
+      periods: PROMO_META[promoRetailer]?.periods || [],
+      items: promoFiltered,
+    }
+  }, [promoFiltered, promoRetailer])
 
   const promoBrandList = useMemo(() => {
-    const base = promoRetailers.length > 0 ? enrichedPromoData.filter(p => promoRetailers.includes(p.retailer)) : enrichedPromoData
+    const base = promoRetailer ? enrichedPromoData.filter(p => p.retailer === promoRetailer) : enrichedPromoData
     return [...new Set(base.map(p => p.brand))].filter(Boolean).sort()
-  }, [enrichedPromoData, promoRetailers])
+  }, [enrichedPromoData, promoRetailer])
 
   const maxRetailerActive = Math.max(...intel.retailers.map(r => r.active), 1)
   const gpTone = (g) => g == null ? t.muted : g >= 0.30 ? t.green : g >= 0.20 ? t.yellow : t.red
@@ -791,7 +850,7 @@ export default function App() {
   )
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: t.bg, color: t.text, fontSize: 14 }}>
+    <div style={{ display: 'flex', minHeight: '100vh', background: t.bg, color: t.text, fontSize: 14, zoom: 1.05 }}>
       <style>{`
         *{box-sizing:border-box;margin:0;padding:0;}
         body{font-family:'Plus Jakarta Sans',sans-serif;-webkit-font-smoothing:antialiased;}
@@ -806,6 +865,8 @@ export default function App() {
         .nav-item:hover{background:${t.surface2}!important;}
         .sb-btn{transition:background 0.15s;cursor:pointer;}
         .sb-btn:hover{background:${t.surface2}!important;}
+        .clr-btn{transition:all 0.15s;cursor:pointer;}
+        .clr-btn:hover{box-shadow:0 0 8px 3px rgba(248,81,73,0.4)!important;border-color:#f85149!important;color:#f85149!important;}
         @media(max-width:767px){
           .rhover:hover{background:unset!important;}
           .bpill:hover{background:unset!important;color:unset!important;border-color:unset!important;}
@@ -948,7 +1009,7 @@ export default function App() {
             <div style={{ fontWeight: 800, fontSize: isMobile ? 14 : 17, color: t.text, letterSpacing: 0.2, whiteSpace: 'nowrap', flexShrink: 0 }}>
               Product Master
             </div>
-            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v2.6.0</span>
+            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v2.7.0</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: isMobile ? 11 : 13, background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, padding: isMobile ? '3px 8px' : '5px 12px', overflow: 'hidden', minWidth: 0, flexShrink: 1 }}>
               <span style={{ width: isMobile ? 6 : 7, height: isMobile ? 6 : 7, borderRadius: '50%', flexShrink: 0, background: dataSource === 'csv' ? t.blue : t.green }} />
               <span style={{ fontWeight: 800, color: dataSource === 'csv' ? t.blue : t.green, flexShrink: 0 }}>
@@ -1019,7 +1080,7 @@ export default function App() {
                       )}
                     </div>
                     {hasActiveFilters && (
-                      <button onClick={clearAll} style={{
+                      <button onClick={clearAll} className="clr-btn" style={{
                         background: 'none', border: `1.5px solid ${t.border}`, borderRadius: 8,
                         color: t.muted, fontSize: 12, fontWeight: 600, cursor: 'pointer',
                         padding: '8px 14px', whiteSpace: 'nowrap', flexShrink: 0,
@@ -1375,7 +1436,7 @@ export default function App() {
                 {RETAILERS.map(r => {
                   const sel = psRetailers.includes(r)
                   return (
-                    <button key={r} onClick={() => togglePsRetailer(r)} title={r} style={{ display: 'inline-flex', alignItems: 'center', background: sel ? `${t.accent}18` : t.surface2, border: `2px solid ${sel ? t.accent : t.border}`, borderRadius: 10, padding: isMobile ? '6px 9px' : '4px 7px', cursor: 'pointer', boxShadow: sel ? `0 0 0 3px ${t.accent}22` : 'none', minHeight: isMobile ? 40 : 'unset' }}>
+                    <button key={r} onClick={() => togglePsRetailer(r)} title={r} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: sel ? `${t.accent}18` : t.surface2, border: `2px solid ${sel ? t.accent : t.border}`, borderRadius: 10, cursor: 'pointer', boxShadow: sel ? `0 0 0 3px ${t.accent}22` : 'none', width: isMobile ? 60 : 76, height: isMobile ? 42 : 38 }}>
                       <RetailerLogo name={r} h={isMobile ? 26 : 22} maxW={isMobile ? 68 : 58} fallbackStyle={{ fontSize: 11, fontWeight: 700, color: t.text }} />
                     </button>
                   )
@@ -1440,22 +1501,22 @@ export default function App() {
           {tab === 'promotion' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
-              {/* Customer filter */}
+              {/* Customer single-select pills */}
               <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', alignItems: 'center' }}>
-                <span style={{ fontSize: 12, color: t.muted, fontWeight: 600, flexShrink: 0 }}>Customer:</span>
-                <button onClick={() => setPromoRetailers([])} style={{ background: promoRetailers.length === 0 ? t.accent : t.surface2, color: promoRetailers.length === 0 ? '#000' : t.text, border: `1.5px solid ${promoRetailers.length === 0 ? t.accent : t.border}`, borderRadius: 20, padding: '6px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>All</button>
+                <span style={{ fontSize: 13, color: t.muted, fontWeight: 600, flexShrink: 0 }}>Customer:</span>
                 {(PROMO_RETAILERS.length > 0 ? PROMO_RETAILERS : RETAILERS).map(r => {
-                  const sel = promoRetailers.includes(r)
+                  const sel = promoRetailer === r
                   return (
-                    <button key={r} onClick={() => togglePromoRetailer(r)} title={r} style={{ display: 'inline-flex', alignItems: 'center', background: sel ? `${t.accent}18` : t.surface2, border: `2px solid ${sel ? t.accent : t.border}`, borderRadius: 10, padding: isMobile ? '6px 9px' : '4px 7px', cursor: 'pointer', boxShadow: sel ? `0 0 0 3px ${t.accent}22` : 'none', minHeight: isMobile ? 40 : 'unset' }}>
-                      <RetailerLogo name={r} h={isMobile ? 26 : 22} maxW={isMobile ? 68 : 58} fallbackStyle={{ fontSize: 11, fontWeight: 700, color: t.text }} />
+                    <button key={r} onClick={() => selectPromoRetailer(sel ? null : r, enrichedPromoData)} title={r}
+                      style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: sel ? `${t.accent}18` : t.surface2, border: `2px solid ${sel ? t.accent : t.border}`, borderRadius: 10, cursor: 'pointer', boxShadow: sel ? `0 0 0 3px ${t.accent}22` : 'none', width: isMobile ? 60 : 76, height: isMobile ? 42 : 38 }}>
+                      <RetailerLogo name={r} h={isMobile ? 24 : 20} maxW={isMobile ? 54 : 68} fallbackStyle={{ fontSize: 10, fontWeight: 700, color: t.text, textAlign: 'center', lineHeight: 1.2 }} />
                     </button>
                   )
                 })}
               </div>
 
               {/* Brand filter */}
-              {promoBrandList.length > 0 && (
+              {promoRetailer && promoBrandList.length > 0 && (
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
                   <span style={{ fontSize: 12, color: t.muted, fontWeight: 600, flexShrink: 0 }}>Brand:</span>
                   <button onClick={() => setPromoBrands([])} className="bpill" style={{ background: promoBrands.length === 0 ? t.accent : t.surface2, color: promoBrands.length === 0 ? '#000' : t.text, border: `1.5px solid ${promoBrands.length === 0 ? t.accent : t.border}`, borderRadius: 20, padding: '4px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>All</button>
@@ -1465,140 +1526,205 @@ export default function App() {
                 </div>
               )}
 
-              {/* Activity legend */}
-              <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 11, color: t.muted, fontWeight: 600 }}>Activity:</span>
-                {Object.entries(PROMO_ACTIVITY).map(([key, { label, color }]) => (
-                  <span key={key} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, color: t.muted }}>
-                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, display: 'inline-block', boxShadow: `0 0 5px 1px ${color}99` }} />{label}
-                  </span>
-                ))}
-              </div>
-
-              {/* Promo table or no-data placeholder */}
-              {promoData.length === 0 ? (
-                <div style={{ display: 'flex', justifyContent: 'center', padding: '40px 0' }}>
-                  <div style={{ background: t.surface, border: `2px dashed ${t.border}`, borderRadius: 20, padding: isMobile ? '32px 24px' : '48px 64px', textAlign: 'center', maxWidth: 480 }}>
-                    <div style={{ fontSize: 40, marginBottom: 14 }}>📊</div>
-                    <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 8, color: t.text }}>ยังไม่มีข้อมูล Promotion Plan</div>
-                    <div style={{ fontSize: 13, color: t.muted, lineHeight: 1.9, marginBottom: 4 }}>
-                      รัน <code style={{ background: t.surface2, padding: '2px 8px', borderRadius: 4, fontFamily: 'monospace', color: t.blue }}>python convert_promo.py</code><br />
-                      เพื่อ generate ข้อมูลจากไฟล์ xlsx ก่อน<br />
-                      จากนั้น npm run build และ push เพื่อ deploy
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                  {promoGrouped.length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: '40px 0', color: t.muted }}>
-                      <div style={{ fontSize: 28, marginBottom: 8 }}>🔍</div>
-                      <div style={{ fontWeight: 600 }}>ไม่พบข้อมูลที่ตรงกับ filter</div>
-                    </div>
-                  ) : promoGrouped.map(group => (
-                    <div key={group.retailer} style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 12 }}>
-                      {/* Retailer header */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 18px', borderBottom: `1px solid ${t.border}`, background: dark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.015)', borderRadius: '12px 12px 0 0' }}>
-                        <RetailerLogo name={group.retailer} h={26} maxW={76} fallbackStyle={{ fontSize: 13, fontWeight: 800, color: t.text }} />
-                        <span style={{ fontSize: 11, color: t.muted, fontWeight: 600 }}>{group.items.length} products · {group.periods.length} periods</span>
-                      </div>
-                      {/* Period table */}
-                      <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, minWidth: Math.max(400, 200 + group.periods.length * 110) }}>
-                          <thead>
-                            <tr style={{ borderBottom: `1px solid ${t.border}` }}>
-                              <th style={{ padding: '10px 16px', textAlign: 'left', color: t.muted, fontWeight: 700, fontSize: 10.5, textTransform: 'uppercase', letterSpacing: 0.5, position: 'sticky', left: 0, background: t.surface, zIndex: 1, minWidth: 200 }}>Product</th>
-                              {group.periods.map(period => (
-                                <th key={period.name} style={{ padding: '8px 10px', textAlign: 'center', minWidth: 110 }}>
-                                  <div style={{ fontWeight: 800, fontSize: 12, color: t.text }}>{period.name}</div>
-                                  {period.dateRange && <div style={{ fontSize: 9.5, color: t.muted, marginTop: 1 }}>{period.dateRange}</div>}
-                                </th>
-                              ))}
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {group.items.map(item => (
-                              <tr key={item.barcode + item.retailer} style={{ borderBottom: `1px solid ${t.dim}` }}>
-                                <td style={{ padding: '10px 16px', position: 'sticky', left: 0, background: t.surface, zIndex: 1 }}>
-                                  <div style={{ fontWeight: 700, fontSize: 12, color: t.text }}>{item.product}</div>
-                                  <div style={{ fontSize: 10, color: t.muted, fontFamily: 'monospace', marginTop: 2 }}>{item.barcode}{item.packSize ? ` · ${item.packSize}` : ''}</div>
-                                  {item.brand && <div style={{ fontSize: 10, fontWeight: 700, color: item.company === 'Vcan' ? t.vcanClr : t.moolaClr, marginTop: 1 }}>{item.brand}</div>}
-                                </td>
-                                {group.periods.map(period => {
-                                  const pd = item.periods[period.name]
-                                  const hasPromo = pd && (pd.salePrice != null || pd.saleLabel)
-                                  const acts = pd?.activities || []
-                                  return (
-                                    <td key={period.name} style={{ padding: '6px 8px', textAlign: 'center', verticalAlign: 'middle', background: hasPromo ? (dark ? 'rgba(6,182,212,0.07)' : 'rgba(6,182,212,0.05)') : 'transparent' }}>
-                                      {hasPromo ? (
-                                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-                                          <div style={{ fontWeight: 800, fontSize: 13, color: t.text }}>
-                                            {pd.salePrice != null ? `฿${pd.salePrice.toLocaleString('th-TH')}` : pd.saleLabel}
-                                          </div>
-                                          {acts.length > 0 && (
-                                            <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
-                                              {acts.map(a => {
-                                                const ac = PROMO_ACTIVITY[a]
-                                                return ac ? (
-                                                  <span key={a} title={ac.label} style={{ width: 8, height: 8, borderRadius: '50%', background: ac.color, display: 'inline-block', boxShadow: `0 0 5px 1px ${ac.color}99` }} />
-                                                ) : null
-                                              })}
-                                            </div>
-                                          )}
-                                        </div>
-                                      ) : (
-                                        <span style={{ color: t.dim, fontSize: 16, lineHeight: 1 }}>—</span>
-                                      )}
-                                    </td>
-                                  )
-                                })}
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
+              {/* Activity legend + Cost/GP unlock inline */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+                <div style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 11, color: t.muted, fontWeight: 600 }}>Activity:</span>
+                  {Object.entries(PROMO_ACTIVITY_DISPLAY).map(([key, { label, color }]) => (
+                    <span key={key} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, color: t.muted }}>
+                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, display: 'inline-block', boxShadow: `0 0 5px 1px ${color}99` }} />{label}
+                    </span>
                   ))}
                 </div>
-              )}
-
-              {/* ── Compensate Calculator ── */}
-              <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 12, padding: isMobile ? 16 : 20 }}>
-                <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>Compensate Calculator</div>
-                <div style={{ fontSize: 11, color: t.muted, marginBottom: 14 }}>คำนวณค่า compensate ที่ต้องจ่ายห้าง — <code style={{ fontFamily: 'monospace', fontSize: 10.5 }}>RSP(ex) − Sale(inc) ÷ 1.07</code></div>
-                {!promoUnlocked ? (
-                  <div style={{ background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 10, padding: '18px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-                    <div style={{ fontSize: 24, lineHeight: 1 }}>🔒</div>
-                    <div style={{ fontSize: 12, color: t.muted, fontWeight: 600, textAlign: 'center' }}>Cost & Compensate is confidential<br/>Enter department PIN to unlock</div>
+                {promoRetailer && (
+                  promoUnlocked ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 10, color: t.muted }}>{promoUnlockedDept}</span>
+                      <button onClick={() => { setPromoUnlocked(false); setPromoUnlockedDept(''); setExpandedCostRows(new Set()); sessionStorage.removeItem('pu'); sessionStorage.removeItem('puDept') }}
+                        style={{ background: 'none', border: `1px solid ${t.border}`, borderRadius: 6, fontSize: 10, color: t.muted, cursor: 'pointer', padding: '3px 8px' }}>🔒 Lock Cost/GP</button>
+                    </div>
+                  ) : (
                     <form onSubmit={e => {
                       e.preventDefault()
                       const dept = DEPT_PINS[promoPwInput]
                       if (dept) {
                         setPromoUnlocked(true); setPromoUnlockedDept(dept)
                         sessionStorage.setItem('pu', '1'); sessionStorage.setItem('puDept', dept)
-                        logPricingAccess(dept, 'Compensate Calculator'); setPromoPwInput('')
+                        logPricingAccess(dept, 'Promo Cost/GP'); setPromoPwInput('')
                       } else { setPromoPwError(true); setPromoPwInput('') }
-                    }} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    }} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                       <input type="password" inputMode="numeric" maxLength={10} value={promoPwInput}
                         onChange={e => { setPromoPwInput(e.target.value); setPromoPwError(false) }}
-                        placeholder="PIN"
-                        style={{ width: isMobile ? 110 : 90, background: t.surface, border: `1.5px solid ${promoPwError ? '#f85149' : t.border}`, borderRadius: 8, color: t.text, padding: isMobile ? '10px 14px' : '8px 12px', fontSize: isMobile ? 18 : 14, textAlign: 'center', outline: 'none', letterSpacing: 4 }}
+                        placeholder="PIN — unlock Cost/GP"
+                        style={{ width: isMobile ? 150 : 170, background: t.surface2, border: `1px solid ${promoPwError ? '#f85149' : t.border}`, borderRadius: 7, color: t.text, padding: isMobile ? '8px 10px' : '6px 10px', fontSize: 12, outline: 'none', letterSpacing: 2 }}
                       />
-                      <button type="submit" style={{ background: t.accent, border: 'none', borderRadius: 8, color: '#000', fontWeight: 700, fontSize: 13, padding: isMobile ? '10px 20px' : '8px 16px', cursor: 'pointer', minHeight: isMobile ? 44 : 'unset' }}>Unlock</button>
+                      <button type="submit" style={{ background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 7, color: t.muted, fontSize: 11, fontWeight: 700, padding: '6px 12px', cursor: 'pointer', minHeight: isMobile ? 40 : 'unset' }}>Unlock</button>
+                      {promoPwError && <span style={{ fontSize: 10, color: '#f85149', fontWeight: 600 }}>PIN ผิด</span>}
                     </form>
-                    {promoPwError && <div style={{ fontSize: 11, color: '#f85149', fontWeight: 600 }}>Incorrect PIN</div>}
+                  )
+                )}
+              </div>
+
+              {/* Main content */}
+              {promoData.length === 0 ? (
+                <div style={{ display: 'flex', justifyContent: 'center', padding: '48px 0' }}>
+                  <div style={{ background: t.surface, border: `2px dashed ${t.border}`, borderRadius: 20, padding: isMobile ? '32px 24px' : '48px 64px', textAlign: 'center', maxWidth: 480 }}>
+                    <div style={{ fontSize: 40, marginBottom: 14 }}>📊</div>
+                    <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 8, color: t.text }}>ยังไม่มีข้อมูล Promotion Plan</div>
+                    <div style={{ fontSize: 13, color: t.muted, lineHeight: 1.9 }}>
+                      รัน <code style={{ background: t.surface2, padding: '2px 8px', borderRadius: 4, fontFamily: 'monospace', color: t.blue }}>python convert_promo.py</code><br />
+                      แล้ว build และ push เพื่อ deploy
+                    </div>
                   </div>
+                </div>
+              ) : !promoRetailer ? (
+                <div style={{ display: 'flex', justifyContent: 'center', padding: '56px 0' }}>
+                  <div style={{ textAlign: 'center', maxWidth: 340 }}>
+                    <div style={{ fontSize: 44, marginBottom: 14 }}>🏪</div>
+                    <div style={{ fontSize: 17, fontWeight: 800, color: t.text, marginBottom: 8 }}>เลือก Customer ด้านบน</div>
+                    <div style={{ fontSize: 13, color: t.muted, lineHeight: 1.7 }}>
+                      {PROMO_RETAILERS.length > 0 ? `มีข้อมูล ${PROMO_RETAILERS.length} ร้าน · ${PROMO_RETAILERS.join(', ')}` : 'ยังไม่มีข้อมูล'}
+                    </div>
+                  </div>
+                </div>
+              ) : !promoCurrentGroup || promoCurrentGroup.items.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '40px 0', color: t.muted }}>
+                  <div style={{ fontSize: 28, marginBottom: 8 }}>🔍</div>
+                  <div style={{ fontWeight: 600 }}>ไม่พบข้อมูลที่ตรงกับ filter</div>
+                </div>
+              ) : (
+                <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 12 }}>
+                  {/* Retailer section header */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 18px', borderBottom: `1px solid ${t.border}`, borderRadius: '12px 12px 0 0', background: dark ? 'rgba(255,255,255,0.025)' : 'rgba(0,0,0,0.02)' }}>
+                    <RetailerLogo name={promoRetailer} h={28} maxW={84} fallbackStyle={{ fontSize: 14, fontWeight: 800, color: t.text }} />
+                    <span style={{ fontSize: 11, color: t.muted }}>{promoCurrentGroup.items.length} products · {promoCurrentGroup.periods.length} periods</span>
+                  </div>
+                  {/* Scrollable table */}
+                  <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: Math.max(420, 220 + promoCurrentGroup.periods.length * 115) }}>
+                      <thead>
+                        <tr style={{ borderBottom: `2px solid ${t.border}`, background: dark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.015)' }}>
+                          <th style={{ padding: '11px 16px', textAlign: 'left', color: t.muted, fontWeight: 700, fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5, position: 'sticky', left: 0, background: dark ? '#1a1f28' : '#edf0f4', zIndex: 2, minWidth: 220 }}>Product</th>
+                          {promoCurrentGroup.periods.map(period => (
+                            <th key={period.name} style={{ padding: '9px 10px', textAlign: 'center', minWidth: 115, borderLeft: `1px solid ${t.dim}` }}>
+                              <div style={{ fontWeight: 800, fontSize: 12, color: t.text }}>{period.name}</div>
+                              {period.dateRange && <div style={{ fontSize: 10, color: t.muted, marginTop: 1, fontWeight: 400 }}>{period.dateRange}</div>}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(() => {
+                          const brands = [...new Set(promoCurrentGroup.items.map(it => it.brand || '—'))]
+                          return brands.flatMap(brand => {
+                            const brandItems = promoCurrentGroup.items.filter(it => (it.brand || '—') === brand)
+                            return [
+                              // Brand group header row
+                              <tr key={`g-${brand}`} style={{ background: dark ? 'rgba(240,192,64,0.07)' : 'rgba(184,133,10,0.07)', borderBottom: `1px solid ${t.dim}` }}>
+                                <td colSpan={promoCurrentGroup.periods.length + 1} style={{ padding: '5px 16px 5px 16px', position: 'sticky', left: 0, background: dark ? 'rgba(240,192,64,0.07)' : 'rgba(184,133,10,0.07)' }}>
+                                  <span style={{ fontSize: 11, fontWeight: 800, color: t.accent, textTransform: 'uppercase', letterSpacing: 1 }}>{brand}</span>
+                                  <span style={{ fontSize: 10.5, color: t.muted, marginLeft: 8 }}>{brandItems.length} SKU{brandItems.length !== 1 ? 's' : ''}</span>
+                                </td>
+                              </tr>,
+                              // Product rows
+                              ...brandItems.flatMap((item, idx) => {
+                                const rowKey = item.barcode + promoRetailer
+                                const isExpanded = expandedCostRows.has(rowKey)
+                                const isLastInGroup = idx === brandItems.length - 1
+                                const rows = [
+                                  <tr key={rowKey} className="rhover" style={{ borderBottom: `1px solid ${isLastInGroup ? t.border : t.dim}` }}>
+                                    <td style={{ padding: '9px 14px', position: 'sticky', left: 0, background: t.surface, zIndex: 1 }}>
+                                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 7 }}>
+                                        {promoUnlocked && (
+                                          <button onClick={() => toggleCostRow(rowKey)} title={isExpanded ? 'Hide Cost/GP' : 'Show Cost/GP'}
+                                            style={{ flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer', color: isExpanded ? t.accent : t.muted, fontSize: 12, lineHeight: 1, padding: '2px 0', marginTop: 1 }}>
+                                            {isExpanded ? '▾' : '▸'}
+                                          </button>
+                                        )}
+                                        <div style={{ minWidth: 0 }}>
+                                          <div style={{ fontWeight: 700, fontSize: 13, color: t.text, lineHeight: 1.35, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 190 }}>{item.product}</div>
+                                          <div style={{ fontSize: 10.5, color: t.muted, fontFamily: 'monospace', marginTop: 2 }}>{item.barcode}{item.packSize ? ` · ${item.packSize}` : ''}</div>
+                                          {item.rspIncVat != null && <div style={{ fontSize: 10.5, color: t.muted, marginTop: 1 }}>RSP ฿{item.rspIncVat}</div>}
+                                        </div>
+                                      </div>
+                                    </td>
+                                    {promoCurrentGroup.periods.map(period => {
+                                      const pd = item.periods[period.name]
+                                      const hasPromo = pd && (pd.salePrice != null || pd.saleLabel)
+                                      const acts = pd?.activities || []
+                                      return (
+                                        <td key={period.name} style={{ padding: '8px 8px', textAlign: 'center', verticalAlign: 'middle', borderLeft: `1px solid ${t.dim}`, background: hasPromo ? (dark ? 'rgba(6,182,212,0.09)' : 'rgba(6,182,212,0.07)') : 'transparent' }}>
+                                          {hasPromo ? (
+                                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                                              <div style={{ fontWeight: 800, fontSize: 14, color: t.text }}>
+                                                {pd.salePrice != null ? `฿${pd.salePrice.toLocaleString('th-TH')}` : pd.saleLabel}
+                                              </div>
+                                              {acts.length > 0 && (
+                                                <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
+                                                  {acts.map(a => {
+                                                    const ac = PROMO_ACTIVITY_DISPLAY[a]
+                                                    return ac ? <span key={a} title={ac.label} style={{ width: 7, height: 7, borderRadius: '50%', background: ac.color, display: 'inline-block', boxShadow: `0 0 4px 1px ${ac.color}99` }} /> : null
+                                                  })}
+                                                </div>
+                                              )}
+                                            </div>
+                                          ) : (
+                                            <span style={{ color: t.dim, fontSize: 18 }}>—</span>
+                                          )}
+                                        </td>
+                                      )
+                                    })}
+                                  </tr>
+                                ]
+                                // Cost/GP expandable sub-row
+                                if (promoUnlocked && isExpanded) {
+                                  rows.push(
+                                    <tr key={rowKey + '-cost'} style={{ background: dark ? 'rgba(240,192,64,0.05)' : 'rgba(184,133,10,0.05)', borderBottom: `1px solid ${t.border}` }}>
+                                      <td style={{ padding: '7px 14px 8px 37px', position: 'sticky', left: 0, background: dark ? 'rgba(26,31,40,0.96)' : 'rgba(244,246,249,0.96)' }}>
+                                        <div style={{ display: 'flex', gap: 16, fontSize: 11.5 }}>
+                                          <span style={{ color: t.muted }}>Cost: <strong style={{ color: t.text }}>{item.cost != null ? `฿${item.cost.toFixed(2)}` : '—'}</strong></span>
+                                          <span style={{ color: t.muted }}>GP: <strong style={{ color: item.gp != null ? (item.gp >= 0.30 ? t.green : item.gp >= 0.20 ? t.yellow : t.red) : t.muted }}>{item.gp != null ? `${Math.round(item.gp * 100)}%` : '—'}</strong></span>
+                                        </div>
+                                      </td>
+                                      {promoCurrentGroup.periods.map(period => {
+                                        const comp = item.periods[period.name]?.compensate
+                                        return (
+                                          <td key={period.name} style={{ padding: '7px 8px', textAlign: 'center', borderLeft: `1px solid ${t.dim}` }}>
+                                            {comp != null ? (
+                                              <span style={{ fontSize: 11.5, fontWeight: 700, color: comp < 0 ? t.red : t.muted }}>฿{comp.toFixed(2)}</span>
+                                            ) : <span style={{ color: t.dim }}>—</span>}
+                                          </td>
+                                        )
+                                      })}
+                                    </tr>
+                                  )
+                                }
+                                return rows
+                              })
+                            ]
+                          })
+                        })()}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* ── Compensate Calculator ── */}
+              <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 12, padding: isMobile ? 16 : 20 }}>
+                <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>Compensate Calculator</div>
+                <div style={{ fontSize: 11, color: t.muted, marginBottom: 14 }}>
+                  <code style={{ fontFamily: 'monospace', fontSize: 11 }}>RSP(ex) − Sale(inc) ÷ 1.07</code>
+                  {!promoUnlocked && <span style={{ marginLeft: 10, opacity: 0.7 }}>— unlock Cost/GP ด้านบนก่อน</span>}
+                </div>
+                {!promoUnlocked ? (
+                  <div style={{ fontSize: 12, color: t.dim, fontStyle: 'italic', padding: '8px 0' }}>🔒 ใส่ PIN ด้านบนเพื่อใช้งาน</div>
                 ) : (
                   <div>
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
-                      <span style={{ fontSize: 10, color: t.muted, marginRight: 8 }}>{promoUnlockedDept} dept</span>
-                      <button onClick={() => { setPromoUnlocked(false); setPromoUnlockedDept(''); sessionStorage.removeItem('pu'); sessionStorage.removeItem('puDept') }} style={{ background: 'none', border: 'none', fontSize: 10, color: t.muted, cursor: 'pointer', padding: '2px 6px', opacity: 0.6 }}>🔒 Lock</button>
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(3, 1fr)', gap: 12 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, maxWidth: 380 }}>
                       {[
-                        { label: 'RSP (ex-VAT) ฿', value: calcRsp, set: setCalcRsp, ph: 'เช่น 93.46' },
-                        { label: 'Sale Price (inc-VAT) ฿', value: calcSale, set: setCalcSale, ph: 'เช่น 89.00' },
-                        { label: 'Quantity', value: calcQty, set: setCalcQty, ph: '1' },
+                        { label: 'RSP (inc-VAT) ฿', value: calcRspInc, set: setCalcRspInc, ph: 'เช่น 135' },
+                        { label: 'Sale Price (inc-VAT) ฿', value: calcSaleInc, set: setCalcSaleInc, ph: 'เช่น 115' },
                       ].map(({ label, value, set, ph }) => (
                         <div key={label}>
                           <div style={{ fontSize: 10, color: t.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>{label}</div>
@@ -1607,29 +1733,24 @@ export default function App() {
                         </div>
                       ))}
                     </div>
-                    {calcRsp && calcSale && (() => {
-                      const rsp = parseFloat(calcRsp), sale = parseFloat(calcSale), qty = parseFloat(calcQty) || 1
-                      if (isNaN(rsp) || isNaN(sale)) return null
-                      const compUnit = rsp - (sale / 1.07)
-                      const compTotal = compUnit * qty
-                      const saleEx = sale / 1.07
-                      const pct = ((compUnit / rsp) * 100)
-                      const isNeg = compUnit < 0
+                    {calcRspInc && calcSaleInc && (() => {
+                      const rspInc = parseFloat(calcRspInc), saleInc = parseFloat(calcSaleInc)
+                      if (isNaN(rspInc) || isNaN(saleInc)) return null
+                      const rspEx = rspInc / 1.07, saleEx = saleInc / 1.07
+                      const comp = rspEx - saleEx
+                      const isNeg = comp < 0
                       return (
-                        <div style={{ marginTop: 14, padding: '14px 18px', borderRadius: 10, background: isNeg ? `${t.red}14` : `${t.green}14`, border: `1px solid ${isNeg ? t.red + '44' : t.green + '44'}` }}>
-                          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', gap: 14 }}>
-                            {[
-                              { label: 'Sale (ex-VAT)', value: `฿${saleEx.toFixed(2)}`, color: t.muted },
-                              { label: 'Compensate / unit', value: `฿${compUnit.toFixed(2)}`, color: isNeg ? t.red : t.green, big: true },
-                              { label: `Total (×${qty})`, value: `฿${compTotal.toFixed(2)}`, color: isNeg ? t.red : t.green, big: true },
-                              { label: 'Discount %', value: `${pct.toFixed(1)}%`, color: t.muted },
-                            ].map(({ label, value, color, big }) => (
-                              <div key={label}>
-                                <div style={{ fontSize: 9.5, color: t.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>{label}</div>
-                                <div style={{ fontSize: big ? 20 : 15, fontWeight: 800, color }}>{value}</div>
-                              </div>
-                            ))}
-                          </div>
+                        <div style={{ marginTop: 14, padding: '14px 18px', borderRadius: 10, background: isNeg ? `${t.red}14` : `${t.green}14`, border: `1px solid ${isNeg ? t.red + '44' : t.green + '44'}`, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, maxWidth: 380 }}>
+                          {[
+                            { label: 'RSP (ex-VAT)', value: `฿${rspEx.toFixed(2)}`, color: t.muted },
+                            { label: 'Compensate / unit', value: `฿${comp.toFixed(2)}`, color: isNeg ? t.red : t.green, big: true },
+                            { label: 'Discount', value: `${((comp / rspEx) * 100).toFixed(1)}%`, color: t.muted },
+                          ].map(({ label, value, color, big }) => (
+                            <div key={label}>
+                              <div style={{ fontSize: 9.5, color: t.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>{label}</div>
+                              <div style={{ fontSize: big ? 20 : 14, fontWeight: 800, color }}>{value}</div>
+                            </div>
+                          ))}
                         </div>
                       )
                     })()}
@@ -1671,7 +1792,10 @@ export default function App() {
               <div key={p.barcode} className="rhover" onClick={() => { setSelectedProduct(p); setMatrixPopover(null) }}
                 style={{ padding: '9px 16px', cursor: 'pointer', borderBottom: `1px solid ${t.dim}` }}>
                 <div style={{ fontSize: 12, fontWeight: 600, color: t.text, lineHeight: 1.35 }}>{p.product}</div>
-                <div style={{ fontSize: 10, color: t.muted, fontFamily: 'monospace', marginTop: 2 }}>{p.barcode}{p.packSize ? ` · ${p.packSize}` : ''}</div>
+                <div style={{ fontSize: 10, color: t.muted, marginTop: 3, lineHeight: 1.7 }}>
+                  <span style={{ fontFamily: 'monospace' }}>Barcode: {p.barcode}</span>
+                  {p.packSize && <><br /><span>Pack Size: {p.packSize}</span></>}
+                </div>
               </div>
             ))}
           </div>

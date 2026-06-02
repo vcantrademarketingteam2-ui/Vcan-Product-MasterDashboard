@@ -42,7 +42,8 @@ CONFIG = {
         'file': 'Villa - Activity Promotion 2026.xlsx',
         'sheets': ['Plan Update', 'Moola'],
         'header_row': 8,
-        'cols': {'barcode': 1, 'product': 2, 'pack': 3, 'cost': 4, 'rsp': 5, 'gp': 6, 'period_start': 7},
+        # A=Barcode, B=Item code, C=Product, D=Pack, E=Cost, F=RSP, G=GP%, H+=periods
+        'cols': {'barcode': 1, 'product': 3, 'pack': 4, 'cost': 5, 'rsp': 6, 'gp': 7, 'period_start': 8},
     },
     'Big C': {
         'file': 'Big C - Activity Promotion 2026.xlsx',
@@ -137,7 +138,7 @@ def parse_sheet(ws, cfg, retailer):
     h = cfg['header_row'] - 1  # convert to 0-indexed
     rows = list(ws.iter_rows(values_only=False))
     if h >= len(rows):
-        print(f'    ⚠  Header row {cfg["header_row"]} out of range (sheet has {len(rows)} rows)')
+        print(f'    (!)  Header row {cfg["header_row"]} out of range (sheet has {len(rows)} rows)')
         return [], []
 
     header_row = rows[h]
@@ -270,14 +271,14 @@ def main():
     for retailer, cfg in CONFIG.items():
         fpath = BASE_DIR / cfg['file']
         if not fpath.exists():
-            print(f'  ⚠  Skipping {retailer}: not found at {fpath}')
+            print(f'  (!)  Skipping {retailer}: not found at {fpath}')
             continue
 
         print(f'  Parsing {retailer}...')
         try:
             wb = openpyxl.load_workbook(fpath, read_only=False, data_only=True)
         except Exception as e:
-            print(f'    ❌ Failed to open: {e}')
+            print(f'    FAIL Failed to open: {e}')
             continue
 
         sheets = cfg.get('sheets') or [wb.sheetnames[0]]
@@ -287,7 +288,7 @@ def main():
         for sheet_name in sheets:
             if sheet_name not in wb.sheetnames:
                 # Try first sheet as fallback
-                print(f'    ⚠  Sheet "{sheet_name}" not found — trying first sheet')
+                print(f'    (!)  Sheet "{sheet_name}" not found — trying first sheet')
                 sheet_name = wb.sheetnames[0]
             ws = wb[sheet_name]
             products, periods = parse_sheet(ws, cfg, retailer)
@@ -305,9 +306,9 @@ def main():
             all_products.extend(retailer_products)
             promo_meta[retailer] = {'periods': retailer_periods}
             promo_retailers.append(retailer)
-            print(f'    ✓  {len(retailer_products)} products, {len(retailer_periods)} periods')
+            print(f'    OK {len(retailer_products)} products, {len(retailer_periods)} periods')
         else:
-            print(f'    ⚠  No promo products found (check header_row in CONFIG)')
+            print(f'    (!)  No promo products found (check header_row in CONFIG)')
 
     # Write promo_data.js
     now = datetime.now().isoformat()
@@ -333,7 +334,7 @@ def main():
     ]
 
     OUT.write_text('\n'.join(js_lines), encoding='utf-8')
-    print(f'\n✅ Done — {len(all_products)} records across {len(promo_retailers)} retailers → {OUT}')
+    print(f'\nDone -- {len(all_products)} records across {len(promo_retailers)} retailers -> {OUT}')
     if not all_products:
         print('   Tip: If all retailers were skipped, check BASE_DIR path and CONFIG header_row values.')
 
