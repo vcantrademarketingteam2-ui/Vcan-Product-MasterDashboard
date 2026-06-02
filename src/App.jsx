@@ -7,8 +7,8 @@ const RETAILERS = ['Tops', 'Villa', 'The Mall', 'Lotus', 'Homepro', 'Big C', 'TW
 
 // Department PINs — values come from .env (VITE_ prefix = compiled into bundle)
 const DEPT_PINS = {
-  [import.meta.env.VITE_PIN_SALES]: 'Sales/Trade Marketing',
-  [import.meta.env.VITE_PIN_DATA]:    'Data',
+  [import.meta.env.VITE_PIN_SALES ?? '2745']: 'Sales/Trade Marketing',
+  [import.meta.env.VITE_PIN_DATA   ?? '4343']: 'Data',
 }
 
 function logPricingAccess(dept, productName) {
