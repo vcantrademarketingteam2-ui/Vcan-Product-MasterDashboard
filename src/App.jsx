@@ -4,7 +4,20 @@ import retailerData from './retailer_data.js'
 import vcanLogo from './VCAN.png'
 
 const RETAILERS = ['Tops', 'Villa', 'The Mall', 'Lotus', 'Homepro', 'Big C', 'TWD', 'Boots', 'Foodland', 'Central Department', "Pet'n me", 'Fuji']
-const PRICING_PASSWORD = '2745'
+
+// Department PINs — values come from .env (VITE_ prefix = compiled into bundle)
+const DEPT_PINS = {
+  [import.meta.env.VITE_PIN_GENERAL]: 'General',
+  [import.meta.env.VITE_PIN_DATA]:    'Data',
+}
+
+function logPricingAccess(dept, productName) {
+  try {
+    const logs = JSON.parse(localStorage.getItem('pricingLog') || '[]')
+    logs.unshift({ dept, product: productName, time: new Date().toISOString() })
+    localStorage.setItem('pricingLog', JSON.stringify(logs.slice(0, 200)))
+  } catch {}
+}
 
 const fmtTs = (d) => {
   const dt = new Date(d)
@@ -157,6 +170,7 @@ function ProductPopup({ product, onClose, t, dark, isMobile = false, pricing = {
   const [isDragging, setIsDragging] = useState(false)
   // pricing lock — persists across products within the same session
   const [pricingUnlocked, setPricingUnlocked] = useState(() => sessionStorage.getItem('pu') === '1')
+  const [unlockedDept, setUnlockedDept] = useState(() => sessionStorage.getItem('puDept') || '')
   const [pwInput, setPwInput] = useState('')
   const [pwError, setPwError] = useState(false)
   const lbRef = useRef(null)
@@ -259,7 +273,10 @@ function ProductPopup({ product, onClose, t, dark, isMobile = false, pricing = {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
         <div style={{ fontSize: 11, color: t.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.8 }}>Retailer Pricing</div>
         {pricingUnlocked && (
-          <button onClick={() => { setPricingUnlocked(false); sessionStorage.removeItem('pu') }} style={{ background: 'none', border: 'none', fontSize: 10, color: t.muted, cursor: 'pointer', padding: '2px 6px', opacity: 0.6 }}>🔒 Lock</button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 10, color: t.muted, fontWeight: 600 }}>{unlockedDept} dept</span>
+            <button onClick={() => { setPricingUnlocked(false); setUnlockedDept(''); sessionStorage.removeItem('pu'); sessionStorage.removeItem('puDept') }} style={{ background: 'none', border: 'none', fontSize: 10, color: t.muted, cursor: 'pointer', padding: '2px 6px', opacity: 0.6 }}>🔒 Lock</button>
+          </div>
         )}
       </div>
       {!pricingUnlocked ? (
@@ -275,7 +292,7 @@ function ProductPopup({ product, onClose, t, dark, isMobile = false, pricing = {
               onChange={e => { setPwInput(e.target.value); setPwError(false) }}
               onKeyDown={e => {
                 if (e.key === 'Enter') {
-                  if (pwInput === PRICING_PASSWORD) { setPricingUnlocked(true); sessionStorage.setItem('pu', '1'); setPwInput('') }
+                  const dept = DEPT_PINS[pwInput]; if (dept) { setPricingUnlocked(true); setUnlockedDept(dept); sessionStorage.setItem('pu', '1'); sessionStorage.setItem('puDept', dept); logPricingAccess(dept, product.product); setPwInput('') }
                   else { setPwError(true); setPwInput('') }
                 }
               }}
@@ -859,6 +876,12 @@ export default function App() {
             </div>
           </div>
         )}
+        {/* Credit */}
+        <div style={{ padding: '12px 14px', borderTop: `1px solid ${t.border}`, flexShrink: 0 }}>
+          <div style={{ fontSize: 9.5, color: t.muted, opacity: 0.55, lineHeight: 1.5, textAlign: 'center' }}>
+            Made by Meth<br />Trade Marketing
+          </div>
+        </div>
       </aside>
 
       {/* ── MAIN ── */}
@@ -882,7 +905,7 @@ export default function App() {
             <div style={{ fontWeight: 800, fontSize: isMobile ? 14 : 17, color: t.text, letterSpacing: 0.2, whiteSpace: 'nowrap', flexShrink: 0 }}>
               Product Master
             </div>
-            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v2.4.8</span>
+            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v2.5.0</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: isMobile ? 11 : 13, background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, padding: isMobile ? '3px 8px' : '5px 12px', overflow: 'hidden', minWidth: 0, flexShrink: 1 }}>
               <span style={{ width: isMobile ? 6 : 7, height: isMobile ? 6 : 7, borderRadius: '50%', flexShrink: 0, background: dataSource === 'csv' ? t.blue : t.green }} />
               <span style={{ fontWeight: 800, color: dataSource === 'csv' ? t.blue : t.green, flexShrink: 0 }}>

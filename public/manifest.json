@@ -4,7 +4,7 @@
   "description": "VCAN Trade Marketing — Product Master Dashboard",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#f0c040",
+  "background_color": "#0d1117",
   "theme_color": "#0d1117",
   "orientation": "any",
   "icons": [

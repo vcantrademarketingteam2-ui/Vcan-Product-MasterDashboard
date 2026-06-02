@@ -35,3 +35,6 @@ public/packshots/*.png
 
 # Local backups — keep out of git
 backups/
+*.local
+.env
+.env.*
