@@ -13,17 +13,23 @@ import openpyxl
 BASE_DIR = Path(r'Y:\MARKETING\Promotion Plan ทุกห้าง\2026')
 OUT = Path('src/promo_data.js')
 
-# Activity fill-color detection (openpyxl returns ARGB format: AARRGGBB)
-ACTIVITY_COLORS = {
-    'FFFFFF00': 'media',    # bright yellow = ลงสื่อ (Tops, Villa, Big C)
-    'FFFFC000': 'media',    # amber = ลงสื่อ
-    'FF00B0F0': 'field',    # blue = ลงพื้นที่ (Big C)
-    'FF00B050': 'field',    # green = ลงพื้นที่
-    'FF92D050': 'field',    # lime green = ลงพื้นที่
-    'FFFF0000': None,       # red = ยกเลิก (skip)
-    'FFD9D9D9': None,       # gray = header/ignore
-    'FFBDD7EE': None,       # light blue header = ignore
-    'FFE2EFDA': None,       # light green header = ignore
+# Fill colours (openpyxl ARGB AARRGGBB) grouped into families. The *meaning* of a
+# family differs per retailer (Tops yellow=media but Villa yellow=field — the stores
+# literally swap them), so we map hex -> family here and family -> activity per store.
+COLOR_FAMILY = {
+    'FFFFFF00': 'yellow', 'FFFFC000': 'yellow', 'FFFFFF99': 'yellow',
+    'FF00B0F0': 'blue', 'FFA3DBFF': 'blue', 'FF76E3FF': 'blue', 'FF33CCCC': 'blue', 'FF00B050': 'blue',
+    'FF99FF99': 'green', 'FF92D050': 'green',
+    'FFCE60D1': 'purple', 'FFE3A5E5': 'purple', 'FFFF9933': 'orange', 'FFC65911': 'orange',
+}
+# Ignore: red = cancelled row, pink/grey = header highlighting
+IGNORE_COLORS = {'FFFF0000', 'FFFF99FF', 'FFFF9999', 'FFD9D9D9', 'FFBDD7EE', 'FFE2EFDA'}
+
+# family -> activity, per retailer. '_default' applies to any store not listed.
+RETAILER_ACTIVITY = {
+    '_default': {'yellow': 'media', 'blue': 'field', 'green': 'field', 'purple': 'media', 'orange': 'media'},
+    'Villa':    {'yellow': 'field', 'blue': 'media', 'green': 'field', 'purple': 'media', 'orange': 'media'},  # swapped vs Tops
+    'TWD':      {'yellow': 'media', 'blue': 'media', 'green': 'media', 'purple': 'media', 'orange': 'media'},  # all media (Bro.N)
 }
 
 LOOKS_KEYWORDS = ['looks', 'magazine']
@@ -42,6 +48,10 @@ CONFIG = {
         'file': 'Villa - Activity Promotion 2026.xlsx',
         'sheets': ['Plan Update', 'Moola'],
         'header_row': 8,
+        # Period NAMES (Monthly1..6) sit on row 7, sale-period dates on row 5 — above the
+        # Barcode row (8). Row 8 itself only has '/' placeholders in the period columns.
+        'period_name_row': 7,
+        'period_date_row': 5,
         # A=Barcode, B=Item code, C=Product, D=Pack, E=Cost, F=RSP, G=GP%, H+=periods
         'cols': {'barcode': 1, 'product': 3, 'pack': 4, 'cost': 5, 'rsp': 6, 'gp': 7, 'period_start': 8},
     },
@@ -115,14 +125,34 @@ def get_fill_color(cell):
     return None
 
 
-def map_activity(color_hex, cell_value=''):
-    """Map fill color + cell value to activity key."""
-    if color_hex and color_hex in ACTIVITY_COLORS:
-        return ACTIVITY_COLORS[color_hex]
-    val_str = str(cell_value or '').lower()
-    if any(k in val_str for k in LOOKS_KEYWORDS):
-        return 'looks'
-    return None
+def detect_activities(cell, retailer, period_name=''):
+    """Return a list of activity keys for one promo cell, combining three signals:
+      1. cell comment containing 'LOOK' -> looks (gold) — LOOKS magazine is noted in
+         comments/remarks, never by fill colour
+      2. period name containing 'bro' -> media (brochure column, e.g. TWD Bro.N)
+      3. fill colour -> field/media via the retailer's colour map
+    """
+    acts = []
+    # 1) comment-based LOOKS
+    try:
+        if cell.comment and 'look' in cell.comment.text.lower():
+            acts.append('looks')
+    except Exception:
+        pass
+    # 2) brochure period name = media
+    if 'bro' in str(period_name).lower():
+        if 'media' not in acts:
+            acts.append('media')
+    # 3) fill colour
+    color = get_fill_color(cell)
+    if color and color not in IGNORE_COLORS:
+        fam = COLOR_FAMILY.get(color)
+        if fam:
+            amap = RETAILER_ACTIVITY.get(retailer, RETAILER_ACTIVITY['_default'])
+            act = amap.get(fam)
+            if act and act not in acts:
+                acts.append(act)
+    return acts
 
 
 def num(val):
@@ -170,17 +200,21 @@ def parse_sheet(ws, cfg, retailer):
         print(f'    (!)  Header row out of range (sheet has {len(rows)} rows)')
         return [], []
 
-    header_row = rows[h]
-    date_row = rows[h + 1] if h + 1 < len(rows) else []
-
     c = cfg['cols']
     ps = c['period_start'] - 1  # 0-indexed
 
-    # Extract period column definitions from header row
+    # Some files (Villa) put the period *names* on a row ABOVE the Barcode row, with the
+    # date range higher still. Allow per-retailer overrides; default to the header row.
+    name_row_i = (cfg['period_name_row'] - 1) if cfg.get('period_name_row') else h
+    date_row_i = (cfg['period_date_row'] - 1) if cfg.get('period_date_row') else h + 1
+    name_row = rows[name_row_i] if name_row_i < len(rows) else []
+    date_row = rows[date_row_i] if date_row_i < len(rows) else []
+
+    # Extract period column definitions
     periods = []
     seen_names = set()
-    for ci in range(ps, len(header_row)):
-        cell = header_row[ci]
+    for ci in range(ps, len(name_row)):
+        cell = name_row[ci]
         val = cell.value
         if not val:
             continue
@@ -260,9 +294,7 @@ def parse_sheet(ws, cfg, retailer):
                 else:
                     sale_label = val.strip()  # e.g. "Buy2Get1", "3for499"
 
-            color = get_fill_color(cell)
-            act = map_activity(color, val)
-            activities = [act] if act else []
+            activities = detect_activities(cell, retailer, p['name'])
 
             # Compensate = RSP_ex - (sale_price_inc / 1.07)
             compensate = None
@@ -316,6 +348,7 @@ def main():
         retailer_periods = []
         retailer_products = []
 
+        by_barcode = {}  # dedup within a retailer: same barcode -> merge period dicts
         for sheet_name in sheets:
             if sheet_name not in wb.sheetnames:
                 # Try first sheet as fallback
@@ -323,7 +356,15 @@ def main():
                 sheet_name = wb.sheetnames[0]
             ws = wb[sheet_name]
             products, periods = parse_sheet(ws, cfg, retailer)
-            retailer_products.extend(products)
+            for prod in products:
+                bc = prod['barcode']
+                if bc in by_barcode:
+                    # merge: keep existing fields, fold in any periods it doesn't have yet
+                    for pname, pdata in prod['periods'].items():
+                        by_barcode[bc]['periods'].setdefault(pname, pdata)
+                else:
+                    by_barcode[bc] = prod
+                    retailer_products.append(prod)
             # Merge periods (union, preserve order)
             existing = {p['name'] for p in retailer_periods}
             for p in periods:
