@@ -133,12 +133,41 @@ def num(val):
         return None
 
 
+def detect_header_row(rows, cfg_fallback):
+    """Find the row index (0-based) containing 'Barcode' in the first few columns.
+    Sheets in the same file can have headers on different rows (e.g. Tops VCAN row 9
+    vs อาหารสัตว์ row 3), so we detect per-sheet instead of trusting one config value."""
+    for ri, row in enumerate(rows[:20]):
+        for ci in range(0, 4):
+            if ci < len(row):
+                v = row[ci].value
+                if v is not None and str(v).strip().lower() == 'barcode':
+                    return ri
+    return cfg_fallback - 1  # fall back to config (1-indexed -> 0-indexed)
+
+
+def looks_like_period(name, date_range):
+    """Real periods are dates or month/cycle labels ('2603/04', 'Jan', 'SP6'). Junk
+    columns from mis-structured sheets hold promo *values* ('75', 'buy 2 get 1',
+    'Buy2 145') — reject pure numbers and promo-keyword strings."""
+    n = str(name).strip().lower()
+    if not n:
+        return False
+    # pure number (with optional decimal/comma) = a promo price, not a period
+    if n.replace('.', '').replace(',', '').isdigit():
+        return False
+    # promo-deal wording leaked into a header
+    if any(k in n for k in ('buy', 'get', 'free', 'แถม', 'ซื้อ')):
+        return False
+    return True
+
+
 def parse_sheet(ws, cfg, retailer):
     """Parse one worksheet, return (products list, periods list)."""
-    h = cfg['header_row'] - 1  # convert to 0-indexed
     rows = list(ws.iter_rows(values_only=False))
+    h = detect_header_row(rows, cfg['header_row'])
     if h >= len(rows):
-        print(f'    (!)  Header row {cfg["header_row"]} out of range (sheet has {len(rows)} rows)')
+        print(f'    (!)  Header row out of range (sheet has {len(rows)} rows)')
         return [], []
 
     header_row = rows[h]
@@ -158,12 +187,14 @@ def parse_sheet(ws, cfg, retailer):
         name = str(val).strip()
         if not name or name.lower() in SKIP_HEADER_KEYWORDS:
             continue
-        if name in seen_names:
-            name = f'{name}_{ci}'  # deduplicate
-        seen_names.add(name)
         date_range = ''
         if ci < len(date_row) and date_row[ci].value:
             date_range = str(date_row[ci].value).strip()
+        if not looks_like_period(name, date_range):
+            continue  # skip junk columns (promo values, calc columns)
+        if name in seen_names:
+            name = f'{name}_{ci}'  # deduplicate
+        seen_names.add(name)
         periods.append({'name': name, 'dateRange': date_range, 'colIdx': ci})
 
     # Parse product rows (skip header + date rows)
