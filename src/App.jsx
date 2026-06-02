@@ -428,6 +428,7 @@ export default function App() {
   const [vendorFilter, setVendorFilter] = useState('ALL')
   const [search, setSearch] = useState('')
   const [selectedBrands, setSelectedBrands] = useState([])
+  const [selectedRetailers, setSelectedRetailers] = useState([])
   const [statusTab, setStatusTab] = useState('ALL')
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [selectedProduct, setSelectedProduct] = useState(null)
@@ -490,14 +491,16 @@ export default function App() {
   const visibleBrands = VENDOR_BRANDS[vendorFilter] || VENDOR_BRANDS.ALL
   const handleVendorChange = (v) => { setVendorFilter(v); setSelectedBrands([]) }
   const toggleBrand = (b) => setSelectedBrands(prev => prev.includes(b) ? prev.filter(x => x !== b) : [...prev, b])
-  const clearAll = () => { setSearch(''); setSelectedBrands([]); setStatusTab('ALL'); setVendorFilter('ALL'); setSortCol(null); setSortDir('asc') }
+  const clearAll = () => { setSearch(''); setSelectedBrands([]); setSelectedRetailers([]); setStatusTab('ALL'); setVendorFilter('ALL'); setSortCol(null); setSortDir('asc') }
+  const toggleRetailer = (r) => setSelectedRetailers(prev => prev.includes(r) ? prev.filter(x => x !== r) : [...prev, r])
   const handleSort = (col) => {
     if (sortCol === col) {
       if (sortDir === 'asc') setSortDir('desc')
       else { setSortCol(null); setSortDir('asc') }
     } else { setSortCol(col); setSortDir('asc') }
   }
-  const hasActiveFilters = search || selectedBrands.length > 0 || statusTab !== 'ALL' || vendorFilter !== 'ALL'
+  const hasActiveFilters = search || selectedBrands.length > 0 || selectedRetailers.length > 0 || statusTab !== 'ALL' || vendorFilter !== 'ALL'
+  const visibleRetailers = selectedRetailers.length > 0 ? selectedRetailers : RETAILERS
 
   const stats = useMemo(() => ({
     total: rawData.length,
@@ -510,12 +513,16 @@ export default function App() {
     if (vendorFilter !== 'ALL' && p.company !== vendorFilter) return false
     if (selectedBrands.length > 0 && !selectedBrands.includes(p.brand.trim())) return false
     if (statusTab !== 'ALL' && p.status !== statusTab) return false
+    if (selectedRetailers.length > 0) {
+      // keep product only if it has any relationship with at least one selected retailer
+      if (!selectedRetailers.some(r => p.retailers[r])) return false
+    }
     if (search) {
       const q = search.toLowerCase()
       if (!p.product.toLowerCase().includes(q) && !p.brand.toLowerCase().includes(q) && !p.barcode.includes(q)) return false
     }
     return true
-  }), [rawData, vendorFilter, selectedBrands, statusTab, search])
+  }), [rawData, vendorFilter, selectedBrands, selectedRetailers, statusTab, search])
 
   const sortedFiltered = useMemo(() => {
     if (!sortCol) return filtered
@@ -830,7 +837,7 @@ export default function App() {
             <div style={{ fontWeight: 800, fontSize: isMobile ? 14 : 17, color: t.text, letterSpacing: 0.2, whiteSpace: 'nowrap', flexShrink: 0 }}>
               Product Master
             </div>
-            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v2.4.3</span>
+            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v2.4.4</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: isMobile ? 11 : 13, background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, padding: isMobile ? '3px 8px' : '5px 12px', overflow: 'hidden', minWidth: 0, flexShrink: 1 }}>
               <span style={{ width: isMobile ? 6 : 7, height: isMobile ? 6 : 7, borderRadius: '50%', flexShrink: 0, background: dataSource === 'csv' ? t.blue : t.green }} />
               <span style={{ fontWeight: 800, color: dataSource === 'csv' ? t.blue : t.green, flexShrink: 0 }}>
@@ -910,6 +917,34 @@ export default function App() {
                   </div>
                 </div>
 
+                {/* Retailer logo pills */}
+                <div style={{
+                  background: t.surface, border: `1px solid ${t.border}`,
+                  borderRadius: 12, padding: '10px 14px', marginBottom: 10,
+                  boxShadow: dark ? 'none' : '0 1px 4px rgba(0,0,0,0.06)',
+                }}>
+                  <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <span style={{ fontSize: 11, color: t.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, flexShrink: 0 }}>Customer</span>
+                    {RETAILERS.map(r => {
+                      const sel = selectedRetailers.includes(r)
+                      return (
+                        <button key={r} onClick={() => toggleRetailer(r)} title={r} style={{
+                          display: 'inline-flex', alignItems: 'center',
+                          background: sel ? `${t.accent}18` : t.surface2,
+                          border: `2px solid ${sel ? t.accent : t.border}`,
+                          borderRadius: 10, padding: '3px 7px', cursor: 'pointer',
+                          boxShadow: sel ? `0 0 0 3px ${t.accent}22` : 'none',
+                        }}>
+                          <RetailerLogo name={r} h={22} maxW={58} fallbackStyle={{ fontSize: 11, fontWeight: 700, color: t.text }} />
+                        </button>
+                      )
+                    })}
+                    {selectedRetailers.length > 0 && (
+                      <button onClick={() => setSelectedRetailers([])} style={{ background: 'none', border: 'none', color: t.muted, fontSize: 11, fontWeight: 600, cursor: 'pointer', padding: '4px 6px', flexShrink: 0 }}>✕ Clear</button>
+                    )}
+                  </div>
+                </div>
+
                 {/* Brand pills — card background for contrast */}
                 <div style={{
                   background: t.surface, border: `1px solid ${t.border}`,
@@ -985,7 +1020,7 @@ export default function App() {
                               cursor: key ? 'pointer' : 'default', userSelect: 'none',
                             }}>{label}{key && <SortIcon col={key} />}</th>
                           ))}
-                          {RETAILERS.map(r => (
+                          {visibleRetailers.map(r => (
                             <th key={r} style={{
                               padding: '10px 5px', textAlign: 'center', color: t.text,
                               fontWeight: 700, fontSize: 10.5, whiteSpace: 'nowrap',
@@ -1036,7 +1071,7 @@ export default function App() {
                               {p.status === 'ขาย' ? 'Active' : p.status === 'รอขาย' ? 'Pending' : 'Discon'}
                             </span>
                           </td>
-                          {RETAILERS.map(r => (
+                          {visibleRetailers.map(r => (
                             <td key={r} style={{ padding: '9px 5px', textAlign: 'center' }}>
                               <RetailerDot value={p.retailers[r]} />
                             </td>
@@ -1045,7 +1080,7 @@ export default function App() {
                       ))}
                       {filtered.length === 0 && (
                         <tr>
-                          <td colSpan={isMobile ? 3 : 8 + RETAILERS.length} style={{ padding: 56, textAlign: 'center', color: t.muted }}>
+                          <td colSpan={isMobile ? 3 : 8 + visibleRetailers.length} style={{ padding: 56, textAlign: 'center', color: t.muted }}>
                             <div style={{ fontSize: 32, marginBottom: 10 }}>🔍</div>
                             <div style={{ fontWeight: 600 }}>ไม่พบสินค้าที่ตรงกับ filter</div>
                           </td>
