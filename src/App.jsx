@@ -4,6 +4,7 @@ import retailerData from './retailer_data.js'
 import vcanLogo from './VCAN.png'
 
 const RETAILERS = ['Tops', 'Villa', 'The Mall', 'Lotus', 'Homepro', 'Big C', 'TWD', 'Boots', 'Foodland', 'Central Department', "Pet'n me", 'Fuji']
+const PRICING_PASSWORD = '2745'
 
 const fmtTs = (d) => {
   const dt = new Date(d)
@@ -154,6 +155,10 @@ function ProductPopup({ product, onClose, t, dark, isMobile = false, pricing = {
   const [zoomScale, setZoomScale] = useState(1)
   const [panPos, setPanPos] = useState({ x: 0, y: 0 })
   const [isDragging, setIsDragging] = useState(false)
+  // pricing lock — persists across products within the same session
+  const [pricingUnlocked, setPricingUnlocked] = useState(() => sessionStorage.getItem('pu') === '1')
+  const [pwInput, setPwInput] = useState('')
+  const [pwError, setPwError] = useState(false)
   const lbRef = useRef(null)
   const dragRef = useRef(null)
   useEffect(() => {
@@ -251,31 +256,69 @@ function ProductPopup({ product, onClose, t, dark, isMobile = false, pricing = {
 
   const pricingBlock = () => Object.keys(pricing).length > 0 ? (
     <div>
-      <div style={{ fontSize: 11, color: t.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8 }}>Retailer Pricing</div>
-      <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5, minWidth: 220 }}>
-          <thead>
-            <tr style={{ borderBottom: `1px solid ${t.border}` }}>
-              <th style={{ textAlign: 'left', padding: '4px 8px', color: t.muted, fontWeight: 700, fontSize: 9.5, textTransform: 'uppercase', letterSpacing: 0.5 }}>Retailer</th>
-              <th style={{ textAlign: 'right', padding: '4px 8px', color: t.muted, fontWeight: 700, fontSize: 9.5, textTransform: 'uppercase', letterSpacing: 0.5 }}>Cost/Unit</th>
-              <th style={{ textAlign: 'right', padding: '4px 8px', color: t.muted, fontWeight: 700, fontSize: 9.5, textTransform: 'uppercase', letterSpacing: 0.5 }}>GP</th>
-            </tr>
-          </thead>
-          <tbody>
-            {RETAILERS.filter(r => pricing[r]).map(r => {
-              const d = pricing[r]
-              const gpColor = d.gp >= 0.30 ? t.green : d.gp >= 0.20 ? t.yellow : t.red
-              return (
-                <tr key={r} style={{ borderBottom: `1px solid ${t.dim}` }}>
-                  <td style={{ padding: '5px 8px', fontWeight: 700, color: t.text, whiteSpace: 'nowrap' }}>{r}</td>
-                  <td style={{ padding: '5px 8px', textAlign: 'right', color: t.text, whiteSpace: 'nowrap' }}>{d.costUnit != null ? '฿' + d.costUnit.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}</td>
-                  <td style={{ padding: '5px 8px', textAlign: 'right', fontWeight: 700, color: d.gp != null ? gpColor : t.muted }}>{d.gp != null ? Math.round(d.gp * 100) + '%' : '—'}</td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+        <div style={{ fontSize: 11, color: t.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.8 }}>Retailer Pricing</div>
+        {pricingUnlocked && (
+          <button onClick={() => { setPricingUnlocked(false); sessionStorage.removeItem('pu') }} style={{ background: 'none', border: 'none', fontSize: 10, color: t.muted, cursor: 'pointer', padding: '2px 6px', opacity: 0.6 }}>🔒 Lock</button>
+        )}
       </div>
+      {!pricingUnlocked ? (
+        <div style={{ background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 10, padding: '18px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+          <div style={{ fontSize: 28, lineHeight: 1 }}>🔒</div>
+          <div style={{ fontSize: 12, color: t.muted, fontWeight: 600, textAlign: 'center' }}>Cost & GP data is confidential<br/>Enter PIN to view</div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <input
+              type="password"
+              inputMode="numeric"
+              maxLength={10}
+              value={pwInput}
+              onChange={e => { setPwInput(e.target.value); setPwError(false) }}
+              onKeyDown={e => {
+                if (e.key === 'Enter') {
+                  if (pwInput === PRICING_PASSWORD) { setPricingUnlocked(true); sessionStorage.setItem('pu', '1'); setPwInput('') }
+                  else { setPwError(true); setPwInput('') }
+                }
+              }}
+              placeholder="PIN"
+              style={{ width: 90, background: t.surface, border: `1.5px solid ${pwError ? '#f85149' : t.border}`, borderRadius: 8, color: t.text, padding: '8px 12px', fontSize: 14, textAlign: 'center', outline: 'none', letterSpacing: 4 }}
+              autoFocus
+            />
+            <button
+              onClick={() => {
+                if (pwInput === PRICING_PASSWORD) { setPricingUnlocked(true); sessionStorage.setItem('pu', '1'); setPwInput('') }
+                else { setPwError(true); setPwInput('') }
+              }}
+              style={{ background: t.accent, border: 'none', borderRadius: 8, color: '#000', fontWeight: 700, fontSize: 12, padding: '8px 16px', cursor: 'pointer' }}
+            >Unlock</button>
+          </div>
+          {pwError && <div style={{ fontSize: 11, color: '#f85149', fontWeight: 600 }}>Incorrect PIN</div>}
+        </div>
+      ) : (
+        <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5, minWidth: 220 }}>
+            <thead>
+              <tr style={{ borderBottom: `1px solid ${t.border}` }}>
+                <th style={{ textAlign: 'left', padding: '4px 8px', color: t.muted, fontWeight: 700, fontSize: 9.5, textTransform: 'uppercase', letterSpacing: 0.5 }}>Retailer</th>
+                <th style={{ textAlign: 'right', padding: '4px 8px', color: t.muted, fontWeight: 700, fontSize: 9.5, textTransform: 'uppercase', letterSpacing: 0.5 }}>Cost/Unit</th>
+                <th style={{ textAlign: 'right', padding: '4px 8px', color: t.muted, fontWeight: 700, fontSize: 9.5, textTransform: 'uppercase', letterSpacing: 0.5 }}>GP</th>
+              </tr>
+            </thead>
+            <tbody>
+              {RETAILERS.filter(r => pricing[r]).map(r => {
+                const d = pricing[r]
+                const gpColor = d.gp >= 0.30 ? t.green : d.gp >= 0.20 ? t.yellow : t.red
+                return (
+                  <tr key={r} style={{ borderBottom: `1px solid ${t.dim}` }}>
+                    <td style={{ padding: '5px 8px', fontWeight: 700, color: t.text, whiteSpace: 'nowrap' }}>{r}</td>
+                    <td style={{ padding: '5px 8px', textAlign: 'right', color: t.text, whiteSpace: 'nowrap' }}>{d.costUnit != null ? '฿' + d.costUnit.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}</td>
+                    <td style={{ padding: '5px 8px', textAlign: 'right', fontWeight: 700, color: d.gp != null ? gpColor : t.muted }}>{d.gp != null ? Math.round(d.gp * 100) + '%' : '—'}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   ) : null
 
@@ -839,7 +882,7 @@ export default function App() {
             <div style={{ fontWeight: 800, fontSize: isMobile ? 14 : 17, color: t.text, letterSpacing: 0.2, whiteSpace: 'nowrap', flexShrink: 0 }}>
               Product Master
             </div>
-            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v2.4.7</span>
+            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v2.4.8</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: isMobile ? 11 : 13, background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, padding: isMobile ? '3px 8px' : '5px 12px', overflow: 'hidden', minWidth: 0, flexShrink: 1 }}>
               <span style={{ width: isMobile ? 6 : 7, height: isMobile ? 6 : 7, borderRadius: '50%', flexShrink: 0, background: dataSource === 'csv' ? t.blue : t.green }} />
               <span style={{ fontWeight: 800, color: dataSource === 'csv' ? t.blue : t.green, flexShrink: 0 }}>
