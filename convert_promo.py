@@ -54,19 +54,22 @@ CONFIG = {
         'file': 'Boots Plan promotion  2026.xlsx',
         'sheets': ['Sheet1'],
         'header_row': 3,
-        'cols': {'barcode': 1, 'product': 2, 'pack': 3, 'cost': 4, 'rsp': 5, 'gp': 6, 'period_start': 7},
+        # Col A empty, B=Barcode, C=Item code, D=Product, E=Pack, F=Cost, G=RSP, H=GP%, I+=periods
+        'cols': {'barcode': 2, 'product': 4, 'pack': 5, 'cost': 6, 'rsp': 7, 'gp': 8, 'period_start': 9},
     },
     'Foodland': {
         'file': 'Foodland - Activity Promotion 2026.xlsx',
         'sheets': None,
-        'header_row': 8,
-        'cols': {'barcode': 1, 'product': 2, 'pack': 3, 'cost': 4, 'rsp': 5, 'gp': 6, 'period_start': 7},
+        'header_row': 7,
+        # A=Barcode, B=Code Foodland, C=Product, D=Pack, E=Cost, F=RSP, G=GP%, H+=periods
+        'cols': {'barcode': 1, 'product': 3, 'pack': 4, 'cost': 5, 'rsp': 6, 'gp': 7, 'period_start': 8},
     },
     'Homepro': {
         'file': 'Homepro - Activity Promotion 2026.xlsx',
         'sheets': None,
-        'header_row': 8,
-        'cols': {'barcode': 1, 'product': 2, 'pack': 3, 'cost': 4, 'rsp': 5, 'gp': 6, 'period_start': 7},
+        'header_row': 6,
+        # A=Barcode, B=Article, C=Product, D=Pack, E=Cost, F=RSP, G=GP%, H+=periods
+        'cols': {'barcode': 1, 'product': 3, 'pack': 4, 'cost': 5, 'rsp': 6, 'gp': 7, 'period_start': 8},
     },
     'Lotus': {
         'file': 'Lotus - Activity Promotion 2026.xlsx',
@@ -76,9 +79,10 @@ CONFIG = {
     },
     'TWD': {
         'file': 'TWD - Activity Promotion 2026.xlsx',
-        'sheets': None,
-        'header_row': 8,
-        'cols': {'barcode': 1, 'product': 2, 'pack': 3, 'cost': 4, 'rsp': 5, 'gp': 6, 'period_start': 7},
+        'sheets': ['TWD'],
+        'header_row': 5,
+        # A=Barcode, B=Item Code, C=Product, D=Pack, E=Cost, F=RSP, G=GP%, H+=periods
+        'cols': {'barcode': 1, 'product': 3, 'pack': 4, 'cost': 5, 'rsp': 6, 'gp': 7, 'period_start': 8},
     },
     # Central: add path when available
     # 'Central Department': {
