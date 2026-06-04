@@ -48,10 +48,10 @@ CONFIG = {
         'file': 'Villa - Activity Promotion 2026.xlsx',
         'sheets': ['Plan Update', 'Moola'],
         'header_row': 8,
-        # Period NAMES (Monthly1..6) sit on row 7, sale-period dates on row 5 — above the
-        # Barcode row (8). Row 8 itself only has '/' placeholders in the period columns.
-        'period_name_row': 7,
-        'period_date_row': 5,
+        # Both Villa sheets put period NAMES (Monthly1..N) on the row directly above the
+        # Barcode row (Plan Update: names r7/barcode r8; Moola: names r6/barcode r7). Their
+        # date rows are stale 2022/2023 template values, so we show the Monthly label only.
+        'period_names_above': True,
         # A=Barcode, B=Item code, C=Product, D=Pack, E=Cost, F=RSP, G=GP%, H+=periods
         'cols': {'barcode': 1, 'product': 3, 'pack': 4, 'cost': 5, 'rsp': 6, 'gp': 7, 'period_start': 8},
     },
@@ -110,6 +110,16 @@ def is_barcode(val):
     return s.isdigit() and len(s) >= 8
 
 
+def fmt_date_cell(val):
+    """Render a date-range cell as a compact single-line string. Excel often stores these
+    as datetime objects which str() turns into '2022-11-08 00:00:00' (long, wraps) — collapse
+    those to 'DD/MM/YY'. Plain strings are just whitespace-collapsed."""
+    from datetime import datetime, date
+    if isinstance(val, (datetime, date)):
+        return val.strftime('%d/%m/%y')
+    return ' '.join(str(val).split())  # collapse internal whitespace/newlines
+
+
 def get_fill_color(cell):
     """Return ARGB hex string if cell has a solid fill, else None."""
     try:
@@ -126,11 +136,12 @@ def get_fill_color(cell):
 
 
 def detect_activities(cell, retailer, period_name=''):
-    """Return a list of activity keys for one promo cell, combining three signals:
+    """Return a list of activity keys for one promo cell, from two signals:
       1. cell comment containing 'LOOK' -> looks (gold) — LOOKS magazine is noted in
          comments/remarks, never by fill colour
-      2. period name containing 'bro' -> media (brochure column, e.g. TWD Bro.N)
-      3. fill colour -> field/media via the retailer's colour map
+      2. fill colour -> field/media via the retailer's colour map
+    An activity is only assigned when the cell is actually marked (coloured or commented);
+    a plain price with no fill = no activity (so e.g. a 'Bro' column cell isn't auto-media).
     """
     acts = []
     # 1) comment-based LOOKS
@@ -139,11 +150,7 @@ def detect_activities(cell, retailer, period_name=''):
             acts.append('looks')
     except Exception:
         pass
-    # 2) brochure period name = media
-    if 'bro' in str(period_name).lower():
-        if 'media' not in acts:
-            acts.append('media')
-    # 3) fill colour
+    # 2) fill colour
     color = get_fill_color(cell)
     if color and color not in IGNORE_COLORS:
         fam = COLOR_FAMILY.get(color)
@@ -203,12 +210,18 @@ def parse_sheet(ws, cfg, retailer):
     c = cfg['cols']
     ps = c['period_start'] - 1  # 0-indexed
 
-    # Some files (Villa) put the period *names* on a row ABOVE the Barcode row, with the
-    # date range higher still. Allow per-retailer overrides; default to the header row.
-    name_row_i = (cfg['period_name_row'] - 1) if cfg.get('period_name_row') else h
-    date_row_i = (cfg['period_date_row'] - 1) if cfg.get('period_date_row') else h + 1
-    name_row = rows[name_row_i] if name_row_i < len(rows) else []
-    date_row = rows[date_row_i] if date_row_i < len(rows) else []
+    # Period-name row location varies. Villa's two sheets both put the period NAMES
+    # (Monthly1..N) on the row directly above the Barcode row — and detect_header_row
+    # finds that Barcode row per sheet — so 'period_names_above' = h - 1 works for both,
+    # unlike a fixed row number which only matched one sheet.
+    if cfg.get('period_names_above'):
+        name_row_i = h - 1
+        date_row_i = None  # Villa's date rows are stale/inconsistent — show name only
+    else:
+        name_row_i = (cfg['period_name_row'] - 1) if cfg.get('period_name_row') else h
+        date_row_i = (cfg['period_date_row'] - 1) if cfg.get('period_date_row') else h + 1
+    name_row = rows[name_row_i] if 0 <= name_row_i < len(rows) else []
+    date_row = rows[date_row_i] if (date_row_i is not None and date_row_i < len(rows)) else []
 
     # Extract period column definitions
     periods = []
@@ -223,7 +236,7 @@ def parse_sheet(ws, cfg, retailer):
             continue
         date_range = ''
         if ci < len(date_row) and date_row[ci].value:
-            date_range = str(date_row[ci].value).strip()
+            date_range = fmt_date_cell(date_row[ci].value)
         if not looks_like_period(name, date_range):
             continue  # skip junk columns (promo values, calc columns)
         if name in seen_names:
