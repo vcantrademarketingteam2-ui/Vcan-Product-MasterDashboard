@@ -22,14 +22,19 @@ COLOR_FAMILY = {
     'FF99FF99': 'green', 'FF92D050': 'green',
     'FFCE60D1': 'purple', 'FFE3A5E5': 'purple', 'FFFF9933': 'orange', 'FFC65911': 'orange',
 }
-# Ignore: red = cancelled row, pink/grey = header highlighting
-IGNORE_COLORS = {'FFFF0000', 'FFFF99FF', 'FFFF9999', 'FFD9D9D9', 'FFBDD7EE', 'FFE2EFDA'}
+# Blue is NOT an activity — it flags a *clearance* promo (item being / already discontinued).
+# Red flags a discontinued line. Neither counts as field/media/LOOKS activity.
+CLEARANCE_FAMILY = 'blue'
+DISCON_COLORS = {'FFFF0000'}
+# Ignore: pink/grey = header highlighting
+IGNORE_COLORS = {'FFFF99FF', 'FFFF9999', 'FFD9D9D9', 'FFBDD7EE', 'FFE2EFDA'}
 
-# family -> activity, per retailer. '_default' applies to any store not listed.
+# family -> activity, per retailer. '_default' applies to any store not listed. Blue is
+# omitted everywhere now (handled as clearance), so only yellow/green/purple/orange map.
 RETAILER_ACTIVITY = {
-    '_default': {'yellow': 'media', 'blue': 'field', 'green': 'field', 'purple': 'media', 'orange': 'media'},
-    'Villa':    {'yellow': 'field', 'blue': 'media', 'green': 'field', 'purple': 'media', 'orange': 'media'},  # swapped vs Tops
-    'TWD':      {'yellow': 'media', 'blue': 'media', 'green': 'media', 'purple': 'media', 'orange': 'media'},  # all media (Bro.N)
+    '_default': {'yellow': 'media', 'green': 'field', 'purple': 'media', 'orange': 'media'},
+    'Villa':    {'yellow': 'field', 'green': 'field', 'purple': 'media', 'orange': 'media'},  # swapped vs Tops
+    'TWD':      {'yellow': 'media', 'green': 'media', 'purple': 'media', 'orange': 'media'},  # all media (Bro.N)
 }
 
 LOOKS_KEYWORDS = ['looks', 'magazine']
@@ -58,8 +63,10 @@ CONFIG = {
     'Big C': {
         'file': 'Big C - Activity Promotion 2026.xlsx',
         'sheets': None,  # first sheet only
-        'header_row': 8,
-        'cols': {'barcode': 1, 'product': 2, 'pack': 3, 'cost': 4, 'rsp': 5, 'gp': 6, 'period_start': 7},
+        'header_row': 7,
+        # Columns are spread out: A=Barcode, B=Product, C=Pack, D=Cost, G=RSP, H=ปรับราคา,
+        # J=GP%, then periods Bro1.. start at L. (RSP/GP are NOT at E/F like other files.)
+        'cols': {'barcode': 1, 'product': 2, 'pack': 3, 'cost': 4, 'rsp': 7, 'gp': 10, 'period_start': 12},
     },
     'Boots': {
         'file': 'Boots Plan promotion  2026.xlsx',
@@ -135,31 +142,34 @@ def get_fill_color(cell):
     return None
 
 
-def detect_activities(cell, retailer, period_name=''):
-    """Return a list of activity keys for one promo cell, from two signals:
-      1. cell comment containing 'LOOK' -> looks (gold) — LOOKS magazine is noted in
-         comments/remarks, never by fill colour
-      2. fill colour -> field/media via the retailer's colour map
-    An activity is only assigned when the cell is actually marked (coloured or commented);
-    a plain price with no fill = no activity (so e.g. a 'Bro' column cell isn't auto-media).
+def detect_marks(cell, retailer):
+    """Inspect one promo cell and return (activities, clearance).
+      - activities: list of 'media'/'field'/'looks' (LOOKS from a comment, others from the
+        retailer's colour map). Only set when actually marked.
+      - clearance: True if the cell is blue-marked (a clearance promo for an item being /
+        already discontinued — NOT a real activity).
     """
     acts = []
-    # 1) comment-based LOOKS
+    clearance = False
+    # comment-based LOOKS
     try:
         if cell.comment and 'look' in cell.comment.text.lower():
             acts.append('looks')
     except Exception:
         pass
-    # 2) fill colour
     color = get_fill_color(cell)
     if color and color not in IGNORE_COLORS:
         fam = COLOR_FAMILY.get(color)
-        if fam:
+        if color in DISCON_COLORS:
+            pass  # discontinued is surfaced at product level via master status, not here
+        elif fam == CLEARANCE_FAMILY:
+            clearance = True
+        elif fam:
             amap = RETAILER_ACTIVITY.get(retailer, RETAILER_ACTIVITY['_default'])
             act = amap.get(fam)
             if act and act not in acts:
                 acts.append(act)
-    return acts
+    return acts, clearance
 
 
 def num(val):
@@ -307,7 +317,7 @@ def parse_sheet(ws, cfg, retailer):
                 else:
                     sale_label = val.strip()  # e.g. "Buy2Get1", "3for499"
 
-            activities = detect_activities(cell, retailer, p['name'])
+            activities, clearance = detect_marks(cell, retailer)
 
             # Compensate = RSP_ex - (sale_price_inc / 1.07)
             compensate = None
@@ -318,6 +328,7 @@ def parse_sheet(ws, cfg, retailer):
                 'salePrice': sale_price,
                 'saleLabel': sale_label,
                 'activities': activities,
+                'clearance': clearance,
                 'compensate': compensate,
             }
 

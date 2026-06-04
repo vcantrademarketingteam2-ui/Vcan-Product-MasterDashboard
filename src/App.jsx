@@ -777,11 +777,13 @@ export default function App() {
   // Promo barcodes not in the master (e.g. Vernel) fall back to the product name's first
   // word as the brand, so every row still groups under something sensible.
   const enrichedPromoData = useMemo(() => promoData.map(p => {
-    if (p.brand) return p
     const m = rawData.find(r => r.barcode === p.barcode)
-    if (m) return { ...p, brand: m.brand, company: m.company }
+    // discontinued status comes from the product master (reliable), shown as strikethrough
+    const discon = m ? m.status === 'ยกเลิกขาย' : false
+    if (p.brand) return { ...p, discon }
+    if (m) return { ...p, brand: m.brand, company: m.company, discon }
     const firstWord = (p.product || '').trim().split(/\s+/)[0] || '—'
-    return { ...p, brand: firstWord }
+    return { ...p, brand: firstWord, discon }
   }), [rawData])
 
   const promoFiltered = useMemo(() => {
@@ -1049,7 +1051,7 @@ export default function App() {
             <div style={{ fontWeight: 800, fontSize: isMobile ? 14 : 17, color: t.text, letterSpacing: 0.2, whiteSpace: 'nowrap', flexShrink: 0 }}>
               Product Master
             </div>
-            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v2.10.0</span>
+            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v2.11.0</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: isMobile ? 11 : 13, background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, padding: isMobile ? '3px 8px' : '5px 12px', overflow: 'hidden', minWidth: 0, flexShrink: 1 }}>
               <span style={{ width: isMobile ? 6 : 7, height: isMobile ? 6 : 7, borderRadius: '50%', flexShrink: 0, background: dataSource === 'csv' ? t.blue : t.green }} />
               <span style={{ fontWeight: 800, color: dataSource === 'csv' ? t.blue : t.green, flexShrink: 0 }}>
@@ -1625,6 +1627,9 @@ export default function App() {
                       <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, display: 'inline-block', boxShadow: `0 0 5px 1px ${color}99` }} />{label}
                     </span>
                   ))}
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, color: t.muted }}>
+                    <span style={{ fontSize: 8, fontWeight: 800, color: t.muted, background: dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)', borderRadius: 4, padding: '0 4px' }}>CLEAR</span>เคลียร์สินค้า
+                  </span>
                 </div>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                   <button onClick={() => setCalcOpen(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: t.accent, border: 'none', borderRadius: 8, color: '#000', fontSize: 12, fontWeight: 700, padding: isMobile ? '8px 14px' : '7px 14px', cursor: 'pointer', minHeight: isMobile ? 40 : 'unset' }}>
@@ -1694,16 +1699,17 @@ export default function App() {
                     <RetailerLogo name={promoRetailer} h={isMobile ? 34 : 44} maxW={isMobile ? 110 : 150} fallbackStyle={{ fontSize: 18, fontWeight: 800, color: t.text }} />
                     <span style={{ fontSize: 12, color: t.muted, fontWeight: 600 }}>{promoCurrentGroup.items.length} products · {promoCurrentGroup.periods.length} periods</span>
                   </div>
-                  {/* Scrollable table */}
-                  <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: Math.max(420, 220 + promoCurrentGroup.periods.length * 115) }}>
+                  {/* Scrollable table — capped height so the horizontal scrollbar stays in
+                      view (no need to scroll to the very bottom to pan a long list) */}
+                  <div style={{ overflow: 'auto', WebkitOverflowScrolling: 'touch', maxHeight: isMobile ? '70vh' : '72vh' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5, minWidth: Math.max(380, 200 + promoCurrentGroup.periods.length * 96) }}>
                       <thead>
                         <tr style={{ borderBottom: `2px solid ${t.border}` }}>
-                          <th style={{ padding: '11px 16px', textAlign: 'left', color: t.muted, fontWeight: 700, fontSize: 11.5, textTransform: 'uppercase', letterSpacing: 0.5, position: 'sticky', left: 0, top: 0, background: dark ? '#1a1f28' : '#e7ebf1', zIndex: 4, minWidth: 220 }}>Product</th>
+                          <th style={{ padding: '8px 14px', textAlign: 'left', color: t.muted, fontWeight: 700, fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5, position: 'sticky', left: 0, top: 0, background: dark ? '#1a1f28' : '#e7ebf1', zIndex: 4, minWidth: 200 }}>Product</th>
                           {promoCurrentGroup.periods.map(period => (
-                            <th key={period.name} style={{ padding: '9px 10px', textAlign: 'center', minWidth: 115, borderLeft: `1px solid ${t.dim}`, position: 'sticky', top: 0, background: dark ? '#1a1f28' : '#e7ebf1', zIndex: 3 }}>
-                              <div style={{ fontWeight: 800, fontSize: 12.5, color: t.text, whiteSpace: 'nowrap' }}>{period.name}</div>
-                              {period.dateRange && <div style={{ fontSize: 10, color: t.muted, marginTop: 1, fontWeight: 400, whiteSpace: 'nowrap' }}>{period.dateRange}</div>}
+                            <th key={period.name} style={{ padding: '7px 8px', textAlign: 'center', minWidth: 96, borderLeft: `1px solid ${t.dim}`, position: 'sticky', top: 0, background: dark ? '#1a1f28' : '#e7ebf1', zIndex: 3 }}>
+                              <div style={{ fontWeight: 800, fontSize: 12, color: t.text, whiteSpace: 'nowrap' }}>{period.name}</div>
+                              {period.dateRange && <div style={{ fontSize: 9.5, color: t.muted, marginTop: 1, fontWeight: 400, whiteSpace: 'nowrap' }}>{period.dateRange}</div>}
                             </th>
                           ))}
                         </tr>
@@ -1732,44 +1738,50 @@ export default function App() {
                                 // zebra stripe for readability — sticky product cell must use the same opaque tone
                                 const stripeSurface = idx % 2 === 1 ? (dark ? '#191f27' : '#eef1f5') : t.surface
                                 return (
-                                  <tr key={rowKey} className="rhover" style={{ borderBottom: `1px solid ${isLastInGroup ? t.border : t.dim}`, background: stripeSurface }}>
-                                    <td style={{ padding: '11px 16px', position: 'sticky', left: 0, background: stripeSurface, zIndex: 1 }}>
-                                      <div style={{ fontWeight: 700, fontSize: 14, color: t.text, lineHeight: 1.35, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 230 }} title={item.product}>{item.product}</div>
-                                      <div style={{ fontSize: 11, color: t.muted, marginTop: 3, lineHeight: 1.5 }}>
+                                  <tr key={rowKey} className="rhover" style={{ borderBottom: `1px solid ${isLastInGroup ? t.border : t.dim}`, background: stripeSurface, opacity: item.discon ? 0.55 : 1 }}>
+                                    <td style={{ padding: '8px 14px', position: 'sticky', left: 0, background: stripeSurface, zIndex: 1 }}>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                                        <div style={{ fontWeight: 700, fontSize: 13, color: t.text, lineHeight: 1.3, whiteSpace: 'normal', maxWidth: 230, textDecoration: item.discon ? 'line-through' : 'none' }}>{item.product}</div>
+                                        {item.discon && <span style={{ fontSize: 9, fontWeight: 800, color: t.red, background: `${t.red}1e`, border: `1px solid ${t.red}55`, borderRadius: 5, padding: '1px 6px', whiteSpace: 'nowrap' }}>ยกเลิกขาย</span>}
+                                      </div>
+                                      <div style={{ fontSize: 10.5, color: t.muted, marginTop: 2, lineHeight: 1.4 }}>
                                         <span style={{ fontFamily: 'monospace' }}>{item.barcode}</span>
                                         {item.packSize ? <span style={{ marginLeft: 8 }}><span style={{ fontWeight: 600 }}>Pack</span> {item.packSize}</span> : null}
                                       </div>
-                                      <div style={{ display: 'flex', gap: 12, marginTop: 4, flexWrap: 'wrap', alignItems: 'center' }}>
-                                        {item.rspIncVat != null && <span style={{ fontSize: 13, fontWeight: 800, color: t.text }}>RSP ฿{item.rspIncVat}</span>}
-                                        {promoUnlocked && item.cost != null && <span style={{ fontSize: 12, color: t.muted, fontWeight: 600 }}>Cost ฿{item.cost.toFixed(2)}</span>}
-                                        {promoUnlocked && item.gp != null && <span style={{ fontSize: 12, fontWeight: 700, color: gpColor }}>GP {Math.round(item.gp * 100)}%</span>}
+                                      <div style={{ display: 'flex', gap: 10, marginTop: 3, flexWrap: 'wrap', alignItems: 'center' }}>
+                                        {item.rspIncVat != null && <span style={{ fontSize: 12, fontWeight: 800, color: t.text }}>RSP ฿{item.rspIncVat}</span>}
+                                        {promoUnlocked && item.cost != null && <span style={{ fontSize: 11, color: t.muted, fontWeight: 600 }}>Cost ฿{item.cost.toFixed(2)}</span>}
+                                        {promoUnlocked && item.gp != null && <span style={{ fontSize: 11, fontWeight: 700, color: gpColor }}>GP {Math.round(item.gp * 100)}%</span>}
                                       </div>
                                     </td>
                                     {promoCurrentGroup.periods.map(period => {
                                       const pd = item.periods[period.name]
                                       const hasPromo = pd && (pd.salePrice != null || pd.saleLabel)
                                       const acts = pd?.activities || []
-                                      // chip tint follows the primary activity (looks=gold, field=cyan, media=purple)
+                                      const isClear = pd?.clearance
+                                      // chip tint follows the primary activity (looks=gold, field=cyan, media=purple);
+                                      // a clearance cell uses a neutral grey instead
                                       const primary = acts.map(a => PROMO_ACTIVITY_DISPLAY[a]).find(Boolean)
-                                      const tint = primary ? primary.color : t.accent
+                                      const tint = primary ? primary.color : (isClear ? t.muted : t.accent)
                                       return (
-                                        <td key={period.name} style={{ padding: '6px 7px', textAlign: 'center', verticalAlign: 'middle', borderLeft: `1px solid ${t.dim}` }}>
+                                        <td key={period.name} style={{ padding: '4px 5px', textAlign: 'center', verticalAlign: 'middle', borderLeft: `1px solid ${t.dim}` }}>
                                           {hasPromo ? (
-                                            <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: 4, padding: '7px 12px', borderRadius: 10, background: dark ? `${tint}1c` : `${tint}14`, border: `1px solid ${tint}55`, boxShadow: primary ? `0 0 10px -2px ${tint}55` : 'none', minWidth: 64 }}>
-                                              <div style={{ fontWeight: 800, fontSize: 14.5, color: t.text, lineHeight: 1 }}>
+                                            <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: '5px 9px', borderRadius: 9, background: dark ? `${tint}1c` : `${tint}14`, border: `1px solid ${tint}55`, boxShadow: primary ? `0 0 9px -3px ${tint}55` : 'none', minWidth: 56 }}>
+                                              <div style={{ fontWeight: 800, fontSize: 13, color: t.text, lineHeight: 1 }}>
                                                 {pd.salePrice != null ? `฿${pd.salePrice.toLocaleString('th-TH')}` : pd.saleLabel}
                                               </div>
-                                              {acts.length > 0 && (
-                                                <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
+                                              {(acts.length > 0 || isClear) && (
+                                                <div style={{ display: 'flex', gap: 4, justifyContent: 'center', alignItems: 'center' }}>
                                                   {acts.map(a => {
                                                     const ac = PROMO_ACTIVITY_DISPLAY[a]
                                                     return ac ? <span key={a} title={ac.label} style={{ width: 7, height: 7, borderRadius: '50%', background: ac.color, display: 'inline-block', boxShadow: `0 0 5px 1px ${ac.color}cc` }} /> : null
                                                   })}
+                                                  {isClear && <span title="Clearance — item being/already discontinued" style={{ fontSize: 8, fontWeight: 800, color: t.muted, background: dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)', borderRadius: 4, padding: '0 4px', letterSpacing: 0.3 }}>CLEAR</span>}
                                                 </div>
                                               )}
                                             </div>
                                           ) : (
-                                            <span style={{ color: t.dim, fontSize: 16, opacity: 0.5 }}>·</span>
+                                            <span style={{ color: t.dim, fontSize: 14, opacity: 0.5 }}>·</span>
                                           )}
                                         </td>
                                       )
@@ -1851,6 +1863,23 @@ export default function App() {
             </div>
             {!promoRetailer ? (
               <div style={{ padding: '32px 20px', textAlign: 'center', color: t.muted, fontSize: 13 }}>Select a customer on the Promotion Plan page first,<br />then reopen the calculator.</div>
+            ) : !promoUnlocked ? (
+              // The calculator exposes cost/GP, so it sits behind the same PIN as Cost/GP.
+              <div style={{ padding: '28px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
+                <div style={{ fontSize: 30 }}>🔒</div>
+                <div style={{ fontSize: 13, color: t.muted, fontWeight: 600, textAlign: 'center' }}>The calculator uses Cost &amp; GP data.<br />Enter your department PIN to use it.</div>
+                <form onSubmit={e => {
+                  e.preventDefault()
+                  const dept = DEPT_PINS[promoPwInput]
+                  if (dept) { setPromoUnlocked(true); setPromoUnlockedDept(dept); sessionStorage.setItem('pu', '1'); sessionStorage.setItem('puDept', dept); logPricingAccess(dept, 'Compensate Calculator'); setPromoPwInput('') }
+                  else { setPromoPwError(true); setPromoPwInput('') }
+                }} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <input type="password" inputMode="numeric" maxLength={10} value={promoPwInput} onChange={e => { setPromoPwInput(e.target.value); setPromoPwError(false) }} placeholder="PIN" autoFocus
+                    style={{ width: isMobile ? 120 : 100, background: t.surface2, border: `1.5px solid ${promoPwError ? '#f85149' : t.border}`, borderRadius: 8, color: t.text, padding: isMobile ? '10px 14px' : '8px 12px', fontSize: isMobile ? 18 : 14, textAlign: 'center', outline: 'none', letterSpacing: 4 }} />
+                  <button type="submit" style={{ background: t.accent, border: 'none', borderRadius: 8, color: '#000', fontWeight: 700, fontSize: 13, padding: isMobile ? '10px 20px' : '8px 16px', cursor: 'pointer', minHeight: isMobile ? 44 : 'unset' }}>Unlock</button>
+                </form>
+                {promoPwError && <div style={{ fontSize: 11, color: '#f85149', fontWeight: 600 }}>Incorrect PIN</div>}
+              </div>
             ) : (
             <>
             {/* Promo type + basis toggles */}
