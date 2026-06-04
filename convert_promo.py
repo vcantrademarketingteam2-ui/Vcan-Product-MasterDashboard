@@ -99,6 +99,9 @@ CONFIG = {
         'file': 'TWD - Activity Promotion 2026.xlsx',
         'sheets': ['TWD'],
         'header_row': 5,
+        # Columns alternate month + brochure: Jan, Bro.1, Feb, Bro.2 ... A value in a 'Bro.N'
+        # column = a media (brochure) placement, so treat those as media regardless of colour.
+        'bro_is_media': True,
         # A=Barcode, B=Item Code, C=Product, D=Pack, E=Cost, F=RSP, G=GP%, H+=periods
         'cols': {'barcode': 1, 'product': 3, 'pack': 4, 'cost': 5, 'rsp': 6, 'gp': 7, 'period_start': 8},
     },
@@ -143,14 +146,14 @@ def get_fill_color(cell):
 
 
 def detect_marks(cell, retailer):
-    """Inspect one promo cell and return (activities, clearance).
+    """Inspect one promo cell and return (activities, is_blue).
       - activities: list of 'media'/'field'/'looks' (LOOKS from a comment, others from the
         retailer's colour map). Only set when actually marked.
-      - clearance: True if the cell is blue-marked (a clearance promo for an item being /
-        already discontinued — NOT a real activity).
+      - is_blue: True if blue-filled. Blue paints the *whole product row* to flag a clearance
+        item, so we accumulate it at product level rather than per cell.
     """
     acts = []
-    clearance = False
+    is_blue = False
     # comment-based LOOKS
     try:
         if cell.comment and 'look' in cell.comment.text.lower():
@@ -163,13 +166,13 @@ def detect_marks(cell, retailer):
         if color in DISCON_COLORS:
             pass  # discontinued is surfaced at product level via master status, not here
         elif fam == CLEARANCE_FAMILY:
-            clearance = True
+            is_blue = True
         elif fam:
             amap = RETAILER_ACTIVITY.get(retailer, RETAILER_ACTIVITY['_default'])
             act = amap.get(fam)
             if act and act not in acts:
                 acts.append(act)
-    return acts, clearance
+    return acts, is_blue
 
 
 def num(val):
@@ -293,6 +296,8 @@ def parse_sheet(ws, cfg, retailer):
 
         # Parse period cells
         period_data = {}
+        any_blue = False  # blue paints the whole row -> product is a clearance item
+        bro_is_media = cfg.get('bro_is_media')
         for p in periods:
             ci = p['colIdx']
             if ci >= len(row):
@@ -317,7 +322,13 @@ def parse_sheet(ws, cfg, retailer):
                 else:
                     sale_label = val.strip()  # e.g. "Buy2Get1", "3for499"
 
-            activities, clearance = detect_marks(cell, retailer)
+            activities, is_blue = detect_marks(cell, retailer)
+            if is_blue:
+                any_blue = True
+            # TWD encodes media as the brochure ('Bro.N') columns themselves — a value in one
+            # means the SKU is placed in that brochure, regardless of fill colour.
+            if bro_is_media and 'bro' in str(p['name']).lower() and 'media' not in activities:
+                activities.append('media')
 
             # Compensate = RSP_ex - (sale_price_inc / 1.07)
             compensate = None
@@ -328,7 +339,6 @@ def parse_sheet(ws, cfg, retailer):
                 'salePrice': sale_price,
                 'saleLabel': sale_label,
                 'activities': activities,
-                'clearance': clearance,
                 'compensate': compensate,
             }
 
@@ -344,6 +354,7 @@ def parse_sheet(ws, cfg, retailer):
                 'rspIncVat': rsp_inc,
                 'cost': cost,
                 'gp': gp,
+                'clearance': any_blue,  # product-level clearance flag
                 'periods': period_data,
             })
 

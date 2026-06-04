@@ -555,8 +555,7 @@ export default function App() {
   const [sortCol, setSortCol] = useState(null)
   const [sortDir, setSortDir] = useState('asc')
   const [matrixPopover, setMatrixPopover] = useState(null)
-  const [expandedActPeriods, setExpandedActPeriods] = useState(() => new Set())
-  const toggleActPeriod = (p) => setExpandedActPeriods(prev => { const s = new Set(prev); s.has(p) ? s.delete(p) : s.add(p); return s })
+  const [periodPopover, setPeriodPopover] = useState(null)  // {period, brands, x, y}
   const [promoRetailer, setPromoRetailer] = useState(null)  // single-select
   const [promoBrands, setPromoBrands] = useState([])
   const togglePromoBrand = (b) => setPromoBrands(prev => prev.includes(b) ? prev.filter(x => x !== b) : [...prev, b])
@@ -828,6 +827,13 @@ export default function App() {
     }).filter(p => p.brands.length > 0)
   }, [promoCurrentGroup])
 
+  // quick lookup: period name -> its activity summary entry (for the header symbols)
+  const promoActivityMap = useMemo(() => {
+    const m = {}
+    promoActivityByPeriod.forEach(e => { m[e.period] = e })
+    return m
+  }, [promoActivityByPeriod])
+
   const maxRetailerActive = Math.max(...intel.retailers.map(r => r.active), 1)
   const gpTone = (g) => g == null ? t.muted : g >= 0.30 ? t.green : g >= 0.20 ? t.yellow : t.red
 
@@ -1051,7 +1057,7 @@ export default function App() {
             <div style={{ fontWeight: 800, fontSize: isMobile ? 14 : 17, color: t.text, letterSpacing: 0.2, whiteSpace: 'nowrap', flexShrink: 0 }}>
               Product Master
             </div>
-            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v2.11.0</span>
+            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v2.12.0</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: isMobile ? 11 : 13, background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, padding: isMobile ? '3px 8px' : '5px 12px', overflow: 'hidden', minWidth: 0, flexShrink: 1 }}>
               <span style={{ width: isMobile ? 6 : 7, height: isMobile ? 6 : 7, borderRadius: '50%', flexShrink: 0, background: dataSource === 'csv' ? t.blue : t.green }} />
               <span style={{ fontWeight: 800, color: dataSource === 'csv' ? t.blue : t.green, flexShrink: 0 }}>
@@ -1574,50 +1580,6 @@ export default function App() {
                 </div>
               )}
 
-              {/* Special-activity summary — periods that have any activity, with the brands
-                  running it. Click a period row to expand the field/media/LOOKS breakdown. */}
-              {promoRetailer && promoActivityByPeriod.length > 0 && (
-                <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 12, overflow: 'hidden' }}>
-                  <div style={{ padding: '11px 16px', borderBottom: `1px solid ${t.border}`, display: 'flex', alignItems: 'center', gap: 8, background: dark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.015)' }}>
-                    <span style={{ fontSize: 12.5, fontWeight: 800, color: t.text }}>✨ Special Activities</span>
-                    <span style={{ fontSize: 11, color: t.muted }}>{promoActivityByPeriod.length} period{promoActivityByPeriod.length !== 1 ? 's' : ''} · click to expand</span>
-                  </div>
-                  {promoActivityByPeriod.map(({ period, dateRange, brands, allActs }) => {
-                    const expanded = expandedActPeriods.has(period)
-                    return (
-                      <div key={period} style={{ borderBottom: `1px solid ${t.dim}` }}>
-                        <div className="rhover" onClick={() => toggleActPeriod(period)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', cursor: 'pointer' }}>
-                          <span style={{ color: t.muted, fontSize: 11, width: 12, flexShrink: 0 }}>{expanded ? '▾' : '▸'}</span>
-                          <div style={{ minWidth: 0, flex: 1 }}>
-                            <span style={{ fontSize: 13, fontWeight: 800, color: t.text }}>{period}</span>
-                            {dateRange && <span style={{ fontSize: 10.5, color: t.muted, marginLeft: 8 }}>{dateRange}</span>}
-                          </div>
-                          {/* activity color dots + brand count (collapsed view) */}
-                          <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexShrink: 0 }}>
-                            {allActs.map(a => { const ac = PROMO_ACTIVITY_DISPLAY[a]; return ac ? <span key={a} title={ac.label} style={{ width: 8, height: 8, borderRadius: '50%', background: ac.color, boxShadow: `0 0 5px 1px ${ac.color}aa` }} /> : null })}
-                            <span style={{ fontSize: 11, color: t.muted, fontWeight: 600, marginLeft: 4 }}>{brands.length} brand{brands.length !== 1 ? 's' : ''}</span>
-                          </div>
-                        </div>
-                        {expanded && (
-                          <div style={{ padding: '2px 16px 12px 38px', display: 'flex', flexDirection: 'column', gap: 7 }}>
-                            {brands.map(({ brand, activities }) => (
-                              <div key={brand} style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                                <span style={{ fontSize: 12, fontWeight: 700, color: t.text, minWidth: 90 }}>{brand}</span>
-                                {activities.map(a => { const ac = PROMO_ACTIVITY_DISPLAY[a]; return ac ? (
-                                  <span key={a} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, color: ac.color, background: `${ac.color}1e`, border: `1px solid ${ac.color}55`, borderRadius: 6, padding: '2px 9px' }}>
-                                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: ac.color }} />{ac.label}
-                                  </span>
-                                ) : null })}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-
               {/* Activity legend + tools (calculator + Cost/GP unlock) — tools sit right after legend */}
               <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 14, rowGap: 10 }}>
                 <div style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -1628,7 +1590,7 @@ export default function App() {
                     </span>
                   ))}
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, color: t.muted }}>
-                    <span style={{ fontSize: 8, fontWeight: 800, color: t.muted, background: dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)', borderRadius: 4, padding: '0 4px' }}>CLEAR</span>เคลียร์สินค้า
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#22d3ee', display: 'inline-block', boxShadow: '0 0 6px 1px rgba(34,211,238,0.8)' }} />เคลียร์สินค้า (Clearance)
                   </span>
                 </div>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -1706,12 +1668,21 @@ export default function App() {
                       <thead>
                         <tr style={{ borderBottom: `2px solid ${t.border}` }}>
                           <th style={{ padding: '8px 14px', textAlign: 'left', color: t.muted, fontWeight: 700, fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5, position: 'sticky', left: 0, top: 0, background: dark ? '#1a1f28' : '#e7ebf1', zIndex: 4, minWidth: 200 }}>Product</th>
-                          {promoCurrentGroup.periods.map(period => (
-                            <th key={period.name} style={{ padding: '7px 8px', textAlign: 'center', minWidth: 96, borderLeft: `1px solid ${t.dim}`, position: 'sticky', top: 0, background: dark ? '#1a1f28' : '#e7ebf1', zIndex: 3 }}>
-                              <div style={{ fontWeight: 800, fontSize: 12, color: t.text, whiteSpace: 'nowrap' }}>{period.name}</div>
+                          {promoCurrentGroup.periods.map(period => {
+                            const actInfo = promoActivityMap[period.name]
+                            return (
+                            <th key={period.name} onClick={actInfo ? (e) => { const r = e.currentTarget.getBoundingClientRect(); setPeriodPopover({ period: period.name, dateRange: period.dateRange, brands: actInfo.brands, x: r.left, y: r.bottom + 4 }) } : undefined}
+                              style={{ padding: '7px 8px', textAlign: 'center', minWidth: 96, borderLeft: `1px solid ${t.dim}`, position: 'sticky', top: 0, background: dark ? '#1a1f28' : '#e7ebf1', zIndex: 3, cursor: actInfo ? 'pointer' : 'default' }}>
+                              <div style={{ fontWeight: 800, fontSize: 12, color: actInfo ? t.accent : t.text, whiteSpace: 'nowrap' }}>{period.name}{actInfo && <span style={{ fontSize: 9, marginLeft: 3, opacity: 0.7 }}>▾</span>}</div>
                               {period.dateRange && <div style={{ fontSize: 9.5, color: t.muted, marginTop: 1, fontWeight: 400, whiteSpace: 'nowrap' }}>{period.dateRange}</div>}
+                              {actInfo && (
+                                <div style={{ display: 'flex', gap: 3, justifyContent: 'center', marginTop: 3 }}>
+                                  {actInfo.allActs.map(a => { const ac = PROMO_ACTIVITY_DISPLAY[a]; return ac ? <span key={a} title={ac.label} style={{ width: 7, height: 7, borderRadius: '50%', background: ac.color, boxShadow: `0 0 5px 1px ${ac.color}cc` }} /> : null })}
+                                </div>
+                              )}
                             </th>
-                          ))}
+                            )
+                          })}
                         </tr>
                       </thead>
                       <tbody>
@@ -1743,6 +1714,7 @@ export default function App() {
                                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                                         <div style={{ fontWeight: 700, fontSize: 13, color: t.text, lineHeight: 1.3, whiteSpace: 'normal', maxWidth: 230, textDecoration: item.discon ? 'line-through' : 'none' }}>{item.product}</div>
                                         {item.discon && <span style={{ fontSize: 9, fontWeight: 800, color: t.red, background: `${t.red}1e`, border: `1px solid ${t.red}55`, borderRadius: 5, padding: '1px 6px', whiteSpace: 'nowrap' }}>ยกเลิกขาย</span>}
+                                        {item.clearance && !item.discon && <span title="Clearance — item being / already discontinued" style={{ fontSize: 9, fontWeight: 800, color: '#22d3ee', background: 'rgba(34,211,238,0.14)', border: '1px solid rgba(34,211,238,0.5)', borderRadius: 5, padding: '1px 6px', whiteSpace: 'nowrap', boxShadow: '0 0 6px -1px rgba(34,211,238,0.7)' }}>CLEAR</span>}
                                       </div>
                                       <div style={{ fontSize: 10.5, color: t.muted, marginTop: 2, lineHeight: 1.4 }}>
                                         <span style={{ fontFamily: 'monospace' }}>{item.barcode}</span>
@@ -1758,11 +1730,9 @@ export default function App() {
                                       const pd = item.periods[period.name]
                                       const hasPromo = pd && (pd.salePrice != null || pd.saleLabel)
                                       const acts = pd?.activities || []
-                                      const isClear = pd?.clearance
-                                      // chip tint follows the primary activity (looks=gold, field=cyan, media=purple);
-                                      // a clearance cell uses a neutral grey instead
+                                      // chip tint follows the primary activity (looks=gold, field=cyan, media=purple)
                                       const primary = acts.map(a => PROMO_ACTIVITY_DISPLAY[a]).find(Boolean)
-                                      const tint = primary ? primary.color : (isClear ? t.muted : t.accent)
+                                      const tint = primary ? primary.color : t.accent
                                       return (
                                         <td key={period.name} style={{ padding: '4px 5px', textAlign: 'center', verticalAlign: 'middle', borderLeft: `1px solid ${t.dim}` }}>
                                           {hasPromo ? (
@@ -1770,13 +1740,12 @@ export default function App() {
                                               <div style={{ fontWeight: 800, fontSize: 13, color: t.text, lineHeight: 1 }}>
                                                 {pd.salePrice != null ? `฿${pd.salePrice.toLocaleString('th-TH')}` : pd.saleLabel}
                                               </div>
-                                              {(acts.length > 0 || isClear) && (
+                                              {acts.length > 0 && (
                                                 <div style={{ display: 'flex', gap: 4, justifyContent: 'center', alignItems: 'center' }}>
                                                   {acts.map(a => {
                                                     const ac = PROMO_ACTIVITY_DISPLAY[a]
                                                     return ac ? <span key={a} title={ac.label} style={{ width: 7, height: 7, borderRadius: '50%', background: ac.color, display: 'inline-block', boxShadow: `0 0 5px 1px ${ac.color}cc` }} /> : null
                                                   })}
-                                                  {isClear && <span title="Clearance — item being/already discontinued" style={{ fontSize: 8, fontWeight: 800, color: t.muted, background: dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)', borderRadius: 4, padding: '0 4px', letterSpacing: 0.3 }}>CLEAR</span>}
                                                 </div>
                                               )}
                                             </div>
@@ -1965,6 +1934,35 @@ export default function App() {
         </div>
         )
       })()}
+
+      {/* ── PERIOD ACTIVITY POPOVER (click a period header) ── */}
+      {periodPopover && (
+        <div onClick={() => setPeriodPopover(null)} style={{ position: 'fixed', inset: 0, zIndex: 2000 }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            position: 'fixed',
+            left: Math.min(periodPopover.x, window.innerWidth - 290),
+            top: Math.min(periodPopover.y, window.innerHeight - 280),
+            background: t.surface, border: `1px solid ${t.border}`, borderRadius: 12,
+            minWidth: 230, maxWidth: 290, maxHeight: 280, overflowY: 'auto',
+            boxShadow: dark ? '0 8px 32px rgba(0,0,0,0.55)' : '0 8px 32px rgba(0,0,0,0.18)', zIndex: 2001,
+          }}>
+            <div style={{ padding: '11px 16px 9px', borderBottom: `1px solid ${t.border}`, position: 'sticky', top: 0, background: t.surface }}>
+              <div style={{ fontWeight: 800, fontSize: 13, color: t.text }}>{periodPopover.period}</div>
+              {periodPopover.dateRange && <div style={{ fontSize: 10.5, color: t.muted, marginTop: 2 }}>{periodPopover.dateRange}</div>}
+            </div>
+            {periodPopover.brands.map(({ brand, activities }) => (
+              <div key={brand} style={{ padding: '8px 16px', borderBottom: `1px solid ${t.dim}`, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: t.text, minWidth: 78 }}>{brand}</span>
+                {activities.map(a => { const ac = PROMO_ACTIVITY_DISPLAY[a]; return ac ? (
+                  <span key={a} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 10.5, fontWeight: 600, color: ac.color, background: `${ac.color}1e`, border: `1px solid ${ac.color}55`, borderRadius: 6, padding: '2px 8px' }}>
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: ac.color }} />{ac.label}
+                  </span>
+                ) : null })}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ── MATRIX POPOVER ── */}
       {matrixPopover && (
