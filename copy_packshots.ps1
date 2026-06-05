@@ -7,7 +7,7 @@ $isInteractive = [Environment]::UserInteractive -and (-not $args -contains "-Non
 
 if (-not (Test-Path $src)) {
     Write-Host "[ERROR] Source folder not found: $src" -ForegroundColor Red
-    if ($isInteractive) { Read-Host "Press Enter to continue..." }
+    try { if ($isInteractive) { Read-Host "Press Enter to continue..." } } catch {}
     exit 1
 }
 
@@ -38,4 +38,4 @@ Write-Host "[2/2] Done!" -ForegroundColor Green
 Write-Host "  Copied  : $copied files"
 Write-Host "  Skipped : $skipped files (no barcode in name)"
 Write-Host "  Errors  : $errors files"
-if ($isInteractive) { Read-Host "Press Enter to continue..." }
+try { if ($isInteractive) { Read-Host "Press Enter to continue..." } } catch {}
