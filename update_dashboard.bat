@@ -1,5 +1,4 @@
 @echo off
-chcp 65001 >nul
 echo.
 echo ============================================
 echo   VCAN Dashboard - Full Update
@@ -34,19 +33,19 @@ if errorlevel 1 (
 )
 
 echo.
-echo [5/5] Pushing to GitHub (Cloudflare auto-deploys)...
+echo [5/5] Pushing to GitHub...
 git add src/data.js src/retailer_data.js src/promo_data.js
 git add public/packshots/*.webp
 git add -u
 git status
 echo.
 set /p MSG=Commit message (Enter for default): 
-if "%MSG%"=="" set MSG=data: update product master, promo plan and packshots
+if "%MSG%"=="" set MSG=data: update product master and promo plan
 git commit -m "%MSG%"
 git push origin main
 
 echo.
 echo ============================================
-echo   Done! Dashboard updates in ~2 minutes
+echo   Done! Cloudflare deploys in ~2 min
 echo ============================================
 pause
