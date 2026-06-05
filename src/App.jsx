@@ -775,15 +775,29 @@ export default function App() {
   // Promo tab derived data — enriches promoData with brand/company from product master.
   // Promo barcodes not in the master (e.g. Vernel) fall back to the product name's first
   // word as the brand, so every row still groups under something sensible.
-  const enrichedPromoData = useMemo(() => promoData.map(p => {
-    const m = rawData.find(r => r.barcode === p.barcode)
-    // discontinued status comes from the product master (reliable), shown as strikethrough
-    const discon = m ? m.status === 'ยกเลิกขาย' : false
-    if (p.brand) return { ...p, discon }
-    if (m) return { ...p, brand: m.brand, company: m.company, discon }
-    const firstWord = (p.product || '').trim().split(/\s+/)[0] || '—'
-    return { ...p, brand: firstWord, discon }
-  }), [rawData])
+  const enrichedPromoData = useMemo(() => {
+    // Build brand list sorted longest-first for prefix matching: lets us map
+    // "General Fresh Five-FORCE..." → "General Fresh" (from master) not "General".
+    const knownBrands = [...new Set(rawData.map(r => r.brand.trim()))].sort((a, b) => b.length - a.length)
+    return promoData.map(p => {
+      const m = rawData.find(r => r.barcode === p.barcode)
+      const discon = m ? m.status === 'ยกเลิกขาย' : false
+      if (m) return { ...p, brand: m.brand, company: m.company, discon }
+      if (p.brand) return { ...p, discon }
+      const prod = (p.product || '').trim()
+      const prodLower = prod.toLowerCase()
+      // Longest-match: find a master brand that is a prefix of this product name
+      const matched = knownBrands.find(b => {
+        const bl = b.toLowerCase()
+        return prodLower === bl || prodLower.startsWith(bl + ' ') || prodLower.startsWith(bl + '-')
+      })
+      if (matched) return { ...p, brand: matched, discon }
+      // Last resort: text before first hyphen (≤25 chars), else first word
+      const dashIdx = prod.indexOf('-')
+      const fallback = (dashIdx > 0 && dashIdx < 25) ? prod.slice(0, dashIdx).trim() : (prod.split(/\s+/)[0] || '—')
+      return { ...p, brand: fallback, discon }
+    })
+  }, [rawData])
 
   const promoFiltered = useMemo(() => {
     let d = enrichedPromoData
@@ -1057,7 +1071,7 @@ export default function App() {
             <div style={{ fontWeight: 800, fontSize: isMobile ? 14 : 17, color: t.text, letterSpacing: 0.2, whiteSpace: 'nowrap', flexShrink: 0 }}>
               Product Master
             </div>
-            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v2.12.1</span>
+            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v2.12.2</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: isMobile ? 11 : 13, background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, padding: isMobile ? '3px 8px' : '5px 12px', overflow: 'hidden', minWidth: 0, flexShrink: 1 }}>
               <span style={{ width: isMobile ? 6 : 7, height: isMobile ? 6 : 7, borderRadius: '50%', flexShrink: 0, background: dataSource === 'csv' ? t.blue : t.green }} />
               <span style={{ fontWeight: 800, color: dataSource === 'csv' ? t.blue : t.green, flexShrink: 0 }}>

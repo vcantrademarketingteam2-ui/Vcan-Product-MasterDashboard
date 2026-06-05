@@ -31,10 +31,14 @@ DISCON_COLORS = {'FFFF0000'}
 IGNORE_COLORS = {'FFFF99FF', 'FFFF9999', 'FFD9D9D9', 'FFBDD7EE', 'FFE2EFDA',
                  'FFA3DBFF', 'FF76E3FF', 'FF33CCCC', 'FFBDD7EE'}
 
-# Single global colour->activity map (the stores do NOT actually swap — earlier confusion
-# came from mis-mapped colours). Confirmed by user: orange = ลงพื้นที่ (field), yellow = ลงสื่อ
-# (media). Purple = media, green = field.
+# Global default: orange = ลงพื้นที่ (field), yellow = ลงสื่อ (media).
 ACTIVITY_BY_FAMILY = {'yellow': 'media', 'orange': 'field', 'purple': 'media', 'green': 'field'}
+
+# Per-retailer overrides for stores that use colours differently.
+# Only supply keys that differ from the global default above.
+RETAILER_ACTIVITY_OVERRIDE = {
+    'TWD': {'orange': 'media'},  # TWD: FFC65911 = ลงสื่อ, not field. No field activity in TWD.
+}
 
 LOOKS_KEYWORDS = ['looks', 'magazine']
 SKIP_HEADER_KEYWORDS = {'total', 'remark', 'note', 'หมายเหตุ', 'grand total', 'sub total'}
@@ -169,9 +173,12 @@ def detect_marks(cell, retailer):
         elif color in CLEARANCE_COLORS:
             is_blue = True
         else:
-            act = ACTIVITY_BY_FAMILY.get(COLOR_FAMILY.get(color))
-            if act and act not in acts:
-                acts.append(act)
+            fam = COLOR_FAMILY.get(color)
+            if fam:
+                override = RETAILER_ACTIVITY_OVERRIDE.get(retailer, {})
+                act = override.get(fam, ACTIVITY_BY_FAMILY.get(fam))
+                if act and act not in acts:
+                    acts.append(act)
     return acts, is_blue, has_comment
 
 
@@ -280,6 +287,10 @@ def parse_sheet(ws, cfg, retailer):
 
         prod_cell = row[c['product'] - 1] if c['product'] - 1 < len(row) else None
         product = str(prod_cell.value or '').strip() if prod_cell else ''
+        # Remove non-breaking spaces (\xa0), soft-hyphens (\xad), and other invisible
+        # Unicode control/format characters that appear in some Excel cells (e.g. Combat·name)
+        product = product.replace('\xa0', ' ').replace('\xad', '').replace('​', '').strip()
+        product = ' '.join(product.split())  # collapse internal whitespace
         if not product or product.lower() in ('total', 'grand total'):
             continue
 
