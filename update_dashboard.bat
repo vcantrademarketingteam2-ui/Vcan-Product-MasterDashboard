@@ -6,18 +6,18 @@ echo   VCAN Dashboard - Full Update
 echo ============================================
 echo.
 
-echo [1/5] Converting Excel to data files...
+echo [1/5] Converting Excel to data.js...
 py convert_to_data.py
 if errorlevel 1 (
-    echo *** FAILED — check convert_to_data.py output ***
+    echo FAILED - check convert_to_data.py
     pause & exit /b 1
 )
 
 echo.
-echo [2/5] Converting Promotion Plan xlsx to promo_data.js...
+echo [2/5] Converting Promotion Plan to promo_data.js...
 py convert_promo.py
 if errorlevel 1 (
-    echo *** FAILED — check convert_promo.py output ***
+    echo FAILED - check convert_promo.py
     pause & exit /b 1
 )
 
@@ -29,7 +29,7 @@ echo.
 echo [4/5] Converting new images to WebP...
 py convert_to_webp.py
 if errorlevel 1 (
-    echo *** FAILED — check convert_to_webp.py output ***
+    echo FAILED - check convert_to_webp.py
     pause & exit /b 1
 )
 
@@ -40,7 +40,7 @@ git add public/packshots/*.webp
 git add -u
 git status
 echo.
-set /p MSG="Commit message (or Enter for default): "
+set /p MSG=Commit message (Enter for default): 
 if "%MSG%"=="" set MSG=data: update product master, promo plan and packshots
 git commit -m "%MSG%"
 git push origin main
@@ -48,6 +48,5 @@ git push origin main
 echo.
 echo ============================================
 echo   Done! Dashboard updates in ~2 minutes
-echo   https://vcanproductmasterdashboard.netlify.app
 echo ============================================
 pause
