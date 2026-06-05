@@ -58,7 +58,7 @@ const RETAILER_LOGO_SCALE = {
 const PROMO_ACTIVITY_DISPLAY = {
   field: { label: 'ลงพื้นที่', color: '#f97316' },  // orange — matches the source-file colour, distinct from clearance cyan
   media: { label: 'ลงสื่อ', color: '#A855F7' },     // purple
-  looks: { label: 'LOOKS Magazine', color: '#F59E0B' },  // gold, matches LOOKS logo
+  looks: { label: 'LOOKS Magazine', color: '#e879f9' },  // fuchsia/pink — clearly distinct from orange field
 }
 
 // Renders a retailer's logo on a white chip (so dark/transparent logos never blend

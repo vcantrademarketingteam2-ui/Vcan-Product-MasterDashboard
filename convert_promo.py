@@ -264,6 +264,29 @@ def parse_sheet(ws, cfg, retailer):
         seen_names.add(name)
         periods.append({'name': name, 'dateRange': date_range, 'colIdx': ci})
 
+    # Pre-scan: find which (period_col_idx, data_row_offset) pairs carry a LOOKS comment.
+    # Planners often note "LOOKs Magazine" only on the first row of a product group; the
+    # other variants in the same group just have the media fill colour. We propagate LOOKS
+    # to any row within LOOKS_PROXIMITY of a LOOKS-commented cell in the same period column.
+    LOOKS_PROXIMITY = 25  # rows
+    looks_by_col = {}  # col_idx -> [row_offsets with LOOKS comment]
+    for ri_off, row in enumerate(rows[h + 2:]):
+        for p in periods:
+            ci = p['colIdx']
+            if ci < len(row):
+                try:
+                    c2 = row[ci]
+                    if c2.comment and 'look' in c2.comment.text.lower():
+                        looks_by_col.setdefault(ci, []).append(ri_off)
+                except Exception:
+                    pass
+
+    def near_looks(ri_off, col_idx):
+        for r in looks_by_col.get(col_idx, []):
+            if abs(r - ri_off) <= LOOKS_PROXIMITY:
+                return True
+        return False
+
     # Parse product rows (skip header + date rows). Track the real 1-based row number so we
     # can skip rows the planner hid in Excel (hidden = intentionally excluded from the plan).
     products = []
@@ -329,6 +352,15 @@ def parse_sheet(ws, cfg, retailer):
             is_bro = bro_is_media and 'bro' in str(p['name']).lower()
             if is_bro and not blank and 'media' not in activities:
                 activities.append('media')
+
+            # LOOKS propagation: planners note "LOOKs Magazine" on ONE cell per group then
+            # use plain media fill on the other rows.  If this cell has 'media' and a LOOKS
+            # comment exists in the same period column within LOOKS_PROXIMITY rows, upgrade
+            # the media activity to 'looks'.  Brochure-based media (Bro.N columns) is
+            # excluded — it's a different kind of media placement.
+            if 'media' in activities and 'looks' not in activities and not is_bro:
+                if near_looks(ri_off, p['colIdx']):
+                    activities = ['looks' if a == 'media' else a for a in activities]
 
             # Keep the cell only if it carries something to show: a price, an activity
             # (incl. a LOOKS note that sits on an empty cell), or it's a brochure placement.
