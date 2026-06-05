@@ -1071,7 +1071,7 @@ export default function App() {
             <div style={{ fontWeight: 800, fontSize: isMobile ? 14 : 17, color: t.text, letterSpacing: 0.2, whiteSpace: 'nowrap', flexShrink: 0 }}>
               Product Master
             </div>
-            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v2.12.2</span>
+            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v2.12.3</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: isMobile ? 11 : 13, background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, padding: isMobile ? '3px 8px' : '5px 12px', overflow: 'hidden', minWidth: 0, flexShrink: 1 }}>
               <span style={{ width: isMobile ? 6 : 7, height: isMobile ? 6 : 7, borderRadius: '50%', flexShrink: 0, background: dataSource === 'csv' ? t.blue : t.green }} />
               <span style={{ fontWeight: 800, color: dataSource === 'csv' ? t.blue : t.green, flexShrink: 0 }}>
@@ -1748,7 +1748,8 @@ export default function App() {
                                       // (e.g. a LOOKS note on an otherwise empty period cell)
                                       const hasContent = hasPrice || acts.length > 0
                                       const primary = acts.map(a => PROMO_ACTIVITY_DISPLAY[a]).find(Boolean)
-                                      const tint = primary ? primary.color : t.accent
+                                      // clearance rows use cyan tint for all cells so the whole row reads as "clearance"
+                                      const tint = primary ? primary.color : item.clearance ? '#22d3ee' : t.accent
                                       return (
                                         <td key={period.name} style={{ padding: '4px 5px', textAlign: 'center', verticalAlign: 'middle', borderLeft: `1px solid ${t.dim}` }}>
                                           {hasContent ? (
