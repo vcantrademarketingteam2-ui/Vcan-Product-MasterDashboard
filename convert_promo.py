@@ -18,24 +18,23 @@ OUT = Path('src/promo_data.js')
 # literally swap them), so we map hex -> family here and family -> activity per store.
 COLOR_FAMILY = {
     'FFFFFF00': 'yellow', 'FFFFC000': 'yellow', 'FFFFFF99': 'yellow',
-    'FF00B0F0': 'blue', 'FFA3DBFF': 'blue', 'FF76E3FF': 'blue', 'FF33CCCC': 'blue', 'FF00B050': 'blue',
-    'FF99FF99': 'green', 'FF92D050': 'green',
-    'FFCE60D1': 'purple', 'FFE3A5E5': 'purple', 'FFFF9933': 'orange', 'FFC65911': 'orange',
+    'FFC65911': 'orange', 'FFFF9933': 'orange', 'FFED7D31': 'orange',
+    'FF99FF99': 'green', 'FF92D050': 'green', 'FF00B050': 'green',
+    'FFCE60D1': 'purple', 'FFE3A5E5': 'purple',
 }
-# Blue is NOT an activity — it flags a *clearance* promo (item being / already discontinued).
-# Red flags a discontinued line. Neither counts as field/media/LOOKS activity.
-CLEARANCE_FAMILY = 'blue'
+# Clearance is ONLY the bright cyan-blue FF00B0F0 (it paints a whole row for a clearance
+# item). The lighter blues (FFA3DBFF/FF76E3FF/FF33CCCC) are just price highlights, NOT
+# clearance — grouping them caused false CLEAR badges (e.g. L'Arbre Vert).
+CLEARANCE_COLORS = {'FF00B0F0'}
 DISCON_COLORS = {'FFFF0000'}
-# Ignore: pink/grey = header highlighting
-IGNORE_COLORS = {'FFFF99FF', 'FFFF9999', 'FFD9D9D9', 'FFBDD7EE', 'FFE2EFDA'}
+# Ignore: pink/grey header highlighting + the light-blue price highlights
+IGNORE_COLORS = {'FFFF99FF', 'FFFF9999', 'FFD9D9D9', 'FFBDD7EE', 'FFE2EFDA',
+                 'FFA3DBFF', 'FF76E3FF', 'FF33CCCC', 'FFBDD7EE'}
 
-# family -> activity, per retailer. '_default' applies to any store not listed. Blue is
-# omitted everywhere now (handled as clearance), so only yellow/green/purple/orange map.
-RETAILER_ACTIVITY = {
-    '_default': {'yellow': 'media', 'green': 'field', 'purple': 'media', 'orange': 'media'},
-    'Villa':    {'yellow': 'field', 'green': 'field', 'purple': 'media', 'orange': 'media'},  # swapped vs Tops
-    'TWD':      {'yellow': 'media', 'green': 'media', 'purple': 'media', 'orange': 'media'},  # all media (Bro.N)
-}
+# Single global colour->activity map (the stores do NOT actually swap — earlier confusion
+# came from mis-mapped colours). Confirmed by user: orange = ลงพื้นที่ (field), yellow = ลงสื่อ
+# (media). Purple = media, green = field.
+ACTIVITY_BY_FAMILY = {'yellow': 'media', 'orange': 'field', 'purple': 'media', 'green': 'field'}
 
 LOOKS_KEYWORDS = ['looks', 'magazine']
 SKIP_HEADER_KEYWORDS = {'total', 'remark', 'note', 'หมายเหตุ', 'grand total', 'sub total'}
@@ -146,33 +145,34 @@ def get_fill_color(cell):
 
 
 def detect_marks(cell, retailer):
-    """Inspect one promo cell and return (activities, is_blue).
-      - activities: list of 'media'/'field'/'looks' (LOOKS from a comment, others from the
-        retailer's colour map). Only set when actually marked.
-      - is_blue: True if blue-filled. Blue paints the *whole product row* to flag a clearance
-        item, so we accumulate it at product level rather than per cell.
+    """Inspect one promo cell and return (activities, is_blue, has_comment).
+      - activities: list of 'media'/'field'/'looks' (LOOKS from a comment, others via the
+        global colour map).
+      - is_blue: True if FF00B0F0-filled (whole-row clearance flag, accumulated per product).
+      - has_comment: True if the cell carries any comment (so we don't drop a LOOKS note that
+        sits on an empty price cell).
     """
     acts = []
     is_blue = False
-    # comment-based LOOKS
+    has_comment = False
     try:
-        if cell.comment and 'look' in cell.comment.text.lower():
-            acts.append('looks')
+        if cell.comment:
+            has_comment = True
+            if 'look' in cell.comment.text.lower():
+                acts.append('looks')
     except Exception:
         pass
     color = get_fill_color(cell)
     if color and color not in IGNORE_COLORS:
-        fam = COLOR_FAMILY.get(color)
         if color in DISCON_COLORS:
             pass  # discontinued is surfaced at product level via master status, not here
-        elif fam == CLEARANCE_FAMILY:
+        elif color in CLEARANCE_COLORS:
             is_blue = True
-        elif fam:
-            amap = RETAILER_ACTIVITY.get(retailer, RETAILER_ACTIVITY['_default'])
-            act = amap.get(fam)
+        else:
+            act = ACTIVITY_BY_FAMILY.get(COLOR_FAMILY.get(color))
             if act and act not in acts:
                 acts.append(act)
-    return acts, is_blue
+    return acts, is_blue, has_comment
 
 
 def num(val):
@@ -257,9 +257,13 @@ def parse_sheet(ws, cfg, retailer):
         seen_names.add(name)
         periods.append({'name': name, 'dateRange': date_range, 'colIdx': ci})
 
-    # Parse product rows (skip header + date rows)
+    # Parse product rows (skip header + date rows). Track the real 1-based row number so we
+    # can skip rows the planner hid in Excel (hidden = intentionally excluded from the plan).
     products = []
-    for row in rows[h + 2:]:
+    for ri_off, row in enumerate(rows[h + 2:]):
+        row_num = h + 2 + ri_off + 1  # 1-based Excel row
+        if ws.row_dimensions[row_num].hidden:
+            continue
         if len(row) <= c['barcode'] - 1:
             continue
         bc_cell = row[c['barcode'] - 1]
@@ -304,31 +308,32 @@ def parse_sheet(ws, cfg, retailer):
                 continue
             cell = row[ci]
             val = cell.value
-            if val is None:
-                continue
-            if isinstance(val, str) and not val.strip():
-                continue
+            blank = val is None or (isinstance(val, str) and not val.strip())
 
-            sale_price = None
-            sale_label = None
-
-            if isinstance(val, (int, float)):
-                sale_price = float(val)
-            elif isinstance(val, str):
-                # Try numeric parse first
-                v = num(val.replace(',', ''))
-                if v is not None:
-                    sale_price = v
-                else:
-                    sale_label = val.strip()  # e.g. "Buy2Get1", "3for499"
-
-            activities, is_blue = detect_marks(cell, retailer)
+            activities, is_blue, has_comment = detect_marks(cell, retailer)
             if is_blue:
                 any_blue = True
             # TWD encodes media as the brochure ('Bro.N') columns themselves — a value in one
             # means the SKU is placed in that brochure, regardless of fill colour.
-            if bro_is_media and 'bro' in str(p['name']).lower() and 'media' not in activities:
+            is_bro = bro_is_media and 'bro' in str(p['name']).lower()
+            if is_bro and not blank and 'media' not in activities:
                 activities.append('media')
+
+            # Keep the cell only if it carries something to show: a price, an activity
+            # (incl. a LOOKS note that sits on an empty cell), or it's a brochure placement.
+            if blank and not activities and not (is_bro and has_comment):
+                continue
+
+            sale_price = None
+            sale_label = None
+            if not blank:
+                if isinstance(val, (int, float)):
+                    sale_price = float(val)
+                else:
+                    v = num(str(val).replace(',', ''))
+                    sale_price = v if v is not None else None
+                    if v is None:
+                        sale_label = str(val).strip()  # e.g. "Buy2Get1", "3for499"
 
             # Compensate = RSP_ex - (sale_price_inc / 1.07)
             compensate = None

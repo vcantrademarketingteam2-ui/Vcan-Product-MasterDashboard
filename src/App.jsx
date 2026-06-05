@@ -56,8 +56,8 @@ const RETAILER_LOGO_SCALE = {
 // Activity badge colors for Promotion Plan — defined here (not imported) so colors are
 // independent of the generated promo_data.js
 const PROMO_ACTIVITY_DISPLAY = {
-  field: { label: 'ลงพื้นที่', color: '#06B6D4' },
-  media: { label: 'ลงสื่อ', color: '#A855F7' },
+  field: { label: 'ลงพื้นที่', color: '#f97316' },  // orange — matches the source-file colour, distinct from clearance cyan
+  media: { label: 'ลงสื่อ', color: '#A855F7' },     // purple
   looks: { label: 'LOOKS Magazine', color: '#F59E0B' },  // gold, matches LOOKS logo
 }
 
@@ -1057,7 +1057,7 @@ export default function App() {
             <div style={{ fontWeight: 800, fontSize: isMobile ? 14 : 17, color: t.text, letterSpacing: 0.2, whiteSpace: 'nowrap', flexShrink: 0 }}>
               Product Master
             </div>
-            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v2.12.0</span>
+            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v2.12.1</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: isMobile ? 11 : 13, background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, padding: isMobile ? '3px 8px' : '5px 12px', overflow: 'hidden', minWidth: 0, flexShrink: 1 }}>
               <span style={{ width: isMobile ? 6 : 7, height: isMobile ? 6 : 7, borderRadius: '50%', flexShrink: 0, background: dataSource === 'csv' ? t.blue : t.green }} />
               <span style={{ fontWeight: 800, color: dataSource === 'csv' ? t.blue : t.green, flexShrink: 0 }}>
@@ -1728,17 +1728,19 @@ export default function App() {
                                     </td>
                                     {promoCurrentGroup.periods.map(period => {
                                       const pd = item.periods[period.name]
-                                      const hasPromo = pd && (pd.salePrice != null || pd.saleLabel)
+                                      const hasPrice = pd && (pd.salePrice != null || pd.saleLabel)
                                       const acts = pd?.activities || []
-                                      // chip tint follows the primary activity (looks=gold, field=cyan, media=purple)
+                                      // a cell counts as content if it has a price OR an activity
+                                      // (e.g. a LOOKS note on an otherwise empty period cell)
+                                      const hasContent = hasPrice || acts.length > 0
                                       const primary = acts.map(a => PROMO_ACTIVITY_DISPLAY[a]).find(Boolean)
                                       const tint = primary ? primary.color : t.accent
                                       return (
                                         <td key={period.name} style={{ padding: '4px 5px', textAlign: 'center', verticalAlign: 'middle', borderLeft: `1px solid ${t.dim}` }}>
-                                          {hasPromo ? (
+                                          {hasContent ? (
                                             <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: '5px 9px', borderRadius: 9, background: dark ? `${tint}1c` : `${tint}14`, border: `1px solid ${tint}55`, boxShadow: primary ? `0 0 9px -3px ${tint}55` : 'none', minWidth: 56 }}>
-                                              <div style={{ fontWeight: 800, fontSize: 13, color: t.text, lineHeight: 1 }}>
-                                                {pd.salePrice != null ? `฿${pd.salePrice.toLocaleString('th-TH')}` : pd.saleLabel}
+                                              <div style={{ fontWeight: 800, fontSize: 13, color: hasPrice ? t.text : t.muted, lineHeight: 1 }}>
+                                                {hasPrice ? (pd.salePrice != null ? `฿${pd.salePrice.toLocaleString('th-TH')}` : pd.saleLabel) : '◆'}
                                               </div>
                                               {acts.length > 0 && (
                                                 <div style={{ display: 'flex', gap: 4, justifyContent: 'center', alignItems: 'center' }}>
