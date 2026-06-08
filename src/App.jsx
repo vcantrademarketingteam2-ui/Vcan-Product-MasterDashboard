@@ -3,6 +3,7 @@ import fallbackData, { GENERATED_AT } from './data.js'
 import retailerData from './retailer_data.js'
 import promoData, { PROMO_META, PROMO_ACTIVITY, PROMO_RETAILERS } from './promo_data.js'
 import vcanLogo from './VCAN.png'
+import PromoSection from './PromoSection.jsx'
 
 const RETAILERS = ['Tops', 'Villa', 'The Mall', 'Lotus', 'Homepro', 'Big C', 'TWD', 'Boots', 'Foodland', 'Central Department', "Pet'n me", 'Fuji']
 
@@ -1071,7 +1072,7 @@ export default function App() {
             <div style={{ fontWeight: 800, fontSize: isMobile ? 14 : 17, color: t.text, letterSpacing: 0.2, whiteSpace: 'nowrap', flexShrink: 0 }}>
               Product Master
             </div>
-            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v2.12.3</span>
+            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v2.13.0</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: isMobile ? 11 : 13, background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, padding: isMobile ? '3px 8px' : '5px 12px', overflow: 'hidden', minWidth: 0, flexShrink: 1 }}>
               <span style={{ width: isMobile ? 6 : 7, height: isMobile ? 6 : 7, borderRadius: '50%', flexShrink: 0, background: dataSource === 'csv' ? t.blue : t.green }} />
               <span style={{ fontWeight: 800, color: dataSource === 'csv' ? t.blue : t.green, flexShrink: 0 }}>
@@ -1564,227 +1565,15 @@ export default function App() {
 
           {/* PROMOTION PLAN */}
           {tab === 'promotion' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-
-              {/* Customer single-select pills */}
-              <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', alignItems: 'center' }}>
-                <span style={{ fontSize: 13, color: t.muted, fontWeight: 600, flexShrink: 0 }}>Customer:</span>
-                {(PROMO_RETAILERS.length > 0 ? PROMO_RETAILERS : RETAILERS).map(r => {
-                  const sel = promoRetailer === r
-                  return (
-                    <button key={r} onClick={() => selectPromoRetailer(sel ? null : r, enrichedPromoData)} title={r}
-                      style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: sel ? `${t.accent}18` : t.surface2, border: `2px solid ${sel ? t.accent : t.border}`, borderRadius: 10, cursor: 'pointer', boxShadow: sel ? `0 0 0 3px ${t.accent}22` : 'none', width: isMobile ? 60 : 76, height: isMobile ? 42 : 38 }}>
-                      <RetailerLogo name={r} h={isMobile ? 24 : 20} maxW={isMobile ? 54 : 68} fallbackStyle={{ fontSize: 10, fontWeight: 700, color: t.text, textAlign: 'center', lineHeight: 1.2 }} />
-                    </button>
-                  )
-                })}
-              </div>
-
-              {/* Brand filter */}
-              {promoRetailer && promoBrandList.length > 0 && (
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-                  <span style={{ fontSize: 12, color: t.muted, fontWeight: 600, flexShrink: 0 }}>Brand:</span>
-                  <button onClick={() => setPromoBrands([])} className="bpill" style={{ background: promoBrands.length === 0 ? t.accent : t.surface2, color: promoBrands.length === 0 ? '#000' : t.text, border: `1.5px solid ${promoBrands.length === 0 ? t.accent : t.border}`, borderRadius: 20, padding: '4px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>All</button>
-                  {promoBrandList.map(b => (
-                    <button key={b} onClick={() => togglePromoBrand(b)} className="bpill" style={{ background: promoBrands.includes(b) ? t.accent : t.surface2, color: promoBrands.includes(b) ? '#000' : t.text, border: `1.5px solid ${promoBrands.includes(b) ? t.accent : t.border}`, borderRadius: 20, padding: '4px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>{b}</button>
-                  ))}
-                  {promoBrands.length > 0 && (
-                    <button onClick={() => setPromoBrands([])} className="clr-btn" style={{ background: 'none', border: `1.5px solid ${t.border}`, borderRadius: 20, color: t.muted, fontSize: 11.5, fontWeight: 600, cursor: 'pointer', padding: '4px 12px', whiteSpace: 'nowrap' }}>✕ Clear</button>
-                  )}
-                </div>
-              )}
-
-              {/* Activity legend + tools (calculator + Cost/GP unlock) — tools sit right after legend */}
-              <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 14, rowGap: 10 }}>
-                <div style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: 11, color: t.muted, fontWeight: 600 }}>Activity:</span>
-                  {Object.entries(PROMO_ACTIVITY_DISPLAY).map(([key, { label, color }]) => (
-                    <span key={key} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, color: t.muted }}>
-                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, display: 'inline-block', boxShadow: `0 0 5px 1px ${color}99` }} />{label}
-                    </span>
-                  ))}
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, color: t.muted }}>
-                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#22d3ee', display: 'inline-block', boxShadow: '0 0 6px 1px rgba(34,211,238,0.8)' }} />เคลียร์สินค้า (Clearance)
-                  </span>
-                </div>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                  <button onClick={() => setCalcOpen(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: t.accent, border: 'none', borderRadius: 8, color: '#000', fontSize: 12, fontWeight: 700, padding: isMobile ? '8px 14px' : '7px 14px', cursor: 'pointer', minHeight: isMobile ? 40 : 'unset' }}>
-                    🧮 Compensate Calculator
-                  </button>
-                  {promoRetailer && (
-                    promoUnlocked ? (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ fontSize: 10, color: t.muted }}>{promoUnlockedDept}</span>
-                        <button onClick={() => { setPromoUnlocked(false); setPromoUnlockedDept(''); sessionStorage.removeItem('pu'); sessionStorage.removeItem('puDept') }}
-                          style={{ background: 'none', border: `1px solid ${t.border}`, borderRadius: 6, fontSize: 10, color: t.muted, cursor: 'pointer', padding: '3px 8px' }}>🔒 Lock Cost/GP</button>
-                      </div>
-                    ) : (
-                      <form onSubmit={e => {
-                        e.preventDefault()
-                        const dept = DEPT_PINS[promoPwInput]
-                        if (dept) {
-                          setPromoUnlocked(true); setPromoUnlockedDept(dept)
-                          sessionStorage.setItem('pu', '1'); sessionStorage.setItem('puDept', dept)
-                          logPricingAccess(dept, 'Promo Cost/GP'); setPromoPwInput('')
-                        } else { setPromoPwError(true); setPromoPwInput('') }
-                      }} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                        <input type="password" inputMode="numeric" maxLength={10} value={promoPwInput}
-                          onChange={e => { setPromoPwInput(e.target.value); setPromoPwError(false) }}
-                          placeholder="PIN — unlock Cost/GP"
-                          style={{ width: isMobile ? 150 : 170, background: t.surface2, border: `1px solid ${promoPwError ? '#f85149' : t.border}`, borderRadius: 7, color: t.text, padding: isMobile ? '8px 10px' : '6px 10px', fontSize: 12, outline: 'none', letterSpacing: 2 }}
-                        />
-                        <button type="submit" style={{ background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 7, color: t.muted, fontSize: 11, fontWeight: 700, padding: '6px 12px', cursor: 'pointer', minHeight: isMobile ? 40 : 'unset' }}>Unlock</button>
-                        {promoPwError && <span style={{ fontSize: 10, color: '#f85149', fontWeight: 600 }}>PIN ผิด</span>}
-                      </form>
-                    )
-                  )}
-                </div>
-              </div>
-
-              {/* Main content */}
-              {promoData.length === 0 ? (
-                <div style={{ display: 'flex', justifyContent: 'center', padding: '48px 0' }}>
-                  <div style={{ background: t.surface, border: `2px dashed ${t.border}`, borderRadius: 20, padding: isMobile ? '32px 24px' : '48px 64px', textAlign: 'center', maxWidth: 480 }}>
-                    <div style={{ fontSize: 40, marginBottom: 14 }}>📊</div>
-                    <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 8, color: t.text }}>ยังไม่มีข้อมูล Promotion Plan</div>
-                    <div style={{ fontSize: 13, color: t.muted, lineHeight: 1.9 }}>
-                      รัน <code style={{ background: t.surface2, padding: '2px 8px', borderRadius: 4, fontFamily: 'monospace', color: t.blue }}>python convert_promo.py</code><br />
-                      แล้ว build และ push เพื่อ deploy
-                    </div>
-                  </div>
-                </div>
-              ) : !promoRetailer ? (
-                <div style={{ display: 'flex', justifyContent: 'center', padding: '56px 0' }}>
-                  <div style={{ textAlign: 'center', maxWidth: 340 }}>
-                    <div style={{ fontSize: 44, marginBottom: 14 }}>🏪</div>
-                    <div style={{ fontSize: 17, fontWeight: 800, color: t.text, marginBottom: 8 }}>เลือก Customer ด้านบน</div>
-                    <div style={{ fontSize: 13, color: t.muted, lineHeight: 1.7 }}>
-                      {PROMO_RETAILERS.length > 0 ? `มีข้อมูล ${PROMO_RETAILERS.length} ร้าน · ${PROMO_RETAILERS.join(', ')}` : 'ยังไม่มีข้อมูล'}
-                    </div>
-                  </div>
-                </div>
-              ) : !promoCurrentGroup || promoCurrentGroup.items.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '40px 0', color: t.muted }}>
-                  <div style={{ fontSize: 28, marginBottom: 8 }}>🔍</div>
-                  <div style={{ fontWeight: 600 }}>ไม่พบข้อมูลที่ตรงกับ filter</div>
-                </div>
-              ) : (
-                <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 12 }}>
-                  {/* Retailer section header */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '15px 20px', borderBottom: `1px solid ${t.border}`, borderRadius: '12px 12px 0 0', background: dark ? 'rgba(255,255,255,0.025)' : 'rgba(0,0,0,0.02)' }}>
-                    <RetailerLogo name={promoRetailer} h={isMobile ? 34 : 44} maxW={isMobile ? 110 : 150} fallbackStyle={{ fontSize: 18, fontWeight: 800, color: t.text }} />
-                    <span style={{ fontSize: 12, color: t.muted, fontWeight: 600 }}>{promoCurrentGroup.items.length} products · {promoCurrentGroup.periods.length} periods</span>
-                  </div>
-                  {/* Scrollable table — capped height so the horizontal scrollbar stays in
-                      view (no need to scroll to the very bottom to pan a long list) */}
-                  <div style={{ overflow: 'auto', WebkitOverflowScrolling: 'touch', maxHeight: isMobile ? '70vh' : '72vh' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5, minWidth: Math.max(380, 200 + promoCurrentGroup.periods.length * 96) }}>
-                      <thead>
-                        <tr style={{ borderBottom: `2px solid ${t.border}` }}>
-                          <th style={{ padding: '8px 14px', textAlign: 'left', color: t.muted, fontWeight: 700, fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5, position: 'sticky', left: 0, top: 0, background: dark ? '#1a1f28' : '#e7ebf1', zIndex: 4, minWidth: 200 }}>Product</th>
-                          {promoCurrentGroup.periods.map(period => {
-                            const actInfo = promoActivityMap[period.name]
-                            return (
-                            <th key={period.name} onClick={actInfo ? (e) => { const r = e.currentTarget.getBoundingClientRect(); setPeriodPopover({ period: period.name, dateRange: period.dateRange, brands: actInfo.brands, x: r.left, y: r.bottom + 4 }) } : undefined}
-                              style={{ padding: '7px 8px', textAlign: 'center', minWidth: 96, borderLeft: `1px solid ${t.dim}`, position: 'sticky', top: 0, background: dark ? '#1a1f28' : '#e7ebf1', zIndex: 3, cursor: actInfo ? 'pointer' : 'default' }}>
-                              <div style={{ fontWeight: 800, fontSize: 12, color: actInfo ? t.accent : t.text, whiteSpace: 'nowrap' }}>{period.name}{actInfo && <span style={{ fontSize: 9, marginLeft: 3, opacity: 0.7 }}>▾</span>}</div>
-                              {period.dateRange && <div style={{ fontSize: 9.5, color: t.muted, marginTop: 1, fontWeight: 400, whiteSpace: 'nowrap' }}>{period.dateRange}</div>}
-                              {actInfo && (
-                                <div style={{ display: 'flex', gap: 3, justifyContent: 'center', marginTop: 3 }}>
-                                  {actInfo.allActs.map(a => { const ac = PROMO_ACTIVITY_DISPLAY[a]; return ac ? <span key={a} title={ac.label} style={{ width: 7, height: 7, borderRadius: '50%', background: ac.color, boxShadow: `0 0 5px 1px ${ac.color}cc` }} /> : null })}
-                                </div>
-                              )}
-                            </th>
-                            )
-                          })}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {(() => {
-                          const brands = [...new Set(promoCurrentGroup.items.map(it => it.brand || '—'))]
-                          return brands.flatMap(brand => {
-                            const brandItems = promoCurrentGroup.items.filter(it => (it.brand || '—') === brand)
-                            return [
-                              // Brand group header row — name lives in a sticky inner div so it
-                              // stays pinned to the left edge while the row scrolls horizontally
-                              <tr key={`g-${brand}`} style={{ background: dark ? 'rgba(240,192,64,0.1)' : 'rgba(184,133,10,0.1)', borderTop: `1px solid ${t.accent}44`, borderBottom: `1px solid ${t.accent}44` }}>
-                                <td colSpan={promoCurrentGroup.periods.length + 1} style={{ padding: 0 }}>
-                                  <div style={{ position: 'sticky', left: 0, display: 'inline-flex', alignItems: 'center', gap: 8, padding: '6px 16px' }}>
-                                    <span style={{ fontSize: 12, fontWeight: 800, color: t.accent, textTransform: 'uppercase', letterSpacing: 1 }}>{brand}</span>
-                                    <span style={{ fontSize: 10.5, color: t.muted }}>{brandItems.length} SKU{brandItems.length !== 1 ? 's' : ''}</span>
-                                  </div>
-                                </td>
-                              </tr>,
-                              // Product rows
-                              ...brandItems.map((item, idx) => {
-                                const rowKey = item.barcode + promoRetailer
-                                const isLastInGroup = idx === brandItems.length - 1
-                                const gpColor = item.gp != null ? (item.gp >= 0.30 ? t.green : item.gp >= 0.20 ? t.yellow : t.red) : t.muted
-                                // zebra stripe for readability — sticky product cell must use the same opaque tone
-                                const stripeSurface = idx % 2 === 1 ? (dark ? '#191f27' : '#eef1f5') : t.surface
-                                return (
-                                  <tr key={rowKey} className="rhover" style={{ borderBottom: `1px solid ${isLastInGroup ? t.border : t.dim}`, background: stripeSurface, opacity: item.discon ? 0.55 : 1 }}>
-                                    <td style={{ padding: '8px 14px', position: 'sticky', left: 0, background: stripeSurface, zIndex: 1 }}>
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                                        <div style={{ fontWeight: 700, fontSize: 13, color: t.text, lineHeight: 1.3, whiteSpace: 'normal', maxWidth: 230, textDecoration: item.discon ? 'line-through' : 'none' }}>{item.product}</div>
-                                        {item.discon && <span style={{ fontSize: 9, fontWeight: 800, color: t.red, background: `${t.red}1e`, border: `1px solid ${t.red}55`, borderRadius: 5, padding: '1px 6px', whiteSpace: 'nowrap' }}>ยกเลิกขาย</span>}
-                                        {item.clearance && !item.discon && <span title="Clearance — item being / already discontinued" style={{ fontSize: 9, fontWeight: 800, color: '#22d3ee', background: 'rgba(34,211,238,0.14)', border: '1px solid rgba(34,211,238,0.5)', borderRadius: 5, padding: '1px 6px', whiteSpace: 'nowrap', boxShadow: '0 0 6px -1px rgba(34,211,238,0.7)' }}>CLEAR</span>}
-                                      </div>
-                                      <div style={{ fontSize: 10.5, color: t.muted, marginTop: 2, lineHeight: 1.4 }}>
-                                        <span style={{ fontFamily: 'monospace' }}>{item.barcode}</span>
-                                        {item.packSize ? <span style={{ marginLeft: 8 }}><span style={{ fontWeight: 600 }}>Pack</span> {item.packSize}</span> : null}
-                                      </div>
-                                      <div style={{ display: 'flex', gap: 10, marginTop: 3, flexWrap: 'wrap', alignItems: 'center' }}>
-                                        {item.rspIncVat != null && <span style={{ fontSize: 12, fontWeight: 800, color: t.text }}>RSP ฿{item.rspIncVat}</span>}
-                                        {promoUnlocked && item.cost != null && <span style={{ fontSize: 11, color: t.muted, fontWeight: 600 }}>Cost ฿{item.cost.toFixed(2)}</span>}
-                                        {promoUnlocked && item.gp != null && <span style={{ fontSize: 11, fontWeight: 700, color: gpColor }}>GP {Math.round(item.gp * 100)}%</span>}
-                                      </div>
-                                    </td>
-                                    {promoCurrentGroup.periods.map(period => {
-                                      const pd = item.periods[period.name]
-                                      const hasPrice = pd && (pd.salePrice != null || pd.saleLabel)
-                                      const acts = pd?.activities || []
-                                      // a cell counts as content if it has a price OR an activity
-                                      // (e.g. a LOOKS note on an otherwise empty period cell)
-                                      const hasContent = hasPrice || acts.length > 0
-                                      const primary = acts.map(a => PROMO_ACTIVITY_DISPLAY[a]).find(Boolean)
-                                      // clearance rows use cyan tint for all cells so the whole row reads as "clearance"
-                                      const tint = primary ? primary.color : item.clearance ? '#22d3ee' : t.accent
-                                      return (
-                                        <td key={period.name} style={{ padding: '4px 5px', textAlign: 'center', verticalAlign: 'middle', borderLeft: `1px solid ${t.dim}` }}>
-                                          {hasContent ? (
-                                            <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: '5px 9px', borderRadius: 9, background: dark ? `${tint}1c` : `${tint}14`, border: `1px solid ${tint}55`, boxShadow: primary ? `0 0 9px -3px ${tint}55` : 'none', minWidth: 56 }}>
-                                              <div style={{ fontWeight: 800, fontSize: 13, color: hasPrice ? t.text : t.muted, lineHeight: 1 }}>
-                                                {hasPrice ? (pd.salePrice != null ? `฿${pd.salePrice.toLocaleString('th-TH')}` : pd.saleLabel) : '◆'}
-                                              </div>
-                                              {acts.length > 0 && (
-                                                <div style={{ display: 'flex', gap: 4, justifyContent: 'center', alignItems: 'center' }}>
-                                                  {acts.map(a => {
-                                                    const ac = PROMO_ACTIVITY_DISPLAY[a]
-                                                    return ac ? <span key={a} title={ac.label} style={{ width: 7, height: 7, borderRadius: '50%', background: ac.color, display: 'inline-block', boxShadow: `0 0 5px 1px ${ac.color}cc` }} /> : null
-                                                  })}
-                                                </div>
-                                              )}
-                                            </div>
-                                          ) : (
-                                            <span style={{ color: t.dim, fontSize: 14, opacity: 0.5 }}>·</span>
-                                          )}
-                                        </td>
-                                      )
-                                    })}
-                                  </tr>
-                                )
-                              })
-                            ]
-                          })
-                        })()}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-
-            </div>
+            <PromoSection
+              rawData={rawData}
+              retailerData={retailerData}
+              t={t}
+              dark={dark}
+              isMobile={isMobile}
+              onSelect={setSelectedProduct}
+              RetailerLogo={RetailerLogo}
+            />
           )}
 
         </main>
