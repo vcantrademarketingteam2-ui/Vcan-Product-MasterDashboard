@@ -300,10 +300,25 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
           {/* brand bands + rows */}
           {grouped.map(([brand, list]) => (
             <div key={brand}>
+              {/* brand band — uses lead+lane structure so the NOW glow line runs continuously */}
               <div className="ps-tl-band" style={{ background: s2, borderBottom: `1px solid ${dim}`, borderTop: `1px solid ${dim}` }}>
-                <span style={{ width: 6, height: 6, borderRadius: 2, background: coColor(list[0].company) || t.accent, display: 'inline-block' }} />
-                <span style={{ fontSize: 11.5, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: coColor(list[0].company) || t.accent }}>{brand}</span>
-                <span style={{ fontSize: 10.5, fontFamily: 'monospace', color: mu }}>{list.length} SKU{list.length > 1 ? 's' : ''}</span>
+                <div className="ps-tl-row-lead" style={{ background: s2, borderRight: `1px solid ${bdr}`, display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 8, justifyContent: 'flex-start' }}>
+                  <span style={{ width: 6, height: 6, borderRadius: 2, background: coColor(list[0].company) || t.accent, display: 'inline-block', flexShrink: 0 }} />
+                  <span style={{ fontSize: 11.5, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: coColor(list[0].company) || t.accent }}>{brand}</span>
+                  <span style={{ fontSize: 10.5, fontFamily: 'monospace', color: mu }}>{list.length} SKU{list.length > 1 ? 's' : ''}</span>
+                </div>
+                <div className="ps-tl-lane">
+                  {periods.map((p, i) => {
+                    const isNow = i === currentIdx
+                    return (
+                      <div key={p.name} className={`ps-tl-slot${isNow ? ' ps-now-slot' : ''}`}
+                        style={{ borderLeftColor: isNow ? dim : 'transparent', background: isNow ? nowBg : 'transparent',
+                          boxShadow: isNow ? 'inset -2px 0 10px rgba(240,192,64,.28)' : 'none' }}>
+                        {isNow && <span style={{ position: 'absolute', left: -1, top: 0, bottom: 0, width: 2, background: nowLine, boxShadow: `0 0 8px 1px ${nowLine}`, pointerEvents: 'none' }} />}
+                      </div>
+                    )
+                  })}
+                </div>
               </div>
               {list.map(it => (
                 <div key={it.barcode} className="ps-tl-row" style={{ borderColor: dim }}>
