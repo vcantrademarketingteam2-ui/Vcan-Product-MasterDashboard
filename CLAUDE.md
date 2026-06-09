@@ -55,7 +55,34 @@ The `t` object (computed from `dark` state) provides all colors used in inline s
 - **Products** — filterable table with vendor/brand/status/search filters + stat cards; row click opens `ProductPopup` (data-forward `variant`)
 - **Analytics** — portfolio KPIs, brand distribution dot-matrix, distribution gaps, retailer scorecard (driven by the `intel` memo; factual, no auto-recommendations)
 - **Packshot** — image gallery; card click opens `ProductPopup` (image-forward `variant`). Images live in `public/packshots/<barcode>_<front|back>.webp`; `.jpg/.png` originals are git-ignored, only `.webp` is committed/deployed
-- **Promotion Plan** — placeholder, coming in v2.5
+- **Promotion Plan** — live as of v2.13.0; implemented in [src/PromoSection.jsx](src/PromoSection.jsx) (extracted component, not inlined in App.jsx). Reads from [src/promo_data.js](src/promo_data.js). See PromoSection section below.
+
+### PromoSection (Promotion Plan tab)
+
+Implemented in [src/PromoSection.jsx](src/PromoSection.jsx) + [src/PromoSection.css](src/PromoSection.css). App.jsx renders it as:
+```jsx
+<PromoSection rawData={rawData} retailerData={retailerData} t={t} dark={dark}
+              isMobile={isMobile} onSelect={setSelectedProduct} RetailerLogo={RetailerLogo} />
+```
+
+**Data source:** `promo_data.js` exports `default` (promo items array), `PROMO_META` (per-retailer period list), `PROMO_ACTIVITY` (activity type definitions), `PROMO_RETAILERS` (ordered retailer list).
+
+**Activity color overrides (in PromoSection, NOT in promo_data.js):**
+- `field` → `#f97316` (orange) — distinct from clearance cyan
+- `media` → `#3b82f6` (blue)
+- `clearance` → `#22d3ee` (`CLEAR_COLOR` constant)
+
+**RetailerLogo:** passed as a prop from App.jsx (`RetailerLogo` component). Customer selector pills use logo images, not plain text. Do not replace with text.
+
+**NOW glow line technique:** CSS `calc()` with `%` is unreliable inside `min-width: max-content` containers. The overlay uses `useLayoutEffect` + `getBoundingClientRect` to measure the NOW slot's actual pixel position after each render, then sets the overlay `left` as a hard pixel value. Refs: `calInnerRef` (Calendar) and `tlInnerRef` (Timeline). The measurement function looks for `.ps-now-ph` (Calendar header cell) or `.ps-now-slot` (Timeline data cell).
+
+**Two views:**
+- **Calendar** — period-column matrix, compact price chips (`.ps-chip`), brand band rows sticky left, column header shows period code + date range + NOW tag
+- **Timeline** — Gantt/swimlane redesign: month-only axis, thin colored brand header strips (`.ps-tl-brand-hdr`), 68px rows with wide Gantt bars (`.ps-bar`) in gradient activity color, white bold price + discount % subtitle + activity dots. Column separators transparent (open look).
+
+**PIN gate:** `DEPT_PINS` maps env var pins → department name. Unlocked state shows GP% in cells and compensate values. `VITE_PIN_SALES` / `VITE_PIN_DATA` env vars (defaults hardcoded as fallback).
+
+**Hover discount tooltip:** `.ps-tip` inside `.ps-chip`, `.ps-tl-pill`, and `.ps-bar` — `opacity: 0` → `1` on parent hover. Shows `−N%` discount off RSP.
 
 ### Mobile UI rules (IMPORTANT)
 
@@ -67,3 +94,11 @@ The app supports mobile (`isMobile` = `window.innerWidth < 768`). **Every UI cha
 - **Scrollable tables** (Analytics matrix, Retailer Scorecard, Popup pricing) — always wrapped in `overflowX: 'auto'` with `WebkitOverflowScrolling: 'touch'` and a `minWidth` so they scroll horizontally on small screens.
 - **Touch targets** — interactive elements on mobile should be at least 40px tall. Use `isMobile ? '...mobile...' : '...desktop...'` inline for padding/size adjustments.
 - Sidebar is a slide-in drawer on mobile (fixed, `transform: translateX`). Filters inside it are always accessible via the hamburger menu.
+
+## Version history (recent)
+
+| Version | What changed |
+|---------|-------------|
+| v2.14.0 | Fix NOW glow line (useLayoutEffect pixel measurement); Timeline redesigned as Gantt/swimlane (month-only axis, colored bars, brand strips) |
+| v2.13.0 | Promotion Plan launched: PromoSection.jsx extracted component, Calendar + Timeline views, hover discount tooltip (−%), activity ribbon, customer logo pills |
+| v2.12.x | Timeline NOW glow line continuity fixes (multiple attempts before v2.14 pixel approach) |
