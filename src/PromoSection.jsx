@@ -292,11 +292,11 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
 
   // Bar color: driven by activity type, with clearance override
   const getBarStyle = (activities, clearance) => {
-    if (clearance) return { bg: 'linear-gradient(90deg,#0e7490cc,#155e75cc)', clr: CLEAR_COLOR }
+    if (clearance) return { bg: 'linear-gradient(135deg,#0e7490,#0891b2)', clr: CLEAR_COLOR }
     for (const a of (activities || [])) {
-      if (ACT[a]) return { bg: `linear-gradient(90deg,${ACT[a].color}e0,${ACT[a].color}88)`, clr: ACT[a].color }
+      if (ACT[a]) return { bg: `linear-gradient(135deg,${ACT[a].color},${ACT[a].color}bb)`, clr: ACT[a].color }
     }
-    return { bg: `linear-gradient(90deg,${t.accent}e0,${t.accent}88)`, clr: t.accent }
+    return { bg: `linear-gradient(135deg,${t.accent},${t.accent}cc)`, clr: t.accent }
   }
 
   // Bar position for a period (returns {left%, width%} or null if no dateRange)
@@ -423,7 +423,8 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
   // Schedule view — proportional Gantt with date-accurate bar widths
   function Schedule() {
     return (
-      <div className="ps-sched-scroll" style={{ scrollbarColor: `${bdr} transparent` }}>
+      <div className="ps-sched-scroll" style={{ scrollbarColor: `${bdr} transparent` }}
+        onMouseLeave={() => setBarTip(null)}>
         <div className="ps-sched-inner" ref={tlInnerRef} style={{ position: 'relative' }}>
 
           {/* NOW glow line — first in DOM, paints behind all content */}
@@ -461,11 +462,10 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
           {/* Brand + product rows */}
           {grouped.map(([brand, list]) => (
             <div key={brand}>
-              {/* Brand header — sticky left so label is always visible */}
+              {/* Brand header */}
               <div style={{
-                position: 'sticky', left: 0,
-                display: 'inline-flex', alignItems: 'center', gap: 8,
-                padding: '6px 16px 5px 14px', minWidth: '100%', width: 'max-content',
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '6px 16px 5px 14px',
                 borderLeft: `3px solid ${coColor(list[0].company) || t.accent}`,
                 background: dark ? 'rgba(255,255,255,.03)' : 'rgba(0,0,0,.02)',
                 borderBottom: `1px solid ${dim}`, borderTop: `1px solid ${bdr}`,
@@ -490,7 +490,7 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
 
                   {/* Proportional Gantt lane */}
                   <div className="ps-sched-lane">
-                    <div className="ps-sched-track" style={{ background: dark ? 'rgba(255,255,255,.025)' : 'rgba(0,0,0,.02)' }}>
+                    <div className="ps-sched-track" style={{ background: dark ? 'rgba(255,255,255,.06)' : 'rgba(0,0,0,.06)' }}>
                       {periods.map(p => {
                         const pd = it.periods?.[p.name]
                         if (!pd) return null
@@ -501,7 +501,7 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
                         return (
                           <div key={p.name} className="ps-sched-bar"
                             style={{ left: `${pos.left}%`, width: `${pos.width}%`, background: bs.bg,
-                              boxShadow: `0 2px 10px ${bs.clr}44, inset 0 1px 0 rgba(255,255,255,.1)` }}
+                              boxShadow: `0 3px 14px ${bs.clr}66, inset 0 1px 0 rgba(255,255,255,.18)` }}
                             onMouseEnter={e => setBarTip({
                               x: e.clientX, y: e.clientY,
                               brand: it.brand, product: it.product,
@@ -515,7 +515,9 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
                             onMouseMove={e => setBarTip(prev => prev ? { ...prev, x: e.clientX, y: e.clientY } : prev)}
                           >
                             <span className="ps-sched-bar-txt">{priceTxt(pd)}</span>
-                            {offPct != null && offPct > 0 && <span className="ps-sched-bar-off">−{offPct}%</span>}
+                            {offPct != null && offPct > 0 && pos.width > 5 && (
+                              <span className="ps-sched-bar-off">−{offPct}%</span>
+                            )}
                           </div>
                         )
                       })}
@@ -691,7 +693,7 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
 
       {/* toolbar: layout toggle + sub-toggle + activity legend + tools */}
       <div className="ps-toolbar">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 8 }}>
           {/* main view toggle */}
           <div className="ps-seg" style={{ background: s2, border: `1px solid ${bdr}` }}>
             {[['timeline','📊 Timeline'], ['grid','📋 Grid']].map(([k, l]) => (
@@ -701,9 +703,9 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
               }}>{l}</button>
             ))}
           </div>
-          {/* sub-toggle — only visible when Timeline is selected */}
+          {/* sub-toggle — directly under main toggle when Timeline is selected */}
           {layout === 'timeline' && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingLeft: 3 }}>
               <span style={{ fontSize: 10.5, color: dim, fontWeight: 600 }}>view:</span>
               <div className="ps-seg" style={{ background: s2, border: `1px solid ${bdr}`, padding: 2 }}>
                 {[['schedule','Schedule'], ['spotlight','Spotlight']].map(([k, l]) => (
