@@ -41,15 +41,37 @@ function parseDR(dr = '') {
 
 const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
+// Infer a date range from the period name when dateRange is empty.
+// Handles: Foodland Thai Buddhist names "1-31/1/2569", Villa "Monthly1-Monthly12", Homepro "Jan"-"Dec"
+function inferPeriodDate(p) {
+  const name = (p?.name || '').trim()
+  // Foodland Thai Buddhist: "1-31/1/2569" or "1-30 /4/2569"
+  const th = name.match(/^(\d+)[–\-]\s*(\d+)\s*\/(\d+)\/(\d{4})$/)
+  if (th) {
+    const rawYr = parseInt(th[4])
+    const yr = rawYr > 2500 ? rawYr - 543 : rawYr
+    const mo = parseInt(th[3]) - 1
+    const day1 = parseInt(th[1]), day2 = parseInt(th[2])
+    if (mo >= 0 && mo < 12 && day1 >= 1 && day2 >= day1)
+      return { s: new Date(yr, mo, day1), e: new Date(yr, mo, day2, 23, 59, 59, 999) }
+  }
+  // Monthly numbered: "Monthly1" ... "Monthly12" (Villa)
+  const mn = name.match(/^[Mm]onthly(\d+)$/i)
+  if (mn) {
+    const mo = parseInt(mn[1]) - 1
+    if (mo >= 0 && mo < 12)
+      return { s: new Date(TODAY.getFullYear(), mo, 1), e: new Date(TODAY.getFullYear(), mo + 1, 0, 23, 59, 59, 999) }
+  }
+  // Short month name exact match: "Jan", "Feb" ... (Homepro)
+  const mi = MONTH_NAMES.findIndex(m => m.toLowerCase() === name.toLowerCase())
+  if (mi >= 0)
+    return { s: new Date(TODAY.getFullYear(), mi, 1), e: new Date(TODAY.getFullYear(), mi + 1, 0, 23, 59, 59, 999) }
+  return null
+}
+
 function periodIsCurrent(p) {
-  const r = parseDR(p.dateRange)
+  const r = parseDR(p.dateRange) || inferPeriodDate(p)
   if (r) return TODAY >= r.s && TODAY <= r.e
-  // Monthly name: "Jan", "Feb"…
-  const mi = MONTH_NAMES.findIndex(m => p.name.startsWith(m))
-  if (mi >= 0) return mi === TODAY.getMonth()
-  // Thai Buddhist: "1-31/5/2569"  or  "1-30 /4/2569"
-  const th = p.name.match(/\/(\d{1,2})\/(\d{4})/)
-  if (th) return parseInt(th[1]) - 1 === TODAY.getMonth() && parseInt(th[2]) - 543 === TODAY.getFullYear()
   return false
 }
 
@@ -63,23 +85,13 @@ function periodLabel(name) {
 // Derive month groupings for Grid axis from a periods array
 function groupPeriodsByMonth(periods) {
   const groups = []
-  periods.forEach((p, i) => {
-    const r = parseDR(p.dateRange)
-    let mName = ''
-    if (r) mName = MONTH_NAMES[r.s.getMonth()]
-    else {
-      const mi = MONTH_NAMES.findIndex(m => p.name.startsWith(m))
-      if (mi >= 0) mName = MONTH_NAMES[mi]
-      else {
-        const th = p.name.match(/\/(\d{1,2})\//)
-        mName = th ? (MONTH_NAMES[parseInt(th[1]) - 1] || 'Period') : 'Period'
-      }
-    }
+  periods.forEach(p => {
+    const r = parseDR(p.dateRange) || inferPeriodDate(p)
+    const mName = r ? MONTH_NAMES[r.s.getMonth()] : 'Period'
     const last = groups[groups.length - 1]
     if (last && last.name === mName) last.count++
     else groups.push({ name: mName, count: 1, nowInside: false })
   })
-  // mark which group contains today
   let acc = 0
   const nowIdx = periods.findIndex(p => periodIsCurrent(p))
   groups.forEach(g => { if (nowIdx >= acc && nowIdx < acc + g.count) g.nowInside = true; acc += g.count })
@@ -108,6 +120,7 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
   const [tlView, setTlView] = useState('schedule')
   const [spotTab, setSpotTab] = useState('live')
   const [barTip, setBarTip] = useState(null)
+  const [schedWindow, setSchedWindow] = useState('6mo')
   const [unlocked, setUnlocked] = useState(null)
   const [pin, setPin] = useState('')
   const [pinErr, setPinErr] = useState(false)
@@ -146,9 +159,9 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
   }, [items])
 
   // ── Schedule / Spotlight memos ───────────────────────────────────────────────
-  // Date range spanning all periods that have a parseable dateRange (for proportional Gantt)
+  // Full range spanning all periods (using inferPeriodDate fallback for empty dateRange)
   const schedRange = useMemo(() => {
-    const drs = periods.map(p => parseDR(p.dateRange)).filter(Boolean)
+    const drs = periods.map(p => parseDR(p.dateRange) || inferPeriodDate(p)).filter(Boolean)
     if (!drs.length) return null
     const start   = new Date(Math.min(...drs.map(d => d.s.getTime())))
     const end     = new Date(Math.max(...drs.map(d => d.e.getTime())))
@@ -156,10 +169,24 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
     return totalMs > 0 ? { start, end, totalMs } : null
   }, [periods])
 
-  // Month cells for the Schedule axis, proportional to actual date span
+  // Clipped range based on time-window selector (3mo / 6mo / full)
+  const filteredSchedRange = useMemo(() => {
+    if (!schedRange) return null
+    if (schedWindow === 'full') return schedRange
+    const months = schedWindow === '3mo' ? 3 : 6
+    const halfBack = Math.floor(months / 3)
+    const wStart = new Date(TODAY.getFullYear(), TODAY.getMonth() - halfBack, 1)
+    const wEnd   = new Date(TODAY.getFullYear(), TODAY.getMonth() + (months - halfBack), 0, 23, 59, 59, 999)
+    const start  = new Date(Math.max(schedRange.start.getTime(), wStart.getTime()))
+    const end    = new Date(Math.min(schedRange.end.getTime(), wEnd.getTime()))
+    const totalMs = end.getTime() - start.getTime()
+    return totalMs > 0 ? { start, end, totalMs } : null
+  }, [schedRange, schedWindow])
+
+  // Month cells for the Schedule axis, proportional to filtered range
   const schedMonths = useMemo(() => {
-    if (!schedRange) return []
-    const { start, end, totalMs } = schedRange
+    if (!filteredSchedRange) return []
+    const { start, end, totalMs } = filteredSchedRange
     const out = []
     let cur = new Date(start.getFullYear(), start.getMonth(), 1)
     while (cur <= end) {
@@ -176,14 +203,14 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
       cur = new Date(cur.getFullYear(), cur.getMonth() + 1, 1)
     }
     return out
-  }, [schedRange])
+  }, [filteredSchedRange])
 
-  // NOW position as 0–100% across the full schedule range
+  // NOW position as 0–100% across the filtered range
   const nowPct = useMemo(() => {
-    if (!schedRange) return null
-    const pct = (TODAY.getTime() - schedRange.start.getTime()) / schedRange.totalMs * 100
+    if (!filteredSchedRange) return null
+    const pct = (TODAY.getTime() - filteredSchedRange.start.getTime()) / filteredSchedRange.totalMs * 100
     return Math.max(0, Math.min(100, pct))
-  }, [schedRange])
+  }, [filteredSchedRange])
 
   // Spotlight: products in current / next / past periods
   const spotLive = useMemo(() => {
@@ -235,15 +262,37 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
       .slice(0, 30)
   }, [items, periods, currentIdx])
 
+  // Spotlight Ended: grouped by period name for tree view
+  const endedGrouped = useMemo(() => {
+    const groups = {}
+    spotEnded.forEach(it => {
+      if (!groups[it.periodName]) groups[it.periodName] = []
+      groups[it.periodName].push(it)
+    })
+    return Object.entries(groups)
+      .sort(([a], [b]) => {
+        const ia = periods.findIndex(p => p.name === a)
+        const ib = periods.findIndex(p => p.name === b)
+        return ib - ia
+      })
+      .map(([periodName, pItems]) => {
+        const period = periods.find(p => p.name === periodName)
+        const dr = parseDR(period?.dateRange || '') || inferPeriodDate(period || {})
+        const dateDisplay = period?.dateRange || (dr ? `${MONTH_NAMES[dr.s.getMonth()]} ${dr.s.getFullYear()}` : period?.name || '')
+        return { periodName, dateDisplay, items: pItems }
+      })
+  }, [spotEnded, periods])
+
   // Progress of the current period (0–100%)
   const periodProgress = useMemo(() => {
     if (currentIdx < 0) return null
     const p = periods[currentIdx]
     if (!p) return null
-    const dr = parseDR(p.dateRange)
+    const dr = parseDR(p.dateRange) || inferPeriodDate(p)
     if (!dr) return null
     const pct = (TODAY.getTime() - dr.s.getTime()) / (dr.e.getTime() - dr.s.getTime()) * 100
-    return { name: p.name, dateRange: p.dateRange || '', pct: Math.max(0, Math.min(100, pct)) }
+    const dateLabel = p.dateRange || (dr ? `${MONTH_NAMES[dr.s.getMonth()]} ${dr.s.getFullYear()}` : '')
+    return { name: p.name, dateRange: dateLabel, pct: Math.max(0, Math.min(100, pct)) }
   }, [periods, currentIdx])
 
   // measure NOW x-position from DOM after render
@@ -271,7 +320,7 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
     } else {
       setTlNowX(null)
     }
-  }, [layout, tlView, retailer, currentIdx, brandFilter, nowPct])
+  }, [layout, tlView, retailer, currentIdx, brandFilter, nowPct, schedWindow])
 
   // per-period activity dots (union across all items in that period)
   const actsByPeriod = useMemo(() => {
@@ -299,14 +348,16 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
     return { bg: `linear-gradient(135deg,${t.accent},${t.accent}cc)`, clr: t.accent }
   }
 
-  // Bar position for a period (returns {left%, width%} or null if no dateRange)
+  // Bar position clipped to the filtered visible range; uses inferPeriodDate for empty dateRange
   const barPos = p => {
-    if (!schedRange || !p.dateRange) return null
-    const dr = parseDR(p.dateRange)
-    if (!dr) return null
-    const { start, totalMs } = schedRange
-    const left  = (dr.s.getTime() - start.getTime()) / totalMs * 100
-    const width = (dr.e.getTime() - dr.s.getTime()) / totalMs * 100
+    const dr = parseDR(p.dateRange) || inferPeriodDate(p)
+    if (!filteredSchedRange || !dr) return null
+    const { start, end, totalMs } = filteredSchedRange
+    const barStart = Math.max(dr.s.getTime(), start.getTime())
+    const barEnd   = Math.min(dr.e.getTime(), end.getTime())
+    if (barEnd <= barStart) return null
+    const left  = (barStart - start.getTime()) / totalMs * 100
+    const width = (barEnd - barStart) / totalMs * 100
     return { left: Math.max(0, left), width: Math.max(0.5, width) }
   }
 
@@ -423,111 +474,172 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
   // Schedule view — proportional Gantt with date-accurate bar widths
   function Schedule() {
     return (
-      <div className="ps-sched-scroll" style={{ scrollbarColor: `${bdr} transparent` }}
-        onMouseLeave={() => setBarTip(null)}>
-        <div className="ps-sched-inner" ref={tlInnerRef} style={{ position: 'relative' }}>
-
-          {/* NOW glow line — first in DOM, paints behind all content */}
-          {tlNowX !== null && (
-            <div style={{
-              position: 'absolute', top: 0, bottom: 0, pointerEvents: 'none', zIndex: 2,
-              left: tlNowX, width: 2, background: nowLine,
-              boxShadow: `0 0 12px 3px ${nowLine}, 0 0 28px 8px rgba(240,192,64,.18)`,
-            }} />
-          )}
-
-          {/* Month axis */}
-          <div className="ps-sched-axis" style={{ background: s2, borderBottom: `1px solid ${bdr}` }}>
-            <div className="ps-sched-axis-lead" style={{ background: s2, borderRight: `1px solid ${bdr}` }}>
-              <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.1em', color: mu }}>Product</span>
-            </div>
-            <div className="ps-sched-months">
-              {schedMonths.length > 0 ? schedMonths.map((m, i) => (
-                <div key={i} style={{
-                  flex: m.flex, minWidth: 0,
-                  padding: '8px 10px 6px',
-                  borderLeft: `1px solid ${m.isNow ? nowLine + '55' : dim}`,
-                  background: m.isNow ? `linear-gradient(180deg,${nowBg},transparent)` : 'transparent',
-                  display: 'flex', flexDirection: 'column', gap: 1,
-                }}>
-                  <b style={{ fontSize: 12, fontWeight: 800, color: m.isNow ? t.accent : tx, letterSpacing: '.04em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.name.toUpperCase()}</b>
-                  <small style={{ fontSize: 10, color: mu, fontFamily: 'ui-monospace,monospace' }}>{m.year}</small>
-                </div>
-              )) : (
-                <div style={{ padding: '10px 14px', fontSize: 12, color: mu }}>กรุณาตรวจสอบข้อมูลวันที่</div>
-              )}
-            </div>
-          </div>
-
-          {/* Brand + product rows */}
-          {grouped.map(([brand, list]) => (
-            <div key={brand}>
-              {/* Brand header */}
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: 8,
-                padding: '6px 16px 5px 14px',
-                borderLeft: `3px solid ${coColor(list[0].company) || t.accent}`,
-                background: dark ? 'rgba(255,255,255,.03)' : 'rgba(0,0,0,.02)',
-                borderBottom: `1px solid ${dim}`, borderTop: `1px solid ${bdr}`,
-              }}>
-                <span style={{ fontSize: 11.5, fontWeight: 800, letterSpacing: '.07em', textTransform: 'uppercase', color: coColor(list[0].company) || t.accent }}>{brand}</span>
-                <span style={{ fontSize: 10.5, color: mu }}>{list.length} SKU{list.length > 1 ? 's' : ''}</span>
-              </div>
-
-              {/* Product rows */}
-              {list.map(it => (
-                <div key={it.barcode} className="ps-sched-row" style={{ borderColor: dim, background: s }}>
-                  {/* Left sticky panel */}
-                  <div className="ps-sched-lead" style={{ background: s, borderRight: `1px solid ${bdr}` }}
-                    onClick={() => onSelect?.(it)}>
-                    <div style={{ fontSize: 12.5, fontWeight: 600, color: tx, lineHeight: 1.35, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.product}</div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
-                      <span style={{ fontSize: 11, fontFamily: 'ui-monospace,monospace', fontWeight: 700, color: mu }}>RSP ฿{it.rspIncVat}</span>
-                      {unlocked && <span style={{ fontSize: 10, fontFamily: 'ui-monospace,monospace', fontWeight: 700, color: gpColor(it.gp) }}>GP {Math.round(it.gp * 100)}%</span>}
-                      {it.clearance && <span style={{ fontSize: 8.5, fontWeight: 800, color: CLEAR_COLOR, background: 'rgba(34,211,238,.14)', borderRadius: 4, padding: '1px 5px', letterSpacing: '.04em' }}>CLEAR</span>}
-                    </div>
-                  </div>
-
-                  {/* Proportional Gantt lane */}
-                  <div className="ps-sched-lane">
-                    <div className="ps-sched-track" style={{ background: dark ? 'rgba(255,255,255,.06)' : 'rgba(0,0,0,.06)' }}>
-                      {periods.map(p => {
-                        const pd = it.periods?.[p.name]
-                        if (!pd) return null
-                        const pos = barPos(p)
-                        if (!pos) return null
-                        const bs = getBarStyle(pd.activities, it.clearance)
-                        const offPct = pd?.salePrice != null ? Math.round((1 - pd.salePrice / it.rspIncVat) * 100) : null
-                        return (
-                          <div key={p.name} className="ps-sched-bar"
-                            style={{ left: `${pos.left}%`, width: `${pos.width}%`, background: bs.bg,
-                              boxShadow: `0 3px 14px ${bs.clr}66, inset 0 1px 0 rgba(255,255,255,.18)` }}
-                            onMouseEnter={e => setBarTip({
-                              x: e.clientX, y: e.clientY,
-                              brand: it.brand, product: it.product,
-                              period: p.name, dates: p.dateRange || '',
-                              price: priceTxt(pd), rsp: `฿${it.rspIncVat}`,
-                              offPct, color: bs.clr,
-                              activities: pd.activities || [],
-                              clearance: it.clearance,
-                            })}
-                            onMouseLeave={() => setBarTip(null)}
-                            onMouseMove={e => setBarTip(prev => prev ? { ...prev, x: e.clientX, y: e.clientY } : prev)}
-                          >
-                            <span className="ps-sched-bar-txt">{priceTxt(pd)}</span>
-                            {offPct != null && offPct > 0 && pos.width > 5 && (
-                              <span className="ps-sched-bar-off">−{offPct}%</span>
-                            )}
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+      <>
+        {/* Time-window selector */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 18px', borderBottom: `1px solid ${bdr}`, background: dark ? 'rgba(255,255,255,.018)' : 'rgba(0,0,0,.018)' }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: mu, textTransform: 'uppercase', letterSpacing: '.08em' }}>Window</span>
+          {[['3mo','3 months'],['6mo','6 months'],['full','Full']].map(([k, l]) => (
+            <button key={k} onClick={() => setSchedWindow(k)} style={{
+              fontSize: 11.5, padding: '4px 11px', borderRadius: 7,
+              border: `1px solid ${schedWindow === k ? t.accent : bdr}`,
+              background: schedWindow === k ? `${t.accent}22` : s2,
+              color: schedWindow === k ? t.accent : mu,
+              cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700, transition: '.12s',
+            }}>{l}</button>
           ))}
+          <span style={{ marginLeft: 'auto', fontSize: 10.5, color: mu }}>hover bars for details</span>
+        </div>
 
+        <div className="ps-sched-scroll" style={{ scrollbarColor: `${bdr} transparent` }}
+          onMouseLeave={() => setBarTip(null)}>
+          <div className="ps-sched-inner" ref={tlInnerRef} style={{ position: 'relative' }}>
+
+            {/* NOW glow line — first in DOM, paints behind all content */}
+            {tlNowX !== null && (
+              <div style={{
+                position: 'absolute', top: 0, bottom: 0, pointerEvents: 'none', zIndex: 2,
+                left: tlNowX, width: 2, background: nowLine,
+                boxShadow: `0 0 12px 3px ${nowLine}, 0 0 28px 8px rgba(240,192,64,.18)`,
+              }} />
+            )}
+
+            {/* Month axis */}
+            <div className="ps-sched-axis" style={{ background: s2, borderBottom: `1px solid ${bdr}` }}>
+              <div className="ps-sched-axis-lead" style={{ background: s2, borderRight: `1px solid ${bdr}` }}>
+                <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.1em', color: mu }}>Product</span>
+              </div>
+              <div className="ps-sched-months">
+                {schedMonths.length > 0 ? schedMonths.map((m, i) => (
+                  <div key={i} style={{
+                    flex: m.flex, minWidth: 0,
+                    padding: '8px 10px 6px',
+                    borderLeft: `1px solid ${m.isNow ? nowLine + '55' : dim}`,
+                    background: m.isNow ? `linear-gradient(180deg,${nowBg},transparent)` : 'transparent',
+                    display: 'flex', flexDirection: 'column', gap: 1,
+                  }}>
+                    <b style={{ fontSize: 12, fontWeight: 800, color: m.isNow ? t.accent : tx, letterSpacing: '.04em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {m.name.toUpperCase()}{m.isNow ? ' ◀' : ''}
+                    </b>
+                    <small style={{ fontSize: 10, color: m.isNow ? t.accent + 'bb' : mu, fontFamily: 'ui-monospace,monospace' }}>{m.isNow ? 'NOW' : m.year}</small>
+                  </div>
+                )) : (
+                  <div style={{ padding: '10px 14px', fontSize: 12, color: mu }}>กรุณาตรวจสอบข้อมูลวันที่</div>
+                )}
+              </div>
+            </div>
+
+            {/* Brand + product rows */}
+            {grouped.map(([brand, list]) => (
+              <div key={brand}>
+                {/* Brand header */}
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  padding: '6px 16px 5px 14px',
+                  borderLeft: `3px solid ${coColor(list[0].company) || t.accent}`,
+                  background: dark ? 'rgba(255,255,255,.03)' : 'rgba(0,0,0,.02)',
+                  borderBottom: `1px solid ${dim}`, borderTop: `1px solid ${bdr}`,
+                }}>
+                  <span style={{ fontSize: 11.5, fontWeight: 800, letterSpacing: '.07em', textTransform: 'uppercase', color: coColor(list[0].company) || t.accent }}>{brand}</span>
+                  <span style={{ fontSize: 10.5, color: mu }}>{list.length} SKU{list.length > 1 ? 's' : ''}</span>
+                  <span style={{ fontSize: 10, color: mu, marginLeft: 4 }}>{list[0].company}</span>
+                </div>
+
+                {/* Product rows */}
+                {list.map(it => (
+                  <div key={it.barcode} className="ps-sched-row" style={{ borderColor: dim, background: s }}>
+                    {/* Left sticky panel */}
+                    <div className="ps-sched-lead" style={{ background: s, borderRight: `1px solid ${bdr}` }}
+                      onClick={() => onSelect?.(it)}>
+                      <div style={{ fontSize: 12.5, fontWeight: 600, color: tx, lineHeight: 1.35, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.product}</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+                        <span style={{ fontSize: 11, fontFamily: 'ui-monospace,monospace', fontWeight: 700, color: mu }}>RSP ฿{it.rspIncVat}</span>
+                        {unlocked && <span style={{ fontSize: 10, fontFamily: 'ui-monospace,monospace', fontWeight: 700, color: gpColor(it.gp) }}>GP {Math.round(it.gp * 100)}%</span>}
+                        {it.clearance && <span style={{ fontSize: 8.5, fontWeight: 800, color: CLEAR_COLOR, background: 'rgba(34,211,238,.14)', borderRadius: 4, padding: '1px 5px', letterSpacing: '.04em' }}>CLEAR</span>}
+                      </div>
+                    </div>
+
+                    {/* Proportional Gantt lane */}
+                    <div className="ps-sched-lane">
+                      <div className="ps-sched-track" style={{ background: dark ? 'rgba(255,255,255,.06)' : 'rgba(0,0,0,.06)' }}
+                        onMouseLeave={() => setBarTip(null)}>
+                        {periods.map(p => {
+                          const pd = it.periods?.[p.name]
+                          if (!pd) return null
+                          const pos = barPos(p)
+                          if (!pos) return null
+                          const bs = getBarStyle(pd.activities, it.clearance)
+                          const offPct = pd?.salePrice != null ? Math.round((1 - pd.salePrice / it.rspIncVat) * 100) : null
+                          const dr = parseDR(p.dateRange) || inferPeriodDate(p)
+                          const dateDisplay = p.dateRange || (dr ? `${MONTH_NAMES[dr.s.getMonth()]} ${dr.e.getFullYear()}` : '')
+                          return (
+                            <div key={p.name} className="ps-sched-bar"
+                              style={{ left: `${pos.left}%`, width: `${pos.width}%`, background: bs.bg,
+                                boxShadow: `0 3px 14px ${bs.clr}66, inset 0 1px 0 rgba(255,255,255,.18)` }}
+                              onMouseEnter={e => setBarTip({
+                                x: e.clientX, y: e.clientY,
+                                brand: it.brand, product: it.product,
+                                period: p.name, dates: dateDisplay,
+                                price: priceTxt(pd), rsp: `฿${it.rspIncVat}`,
+                                offPct, color: bs.clr,
+                                activities: pd.activities || [],
+                                clearance: it.clearance,
+                              })}
+                              onMouseLeave={e => { e.stopPropagation(); setBarTip(null) }}
+                              onMouseMove={e => setBarTip(prev => prev ? { ...prev, x: e.clientX, y: e.clientY } : prev)}
+                            >
+                              {pos.width >= 4 && <span className="ps-sched-bar-txt">{priceTxt(pd)}</span>}
+                              {pos.width >= 8 && offPct != null && offPct > 0 && (
+                                <span className="ps-sched-bar-off">−{offPct}%</span>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ))}
+
+          </div>
+        </div>
+      </>
+    )
+  }
+
+  // Reusable feed card for Spotlight
+  function FeedCard({ it, showPeriod = false }) {
+    const bs = getBarStyle(it.pd?.activities, it.clearance)
+    return (
+      <div onClick={() => onSelect?.(it)}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 12, padding: '12px 15px',
+          background: s, border: `1px solid ${bs.clr}28`,
+          borderLeft: `3px solid ${bs.clr}`,
+          borderRadius: 10, cursor: 'pointer', transition: 'filter .14s',
+        }}
+        onMouseEnter={e => e.currentTarget.style.filter = 'brightness(1.06)'}
+        onMouseLeave={e => e.currentTarget.style.filter = ''}
+      >
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: bs.clr, marginBottom: 2 }}>
+            {it.brand}{it.clearance ? ' · CLEARANCE' : ''}
+          </div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: tx, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.product}</div>
+          <div style={{ fontSize: 11, color: mu, marginTop: 2 }}>RSP ฿{it.rspIncVat}</div>
+          {(it.pd?.activities || []).length > 0 && (
+            <div style={{ display: 'flex', gap: 4, marginTop: 5 }}>
+              {it.pd.activities.map(a => ACT[a] ? (
+                <i key={a} style={{ width: 7, height: 7, borderRadius: 99, background: ACT[a].color, boxShadow: `0 0 5px ${ACT[a].color}`, display: 'inline-block' }} />
+              ) : null)}
+            </div>
+          )}
+        </div>
+        <div style={{ textAlign: 'right', flexShrink: 0 }}>
+          <div style={{ fontSize: 19, fontWeight: 800, fontFamily: 'ui-monospace,monospace', color: bs.clr, lineHeight: 1.1 }}>{priceTxt(it.pd)}</div>
+          {it.offPct != null && it.offPct > 0 && (
+            <div style={{ fontSize: 12, fontWeight: 700, color: bs.clr, marginTop: 2 }}>−{it.offPct}%</div>
+          )}
         </div>
       </div>
     )
@@ -535,7 +647,7 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
 
   // Spotlight view — live feed: Live Now / Next Up / Ended tabs
   function Spotlight() {
-    const feedData = spotTab === 'live' ? spotLive : spotTab === 'next' ? spotNext : spotEnded
+    const feedData = spotTab === 'live' ? spotLive : spotTab === 'next' ? spotNext : []
     return (
       <div style={{ padding: isMobile ? '12px 14px' : '16px 20px' }}>
 
@@ -584,62 +696,58 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
           })}
         </div>
 
-        {/* Feed */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 7, maxWidth: 600 }}>
-          {feedData.length === 0 && (
-            <div style={{ textAlign: 'center', padding: '40px 0', color: mu, fontSize: 13 }}>
-              {spotTab === 'live' ? 'ไม่มีโปรโมชันที่กำลังดำเนินอยู่'
-                : spotTab === 'next' ? 'ไม่มีโปรโมชันที่กำลังจะมาถึง'
-                : 'ไม่มีประวัติโปรโมชัน'}
-            </div>
-          )}
-          {feedData.map((it, idx) => {
-            const bs = getBarStyle(it.pd?.activities, it.clearance)
-            return (
-              <div key={it.barcode + (it.periodName || '') + idx}
-                onClick={() => onSelect?.(it)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 12, padding: '12px 15px',
-                  background: s, border: `1px solid ${bs.clr}28`,
-                  borderLeft: `3px solid ${bs.clr}`,
-                  borderRadius: 10, cursor: 'pointer', transition: 'filter .14s',
-                }}
-                onMouseEnter={e => e.currentTarget.style.filter = 'brightness(1.06)'}
-                onMouseLeave={e => e.currentTarget.style.filter = ''}
-              >
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: bs.clr, marginBottom: 2 }}>
-                    {it.brand}{it.clearance ? ' · CLEARANCE' : ''}
-                    {spotTab === 'ended' && it.periodName ? ` · ${it.periodName}` : ''}
-                  </div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: tx, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.product}</div>
-                  <div style={{ fontSize: 11, color: mu, marginTop: 2 }}>RSP ฿{it.rspIncVat}</div>
-                  {(it.pd?.activities || []).length > 0 && (
-                    <div style={{ display: 'flex', gap: 4, marginTop: 5 }}>
-                      {(it.pd.activities).map(a => ACT[a] ? (
-                        <i key={a} style={{ width: 7, height: 7, borderRadius: 99, background: ACT[a].color, boxShadow: `0 0 5px ${ACT[a].color}`, display: 'inline-block' }} />
-                      ) : null)}
-                    </div>
-                  )}
+        {/* Live Now / Next Up — 2-column grid */}
+        {spotTab !== 'ended' && (
+          <>
+            {feedData.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '40px 0', color: mu, fontSize: 13 }}>
+                {spotTab === 'live' ? 'ไม่มีโปรโมชันที่กำลังดำเนินอยู่' : 'ไม่มีโปรโมชันที่กำลังจะมาถึง'}
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 7 }}>
+                {feedData.map((it, idx) => <FeedCard key={it.barcode + idx} it={it} />)}
+              </div>
+            )}
+
+            {/* Next up teaser at bottom of Live tab */}
+            {spotTab === 'live' && spotNext.length > 0 && (
+              <div style={{ marginTop: 10, padding: '9px 15px', border: `1px dashed ${dim}`, borderRadius: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11.5, color: mu }}>
+                <span>↓ NEXT UP — {periods[currentIdx + 1]?.dateRange || 'coming soon'}</span>
+                <span style={{ color: dim, fontSize: 11 }}>{[...new Set(spotNext.map(i => i.brand))].slice(0, 3).join(' · ')}</span>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Ended — tree view grouped by period */}
+        {spotTab === 'ended' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {endedGrouped.length === 0 && (
+              <div style={{ textAlign: 'center', padding: '40px 0', color: mu, fontSize: 13 }}>ไม่มีประวัติโปรโมชัน</div>
+            )}
+            {endedGrouped.map(group => (
+              <div key={group.periodName}>
+                {/* Period header */}
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  padding: '8px 14px', marginBottom: 8,
+                  background: s2, border: `1px solid ${bdr}`,
+                  borderLeft: `3px solid ${t.accent}`, borderRadius: 9,
+                }}>
+                  <span style={{ fontSize: 13, fontWeight: 800, color: t.accent, fontFamily: 'ui-monospace,monospace' }}>{group.periodName}</span>
+                  {group.dateDisplay && <span style={{ fontSize: 11, color: mu }}>{group.dateDisplay}</span>}
+                  <span style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 700, color: mu }}>
+                    {group.items.length} SKU{group.items.length > 1 ? 's' : ''}
+                  </span>
                 </div>
-                <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                  <div style={{ fontSize: 19, fontWeight: 800, fontFamily: 'ui-monospace,monospace', color: bs.clr, lineHeight: 1.1 }}>{priceTxt(it.pd)}</div>
-                  {it.offPct != null && it.offPct > 0 && (
-                    <div style={{ fontSize: 12, fontWeight: 700, color: bs.clr, marginTop: 2 }}>−{it.offPct}%</div>
-                  )}
+                {/* Products under this period — 2 columns */}
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 7, paddingLeft: isMobile ? 0 : 14 }}>
+                  {group.items.map((it, idx) => <FeedCard key={it.barcode + idx} it={it} />)}
                 </div>
               </div>
-            )
-          })}
-
-          {/* Next up teaser row */}
-          {spotTab === 'live' && spotNext.length > 0 && (
-            <div style={{ padding: '9px 15px', border: `1px dashed ${dim}`, borderRadius: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11.5, color: mu }}>
-              <span>↓ NEXT UP — {periods[currentIdx + 1]?.dateRange || 'coming soon'}</span>
-              <span style={{ color: dim, fontSize: 11 }}>{[...new Set(spotNext.map(i => i.brand))].slice(0, 3).join(' · ')}</span>
-            </div>
-          )}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
     )
   }
