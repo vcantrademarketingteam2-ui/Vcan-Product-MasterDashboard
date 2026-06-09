@@ -151,7 +151,7 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
   const gpColor = gp => gp == null ? t.muted : gp >= 0.30 ? t.green : gp >= 0.20 ? t.yellow : t.red
   const coColor = c => c === 'Vcan' ? t.vcanClr : t.moolaClr
   const priceTxt = pd => pd.salePrice != null ? '฿' + pd.salePrice.toLocaleString('th-TH') : (pd.saleLabel || '')
-  const off = (item, pd) => pd.salePrice != null ? Math.round((1 - pd.salePrice / item.rspIncVat) * 100) : null
+  const off = (item, pd) => pd?.salePrice != null ? Math.round((1 - pd.salePrice / item.rspIncVat) * 100) : null
 
   const toggleBrand = b => setBrandFilter(prev => prev.includes(b) ? prev.filter(x => x !== b) : [...prev, b])
   const toggleChip = (key, e) => { e.stopPropagation(); setOpenKey(prev => prev === key ? null : key) }
