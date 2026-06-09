@@ -33,7 +33,7 @@ function parseDR(dr = '') {
   if (!m) return null
   const yr = m[5] ? (parseInt(m[5]) < 50 ? 2000 + parseInt(m[5]) : 1900 + parseInt(m[5])) : TODAY.getFullYear()
   const s = new Date(yr, parseInt(m[2]) - 1, parseInt(m[1]))
-  let e = new Date(yr, parseInt(m[4]) - 1, parseInt(m[3]))
+  let e = new Date(yr, parseInt(m[4]) - 1, parseInt(m[3]), 23, 59, 59, 999)
   if (e < s) e.setFullYear(e.getFullYear() + 1)
   return { s, e }
 }
