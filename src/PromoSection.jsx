@@ -201,6 +201,14 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
       <div className="ps-cal-scroll" style={{ scrollbarColor: `${bdr} transparent` }}>
         {/* position:relative lets the NOW overlay span all rows including band rows */}
         <div className="ps-cal-inner" ref={calInnerRef} style={{ position: 'relative' }}>
+          {/* NOW glow line — first in DOM so it paints behind rows and chips */}
+          {calNowX !== null && (
+            <div style={{
+              position: 'absolute', top: 0, bottom: 0, pointerEvents: 'none',
+              left: calNowX, width: 2, background: nowLine,
+              boxShadow: `0 0 10px 3px ${nowLine}, 0 0 22px 6px rgba(240,192,64,.18)`,
+            }} />
+          )}
           {/* header */}
           <div className="ps-cal-head" style={{ background: s2, borderBottom: `1px solid ${bdr}` }}>
             <div className="ps-cal-rh" style={{ background: s2, borderRight: `1px solid ${bdr}`, color: mu }}>Product</div>
@@ -278,14 +286,6 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
             </div>
           ))}
 
-          {/* NOW glow line — measured in px from DOM, no CSS calc issues */}
-          {calNowX !== null && (
-            <div style={{
-              position: 'absolute', top: 0, bottom: 0, pointerEvents: 'none',
-              left: calNowX, width: 2, background: nowLine,
-              boxShadow: `0 0 10px 3px ${nowLine}, 0 0 22px 6px rgba(240,192,64,.18)`,
-            }} />
-          )}
         </div>
       </div>
     )
@@ -295,6 +295,14 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
     return (
       <div className="ps-tl-scroll" style={{ scrollbarColor: `${bdr} transparent` }}>
         <div className="ps-tl-inner" ref={tlInnerRef} style={{ position: 'relative' }}>
+          {/* NOW glow line — first in DOM so it paints behind rows and bars */}
+          {tlNowX !== null && (
+            <div style={{
+              position: 'absolute', top: 0, bottom: 0, pointerEvents: 'none',
+              left: tlNowX, width: 2, background: nowLine,
+              boxShadow: `0 0 10px 3px ${nowLine}, 0 0 22px 6px rgba(240,192,64,.18)`,
+            }} />
+          )}
 
           {/* month axis only — cleaner than calendar's period-code grid */}
           <div className="ps-tl-axis" style={{ background: s2, borderBottom: `2px solid ${bdr}` }}>
@@ -383,14 +391,6 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
             </div>
           ))}
 
-          {/* NOW glow line — measured in px from DOM */}
-          {tlNowX !== null && (
-            <div style={{
-              position: 'absolute', top: 0, bottom: 0, pointerEvents: 'none',
-              left: tlNowX, width: 2, background: nowLine,
-              boxShadow: `0 0 10px 3px ${nowLine}, 0 0 22px 6px rgba(240,192,64,.18)`,
-            }} />
-          )}
         </div>
       </div>
     )
