@@ -180,7 +180,8 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
   function Calendar() {
     return (
       <div className="ps-cal-scroll" style={{ scrollbarColor: `${bdr} transparent` }}>
-        <div className="ps-cal-inner">
+        {/* position:relative lets the NOW overlay span all rows including band rows */}
+        <div className="ps-cal-inner" style={{ position: 'relative' }}>
           {/* header */}
           <div className="ps-cal-head" style={{ background: s2, borderBottom: `1px solid ${bdr}` }}>
             <div className="ps-cal-rh" style={{ background: s2, borderRight: `1px solid ${bdr}`, color: mu }}>Product</div>
@@ -190,7 +191,6 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
               return (
                 <div key={p.name} className={`ps-cal-ph${isNow ? ' ps-now-ph' : ''}`}
                   style={{ background: isNow ? `linear-gradient(180deg,${nowBg},${s2})` : s2, borderLeft: `1px solid ${dim}` }}>
-                  {isNow && <span style={{ position: 'absolute', left: -1, top: 0, bottom: 0, width: 2, background: nowLine, boxShadow: `0 0 8px 1px ${nowLine}, 0 0 18px 3px rgba(240,192,64,.2)` }} />}
                   <div className="ps-cal-ph-code" style={{ color: isNow ? t.accent : tx }}>{periodLabel(p.name)}</div>
                   {p.dateRange && <div className="ps-cal-ph-rng" style={{ color: mu }}>{p.dateRange}</div>}
                   {isNow ? <div className="ps-now-tag" style={{ background: t.accent, color: '#1a1505' }}>NOW</div>
@@ -227,23 +227,22 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
                     const prim = (pd?.activities || []).find(a => ACT[a])
                     const mc = prim ? ACT[prim].color : it.clearance ? CLEAR_COLOR : t.accent
                     const ckey = it.barcode + '|' + p.name
+                    const pctOff = off(it, pd)
                     if (!pd) return (
                       <div key={p.name} className="ps-cal-cell ps-cal-cell-empty"
-                        style={{ borderLeft: `1px solid ${dim}`, background: isNow ? nowBg : 'transparent', color: mu }}>
-                        {isNow && <span style={{ position: 'absolute', left: -1, top: 0, bottom: 0, width: 2, background: nowLine, boxShadow: `0 0 8px 1px ${nowLine}`, pointerEvents: 'none' }} />}
-                      </div>
+                        style={{ borderLeft: `1px solid ${dim}`, background: isNow ? nowBg : 'transparent', color: mu }} />
                     )
                     return (
                       <div key={p.name} className={`ps-cal-cell${isNow ? ' ps-now-cell' : ''}`}
                         style={{ borderLeft: `1px solid ${dim}`, background: isNow ? nowBg : 'transparent',
                           boxShadow: isNow ? 'inset -2px 0 10px rgba(240,192,64,.28)' : 'none' }}>
-                        {isNow && <span style={{ position: 'absolute', left: -1, top: 0, bottom: 0, width: 2, background: nowLine, boxShadow: `0 0 8px 1px ${nowLine}`, pointerEvents: 'none' }} />}
                         <span className="ps-chip" onClick={e => toggleChip(ckey, e)}
                           style={{ background: prim ? `color-mix(in srgb, ${mc} 14%, ${s2})` : dark ? `color-mix(in srgb, ${t.accent} 12%, ${s2})` : `color-mix(in srgb, ${t.accent} 18%, ${s2})`,
                             border: `1px solid ${prim ? mc + '88' : t.accent + '55'}` }}>
+                          {pctOff != null && pctOff > 0 && <span className="ps-tip">−{pctOff}%</span>}
                           <span className="ps-chip-pr" style={{ color: tx }}>{priceTxt(pd)}</span>
-                          {openKey === ckey && off(it, pd) != null && off(it, pd) > 0 && (
-                            <span className="ps-chip-off">−{off(it, pd)}%</span>
+                          {openKey === ckey && pctOff != null && pctOff > 0 && (
+                            <span className="ps-chip-off">−{pctOff}%</span>
                           )}
                           {openKey === ckey && unlocked && pd.compensate != null && (
                             <span style={{ fontSize: 9, fontFamily: 'monospace', color: t.blue || '#58a6ff', fontWeight: 700 }}>฿{pd.compensate.toFixed(2)}</span>
@@ -259,6 +258,16 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
               ))}
             </div>
           ))}
+
+          {/* single NOW overlay line — spans ALL rows including band rows, no alignment issues */}
+          {currentIdx >= 0 && (
+            <div style={{
+              position: 'absolute', top: 0, bottom: 0, pointerEvents: 'none',
+              left: `calc(252px + ${currentIdx / Math.max(1, periods.length)} * (100% - 252px) - 1px)`,
+              width: 2, background: nowLine,
+              boxShadow: `0 0 10px 3px ${nowLine}, 0 0 22px 6px rgba(240,192,64,.18)`,
+            }} />
+          )}
         </div>
       </div>
     )
@@ -267,7 +276,8 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
   function Timeline() {
     return (
       <div className="ps-tl-scroll" style={{ scrollbarColor: `${bdr} transparent` }}>
-        <div className="ps-tl-inner">
+        {/* position:relative lets the NOW overlay span all rows/bands */}
+        <div className="ps-tl-inner" style={{ position: 'relative' }}>
           {/* month axis */}
           <div className="ps-tl-axis" style={{ background: s2, borderBottom: `1px solid ${bdr}` }}>
             <div className="ps-tl-lead" style={{ background: s2, borderRight: `1px solid ${bdr}`, color: mu }}>Product</div>
@@ -291,7 +301,6 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
               return (
                 <div key={p.name} className={`ps-tl-slot${isNow ? ' ps-now-slot' : ''}`}
                   style={{ borderLeftColor: dim, background: isNow ? nowBg : 'transparent' }}>
-                  {isNow && <span style={{ position: 'absolute', left: -1, top: 0, bottom: 0, width: 2, background: nowLine, boxShadow: `0 0 8px 1px ${nowLine}`, pointerEvents: 'none' }} />}
                   {acts.map(a => ACT[a] ? <i key={a} style={{ width: 7, height: 7, borderRadius: 99, background: ACT[a].color, boxShadow: `0 0 5px -1px ${ACT[a].color}`, margin: '0 2px' }} /> : null)}
                 </div>
               )
@@ -300,25 +309,11 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
           {/* brand bands + rows */}
           {grouped.map(([brand, list]) => (
             <div key={brand}>
-              {/* brand band — uses lead+lane structure so the NOW glow line runs continuously */}
+              {/* brand band — flat row, glow line handled by overlay */}
               <div className="ps-tl-band" style={{ background: s2, borderBottom: `1px solid ${dim}`, borderTop: `1px solid ${dim}` }}>
-                <div className="ps-tl-row-lead" style={{ background: s2, borderRight: `1px solid ${bdr}`, display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 8, justifyContent: 'flex-start' }}>
-                  <span style={{ width: 6, height: 6, borderRadius: 2, background: coColor(list[0].company) || t.accent, display: 'inline-block', flexShrink: 0 }} />
-                  <span style={{ fontSize: 11.5, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: coColor(list[0].company) || t.accent }}>{brand}</span>
-                  <span style={{ fontSize: 10.5, fontFamily: 'monospace', color: mu }}>{list.length} SKU{list.length > 1 ? 's' : ''}</span>
-                </div>
-                <div className="ps-tl-lane">
-                  {periods.map((p, i) => {
-                    const isNow = i === currentIdx
-                    return (
-                      <div key={p.name} className={`ps-tl-slot${isNow ? ' ps-now-slot' : ''}`}
-                        style={{ borderLeftColor: isNow ? dim : 'transparent', background: isNow ? nowBg : 'transparent',
-                          boxShadow: isNow ? 'inset -2px 0 10px rgba(240,192,64,.28)' : 'none' }}>
-                        {isNow && <span style={{ position: 'absolute', left: -1, top: 0, bottom: 0, width: 2, background: nowLine, boxShadow: `0 0 8px 1px ${nowLine}`, pointerEvents: 'none' }} />}
-                      </div>
-                    )
-                  })}
-                </div>
+                <span style={{ width: 6, height: 6, borderRadius: 2, background: coColor(list[0].company) || t.accent, display: 'inline-block' }} />
+                <span style={{ fontSize: 11.5, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: coColor(list[0].company) || t.accent }}>{brand}</span>
+                <span style={{ fontSize: 10.5, fontFamily: 'monospace', color: mu }}>{list.length} SKU{list.length > 1 ? 's' : ''}</span>
               </div>
               {list.map(it => (
                 <div key={it.barcode} className="ps-tl-row" style={{ borderColor: dim }}>
@@ -335,17 +330,18 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
                       const prim = (pd?.activities || []).find(a => ACT[a])
                       const mc = prim ? ACT[prim].color : it.clearance ? CLEAR_COLOR : t.accent
                       const ckey = it.barcode + '|' + p.name
+                      const pctOff = off(it, pd)
                       return (
                         <div key={p.name} className={`ps-tl-slot${isNow ? ' ps-now-slot' : ''}`}
                           style={{ borderLeftColor: dim, background: isNow ? nowBg : 'transparent',
                             boxShadow: isNow ? 'inset -2px 0 10px rgba(240,192,64,.28)' : 'none' }}>
-                          {isNow && <span style={{ position: 'absolute', left: -1, top: 0, bottom: 0, width: 2, background: nowLine, boxShadow: `0 0 8px 1px ${nowLine}`, pointerEvents: 'none' }} />}
                           {pd && (
                             <span className="ps-tl-pill" onClick={e => toggleChip(ckey, e)}
                               style={{ background: `color-mix(in srgb, ${mc} 16%, ${s})`, borderColor: `color-mix(in srgb, ${mc} 50%, transparent)` }}>
+                              {pctOff != null && pctOff > 0 && <span className="ps-tip">−{pctOff}%</span>}
                               <span className="ps-tl-pill-pr" style={{ color: tx }}>{priceTxt(pd)}</span>
-                              {openKey === ckey && off(it, pd) != null && off(it, pd) > 0 && (
-                                <span className="ps-tl-pill-off" style={{ color: mu }}>−{off(it, pd)}%</span>
+                              {openKey === ckey && pctOff != null && pctOff > 0 && (
+                                <span className="ps-tl-pill-off" style={{ color: mu }}>−{pctOff}%</span>
                               )}
                             </span>
                           )}
@@ -357,6 +353,16 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
               ))}
             </div>
           ))}
+
+          {/* single NOW overlay line — runs full height through every row type */}
+          {currentIdx >= 0 && (
+            <div style={{
+              position: 'absolute', top: 0, bottom: 0, pointerEvents: 'none',
+              left: `calc(252px + ${currentIdx / Math.max(1, periods.length)} * (100% - 252px) - 1px)`,
+              width: 2, background: nowLine,
+              boxShadow: `0 0 10px 3px ${nowLine}, 0 0 22px 6px rgba(240,192,64,.18)`,
+            }} />
+          )}
         </div>
       </div>
     )

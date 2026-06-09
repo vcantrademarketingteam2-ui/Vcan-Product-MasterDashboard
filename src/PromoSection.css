@@ -54,7 +54,7 @@
 .ps-cal-ph.ps-now-ph, .ps-cal-cell.ps-now-cell { box-shadow: inset -2px 0 10px rgba(240,192,64,.28); }
 
 /* price chip */
-.ps-chip { display: inline-flex; flex-direction: column; align-items: center; gap: 2px; min-width: 56px; padding: 5px 8px; border-radius: 9px; cursor: pointer; transition: transform .14s, box-shadow .2s; }
+.ps-chip { display: inline-flex; flex-direction: column; align-items: center; gap: 2px; min-width: 56px; padding: 5px 8px; border-radius: 9px; cursor: pointer; transition: transform .14s, box-shadow .2s; position: relative; }
 .ps-chip:hover { transform: translateY(-1px); }
 .ps-chip-pr { font-size: 13px; font-weight: 800; font-family: ui-monospace, monospace; letter-spacing: -.01em; line-height: 1; }
 .ps-chip-off { font-size: 9px; font-weight: 600; font-family: ui-monospace, monospace; color: #f85149; }
@@ -80,15 +80,13 @@
   display: flex; align-items: center; padding: 0 18px; font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .12em; }
 .ps-tl-slot { flex: 1 0 1px; display: flex; align-items: center; justify-content: center; padding: 6px 3px; border-left-width: 1px; border-left-style: solid; min-height: 30px; position: relative; }
 
-.ps-tl-band { display: flex; align-items: stretch; min-width: 100%; padding: 0; }
-.ps-tl-band .ps-tl-row-lead { cursor: default; padding: 7px 18px; min-height: 36px; }
-.ps-tl-band .ps-tl-slot { min-height: 36px; }
+.ps-tl-band { display: flex; align-items: center; gap: 9px; padding: 7px 18px; min-width: 100%; width: max-content; }
 .ps-tl-row { display: flex; border-bottom-width: 1px; border-bottom-style: solid; min-height: 52px; }
 .ps-tl-row:hover .ps-tl-row-lead { filter: brightness(1.05); }
 .ps-tl-row-lead { position: sticky; left: 0; z-index: 1; width: 252px; min-width: 252px; flex: none;
   padding: 8px 18px; display: flex; flex-direction: column; justify-content: center; cursor: pointer; }
 .ps-tl-lane { flex: 1; display: flex; min-width: 0; }
-.ps-tl-pill { display: inline-flex; flex-direction: column; align-items: center; gap: 1px; padding: 4px 8px; border-radius: 8px; cursor: pointer; border-width: 1px; border-style: solid; transition: transform .13s, box-shadow .2s; white-space: nowrap; }
+.ps-tl-pill { display: inline-flex; flex-direction: column; align-items: center; gap: 1px; padding: 4px 8px; border-radius: 8px; cursor: pointer; border-width: 1px; border-style: solid; transition: transform .13s, box-shadow .2s; white-space: nowrap; position: relative; }
 .ps-tl-pill:hover { transform: translateY(-1px); }
 .ps-tl-pill-pr { font-size: 12px; font-weight: 800; font-family: ui-monospace, monospace; line-height: 1; }
 .ps-tl-pill-off { font-size: 8.5px; font-weight: 600; font-family: ui-monospace, monospace; }
@@ -107,3 +105,26 @@
 .ps-calc-out { margin-top: 14px; padding: 16px; border-radius: 12px; border-width: 1px; border-style: solid; text-align: center; }
 .ps-calc-big { font-size: 30px; font-weight: 800; font-family: ui-monospace, monospace; letter-spacing: -.02em; }
 .ps-calc-ref { font-size: 11px; margin-top: 6px; }
+
+/* ---------- hover discount tooltip ---------- */
+.ps-tip {
+  position: absolute;
+  bottom: calc(100% + 5px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(10,12,18,.9);
+  color: #f97316;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  font-family: ui-monospace, monospace;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 50;
+  box-shadow: 0 2px 6px rgba(0,0,0,.4);
+  opacity: 0;
+  transition: opacity .12s;
+}
+.ps-chip:hover .ps-tip,
+.ps-tl-pill:hover .ps-tip { opacity: 1; }
