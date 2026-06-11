@@ -1072,7 +1072,7 @@ export default function App() {
             <div style={{ fontWeight: 800, fontSize: isMobile ? 14 : 17, color: t.text, letterSpacing: 0.2, whiteSpace: 'nowrap', flexShrink: 0 }}>
               Product Master
             </div>
-            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v2.17.0</span>
+            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v2.18.0</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: isMobile ? 11 : 13, background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, padding: isMobile ? '3px 8px' : '5px 12px', overflow: 'hidden', minWidth: 0, flexShrink: 1 }}>
               <span style={{ width: isMobile ? 6 : 7, height: isMobile ? 6 : 7, borderRadius: '50%', flexShrink: 0, background: dataSource === 'csv' ? t.blue : t.green }} />
               <span style={{ fontWeight: 800, color: dataSource === 'csv' ? t.blue : t.green, flexShrink: 0 }}>
@@ -1339,12 +1339,36 @@ export default function App() {
                   { label: 'Avg Coverage', val: intel.summary.avgCoverage.toFixed(1), sub: `of ${RETAILERS.length} retailers / brand`, c: t.accent },
                   { label: 'Pending Pipeline', val: intel.summary.totalPending, sub: 'awaiting listing', c: t.yellow },
                 ].map(({ label, val, sub, c }) => (
-                  <div key={label} style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 12, padding: isMobile ? '14px 16px' : '18px 20px' }}>
+                  <div key={label} style={{ background: t.surface, border: `1px solid ${t.border}`, borderTop: `3px solid ${c}`, borderRadius: 12, padding: isMobile ? '14px 16px' : '18px 20px' }}>
                     <div style={{ fontSize: 11, color: t.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 6 }}>{label}</div>
-                    <div style={{ fontSize: isMobile ? 26 : 32, fontWeight: 800, color: c, lineHeight: 1 }}>{val}</div>
+                    <div style={{ fontSize: isMobile ? 26 : 32, fontWeight: 800, color: c, lineHeight: 1, textShadow: `0 0 22px ${c}55` }}>{val}</div>
                     <div style={{ fontSize: 11, color: t.muted, marginTop: 4 }}>{sub}</div>
                   </div>
                 ))}
+              </div>
+
+              {/* ── Brand Portfolio bar chart ── */}
+              <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 12, padding: isMobile ? 16 : 24 }}>
+                <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 4 }}>Brand Portfolio</div>
+                <div style={{ color: t.muted, fontSize: 12, marginBottom: 16 }}>Active SKUs per brand — bar color shows the vendor (Vcan / Moola).</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {(() => {
+                    const live = intel.brands.filter(b => b.active > 0).sort((a, b) => b.active - a.active)
+                    const maxA = live[0]?.active || 1
+                    return live.map(b => {
+                      const clr = b.company === 'Vcan' ? t.vcanClr : t.moolaClr
+                      return (
+                        <div key={b.brand} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <span style={{ width: isMobile ? 88 : 130, flexShrink: 0, fontSize: 11.5, fontWeight: 700, color: t.text, textAlign: 'right', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.brand}</span>
+                          <div style={{ flex: 1, height: 14, background: t.surface2, borderRadius: 99, overflow: 'hidden' }}>
+                            <div style={{ height: '100%', width: `${Math.max(4, Math.round(b.active / maxA * 100))}%`, borderRadius: 99, background: `linear-gradient(90deg, ${clr}, ${clr}88)`, boxShadow: `0 0 10px -2px ${clr}` }} />
+                          </div>
+                          <span style={{ width: 28, flexShrink: 0, fontSize: 12, fontWeight: 800, color: clr, fontFamily: 'ui-monospace,monospace', textAlign: 'right' }}>{b.active}</span>
+                        </div>
+                      )
+                    })
+                  })()}
+                </div>
               </div>
 
               {/* ── Brand Distribution Matrix ── */}
@@ -1463,8 +1487,8 @@ export default function App() {
                             </td>
                             <td style={{ padding: '9px 10px' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <div style={{ flex: 1, minWidth: 60, height: 8, background: t.surface2, borderRadius: 4, overflow: 'hidden' }}>
-                                  <div style={{ height: '100%', width: `${Math.round(r.active / maxRetailerActive * 100)}%`, background: 'linear-gradient(90deg,#58a6ff,#7c3aed)', borderRadius: 4 }} />
+                                <div style={{ flex: 1, minWidth: 60, height: 8, background: t.surface2, borderRadius: 99, overflow: 'hidden' }}>
+                                  <div style={{ height: '100%', width: `${Math.round(r.active / maxRetailerActive * 100)}%`, background: 'linear-gradient(90deg,#58a6ff,#7c3aed)', borderRadius: 99, boxShadow: '0 0 8px -1px #7c3aed' }} />
                                 </div>
                                 <span style={{ fontSize: 12, fontWeight: 700, color: t.text, width: 26, textAlign: 'right' }}>{r.active}</span>
                               </div>

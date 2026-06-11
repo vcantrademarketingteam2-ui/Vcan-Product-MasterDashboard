@@ -101,6 +101,12 @@ function groupPeriodsByMonth(periods) {
   return groups
 }
 
+// Discount % off RSP — null when sale price or RSP is missing/invalid
+function offPctOf(item, pd) {
+  if (pd?.salePrice == null || !(item.rspIncVat > 0)) return null
+  return Math.round((1 - pd.salePrice / item.rspIncVat) * 100)
+}
+
 // Enrich promo items with brand/company from the product master
 function enrich(items, rawData) {
   return items.map(p => {
@@ -130,9 +136,7 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
   const [openKey, setOpenKey] = useState(null)
   const [calcOpen, setCalcOpen] = useState(false)
 
-  const calInnerRef = useRef(null)
   const tlInnerRef  = useRef(null)
-  const [calNowX, setCalNowX] = useState(null)
   const [tlNowX,  setTlNowX]  = useState(null)
 
   // ── derived data ────────────────────────────────────────────────────────────
@@ -222,27 +226,28 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
     if (!pName) return []
     return items
       .filter(it => it.periods?.[pName])
-      .map(it => {
-        const pd = it.periods[pName]
-        const offPct = pd?.salePrice != null ? Math.round((1 - pd.salePrice / it.rspIncVat) * 100) : null
-        return { ...it, pd, offPct }
-      })
+      .map(it => ({ ...it, pd: it.periods[pName], offPct: offPctOf(it, it.periods[pName]) }))
       .sort((a, b) => (b.offPct || 0) - (a.offPct || 0))
   }, [items, periods, currentIdx])
 
+  // Next period: the one after current, or — when no period is current — the first
+  // period whose start date is still in the future (not blindly periods[0])
+  const nextIdx = useMemo(() => {
+    if (currentIdx >= 0) return currentIdx + 1 < periods.length ? currentIdx + 1 : -1
+    return periods.findIndex(p => {
+      const r = parseDR(p.dateRange) || inferPeriodDate(p)
+      return r && r.s > TODAY
+    })
+  }, [periods, currentIdx])
+
   const spotNext = useMemo(() => {
-    if (currentIdx + 1 >= periods.length) return []
-    const pName = periods[currentIdx + 1]?.name
+    const pName = nextIdx >= 0 ? periods[nextIdx]?.name : null
     if (!pName) return []
     return items
       .filter(it => it.periods?.[pName])
-      .map(it => {
-        const pd = it.periods[pName]
-        const offPct = pd?.salePrice != null ? Math.round((1 - pd.salePrice / it.rspIncVat) * 100) : null
-        return { ...it, pd, offPct }
-      })
+      .map(it => ({ ...it, pd: it.periods[pName], offPct: offPctOf(it, it.periods[pName]) }))
       .sort((a, b) => (b.offPct || 0) - (a.offPct || 0))
-  }, [items, periods, currentIdx])
+  }, [items, periods, nextIdx])
 
   const spotEnded = useMemo(() => {
     const cutoff = currentIdx >= 0 ? currentIdx : periods.length
@@ -254,11 +259,7 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
         pastNames
           .filter(n => it.periods?.[n])
           .slice(-2) // at most 2 most recent ended periods per product
-          .map(n => {
-            const pd = it.periods[n]
-            const offPct = pd?.salePrice != null ? Math.round((1 - pd.salePrice / it.rspIncVat) * 100) : null
-            return { ...it, pd, offPct, periodName: n }
-          })
+          .map(n => ({ ...it, pd: it.periods[n], offPct: offPctOf(it, it.periods[n]), periodName: n }))
       )
       .filter(it => { const k = it.barcode + it.periodName; if (seen.has(k)) return false; seen.add(k); return true })
       .sort((a, b) => (b.offPct || 0) - (a.offPct || 0))
@@ -311,19 +312,9 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
     return { name: p.name, dateRange: dateLabel, pct: Math.max(0, Math.min(100, pct)) }
   }, [periods, currentIdx])
 
-  // measure NOW x-position from DOM after render
+  // measure NOW x-position from DOM after render (Schedule view only)
   useLayoutEffect(() => {
-    if (layout === 'grid') {
-      function measure(innerEl, setter) {
-        if (!innerEl || currentIdx < 0) { setter(null); return }
-        const slot = innerEl.querySelector('.ps-now-ph')
-        if (!slot) { setter(null); return }
-        const sr = slot.getBoundingClientRect()
-        const ir = innerEl.getBoundingClientRect()
-        setter(Math.round(sr.left - ir.left) - 1)
-      }
-      measure(calInnerRef.current, setCalNowX)
-    } else if (layout === 'timeline' && tlView === 'schedule') {
+    if (layout === 'timeline' && tlView === 'schedule') {
       function measureSched(innerEl, setter) {
         if (!innerEl || nowPct === null) { setter(null); return }
         const track = innerEl.querySelector('.ps-sched-track')
@@ -353,7 +344,7 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
   const gpColor = gp => gp == null ? t.muted : gp >= 0.30 ? t.green : gp >= 0.20 ? t.yellow : t.red
   const coColor = c => c === 'Vcan' ? t.vcanClr : t.moolaClr
   const priceTxt = pd => pd.salePrice != null ? '฿' + pd.salePrice.toLocaleString('th-TH') : (pd.saleLabel || '')
-  const off = (item, pd) => pd?.salePrice != null ? Math.round((1 - pd.salePrice / item.rspIncVat) * 100) : null
+  const off = offPctOf
 
   // Bar color: driven by activity type, with clearance override
   const getBarStyle = (activities, clearance) => {
@@ -404,15 +395,7 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
   function Calendar() {
     return (
       <div className="ps-cal-scroll" style={{ scrollbarColor: `${bdr} transparent` }}>
-        <div className="ps-cal-inner" ref={calInnerRef} style={{ position: 'relative' }}>
-          {/* NOW glow line — first in DOM so it paints behind rows and chips */}
-          {calNowX !== null && (
-            <div style={{
-              position: 'absolute', top: 0, bottom: 0, pointerEvents: 'none',
-              left: calNowX, width: 2, background: nowLine,
-              boxShadow: `0 0 10px 3px ${nowLine}, 0 0 22px 6px rgba(240,192,64,.18)`,
-            }} />
-          )}
+        <div className="ps-cal-inner" style={{ position: 'relative' }}>
           {/* header */}
           <div className="ps-cal-head" style={{ background: s2, borderBottom: `1px solid ${bdr}` }}>
             <div className="ps-cal-rh" style={{ background: s2, borderRight: `1px solid ${bdr}`, color: mu }}>Product</div>
@@ -421,7 +404,8 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
               const acts = actsByPeriod[p.name] || []
               return (
                 <div key={p.name} className={`ps-cal-ph${isNow ? ' ps-now-ph' : ''}`}
-                  style={{ background: isNow ? `linear-gradient(180deg,${nowBg},${s2})` : s2, borderLeft: `1px solid ${dim}` }}>
+                  style={{ background: isNow ? nowBg : s2, borderLeft: `1px solid ${dim}`,
+                    boxShadow: isNow ? `inset 2px 0 0 ${nowLine}, inset -2px 0 0 ${nowLine}, inset 0 2px 0 ${nowLine}` : 'none' }}>
                   <div className="ps-cal-ph-code" style={{ color: isNow ? t.accent : tx }}>{periodLabel(p.name)}</div>
                   {p.dateRange && <div className="ps-cal-ph-rng" style={{ color: mu }}>{p.dateRange}</div>}
                   {isNow ? <div className="ps-now-tag" style={{ background: t.accent, color: '#1a1505' }}>NOW</div>
@@ -456,14 +440,15 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
                     const mc = prim ? ACT[prim].color : it.clearance ? CLEAR_COLOR : t.accent
                     const ckey = it.barcode + '|' + p.name
                     const pctOff = off(it, pd)
+                    const nowEdge = isNow ? `inset 2px 0 0 ${nowLine}, inset -2px 0 0 ${nowLine}` : 'none'
                     if (!pd) return (
                       <div key={p.name} className="ps-cal-cell ps-cal-cell-empty"
-                        style={{ borderLeft: `1px solid ${dim}`, background: isNow ? nowBg : 'transparent', color: mu }} />
+                        style={{ borderLeft: `1px solid ${dim}`, background: isNow ? nowBg : 'transparent', boxShadow: nowEdge, color: mu }} />
                     )
                     return (
                       <div key={p.name} className={`ps-cal-cell${isNow ? ' ps-now-cell' : ''}`}
                         style={{ borderLeft: `1px solid ${dim}`, background: isNow ? nowBg : 'transparent',
-                          boxShadow: isNow ? 'inset -2px 0 10px rgba(240,192,64,.28)' : 'none' }}>
+                          boxShadow: nowEdge }}>
                         <span className="ps-chip" onClick={e => toggleChip(ckey, e)}
                           style={{ background: prim ? `color-mix(in srgb, ${mc} 14%, ${s2})` : dark ? `color-mix(in srgb, ${t.accent} 12%, ${s2})` : `color-mix(in srgb, ${t.accent} 18%, ${s2})`,
                             border: `1px solid ${prim ? mc + '88' : t.accent + '55'}` }}>
@@ -490,36 +475,35 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
   // Schedule view — proportional Gantt with date-accurate bar widths
   function Schedule() {
     return (
-      <div className="ps-sched-scroll" style={{ scrollbarColor: `${bdr} transparent`, overflow: 'auto', maxHeight: '70vh' }}
-        onMouseLeave={() => setBarTip(null)}>
-        <div className="ps-sched-inner" ref={tlInnerRef} style={{ position: 'relative' }}>
+      <>
+        {/* Window selector — flat toolbar OUTSIDE the scroll container so it never
+            collides with the sticky month axis while scrolling */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 7, padding: '8px 18px',
+          borderBottom: `1px solid ${bdr}`,
+          background: dark ? 'rgba(255,255,255,.025)' : 'rgba(0,0,0,.02)',
+        }}>
+          <span style={{ fontSize: 10.5, fontWeight: 700, color: mu, textTransform: 'uppercase', letterSpacing: '.08em' }}>Window</span>
+          {[['3mo','3 mo'],['6mo','6 mo'],['full','Full']].map(([k, l]) => (
+            <button key={k} onClick={() => setSchedWindow(k)} style={{
+              fontSize: 11, padding: '3px 10px', borderRadius: 6,
+              border: `1px solid ${schedWindow === k ? GOLD_A : bdr}`,
+              background: schedWindow === k ? `${GOLD_A}22` : s2,
+              color: schedWindow === k ? GOLD_A : mu,
+              cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700, transition: '.12s',
+            }}>{l}</button>
+          ))}
+          <span style={{ marginLeft: 'auto', fontSize: 10, color: mu, fontStyle: 'italic' }}>hover bars for details</span>
+        </div>
+        <div className="ps-sched-scroll" style={{ scrollbarColor: `${bdr} transparent`, overflow: 'auto', maxHeight: '70vh' }}
+          onMouseLeave={() => setBarTip(null)}>
+          <div className="ps-sched-inner" ref={tlInnerRef} style={{ position: 'relative' }}>
 
-          {/* Window selector — sticky at top inside the scroll container */}
-          <div style={{
-            position: 'sticky', top: 0, zIndex: 6,
-            display: 'flex', alignItems: 'center', gap: 7, padding: '7px 18px',
-            borderBottom: `1px solid ${bdr}`,
-            background: dark ? '#1a1f2e' : '#f4f5f8',
-          }}>
-            <span style={{ fontSize: 10.5, fontWeight: 700, color: mu, textTransform: 'uppercase', letterSpacing: '.08em' }}>Window</span>
-            {[['3mo','3 mo'],['6mo','6 mo'],['full','Full']].map(([k, l]) => (
-              <button key={k} onClick={() => setSchedWindow(k)} style={{
-                fontSize: 11, padding: '3px 10px', borderRadius: 6,
-                border: `1px solid ${schedWindow === k ? GOLD_A : bdr}`,
-                background: schedWindow === k ? `${GOLD_A}22` : s2,
-                color: schedWindow === k ? GOLD_A : mu,
-                cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700, transition: '.12s',
-              }}>{l}</button>
-            ))}
-            <span style={{ marginLeft: 'auto', fontSize: 10, color: mu, fontStyle: 'italic' }}>hover bars for details</span>
-          </div>
-
-            {/* NOW glow line — first in DOM, paints behind all content */}
+            {/* TODAY marker — clean dashed line, no glow */}
             {tlNowX !== null && (
               <div style={{
                 position: 'absolute', top: 0, bottom: 0, pointerEvents: 'none', zIndex: 2,
-                left: tlNowX, width: 2, background: nowLine,
-                boxShadow: `0 0 12px 3px ${nowLine}, 0 0 28px 8px rgba(240,192,64,.18)`,
+                left: tlNowX, width: 0, borderLeft: `2px dashed ${nowLine}`,
               }} />
             )}
 
@@ -538,7 +522,7 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
                     display: 'flex', flexDirection: 'column', gap: 1,
                   }}>
                     <b style={{ fontSize: 12, fontWeight: 800, color: m.isNow ? t.accent : tx, letterSpacing: '.04em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {m.name.toUpperCase()}{m.isNow ? ' ◀' : ''}
+                      {m.name.toUpperCase()}
                     </b>
                     <small style={{ fontSize: 10, color: m.isNow ? t.accent + 'bb' : mu, fontFamily: 'ui-monospace,monospace' }}>{m.isNow ? 'NOW' : m.year}</small>
                   </div>
@@ -580,7 +564,8 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
 
                     {/* Proportional Gantt lane */}
                     <div className="ps-sched-lane">
-                      <div className="ps-sched-track" style={{ background: dark ? 'rgba(255,255,255,.06)' : 'rgba(0,0,0,.06)' }}
+                      <div className="ps-sched-track"
+                        style={{ background: `linear-gradient(to bottom, transparent calc(50% - 1px), ${dim} calc(50% - 1px), ${dim} calc(50% + 1px), transparent calc(50% + 1px))` }}
                         onMouseLeave={() => setBarTip(null)}>
                         {periods.map(p => {
                           const pd = it.periods?.[p.name]
@@ -588,13 +573,13 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
                           const pos = barPos(p)
                           if (!pos) return null
                           const bs = getBarStyle(pd.activities, it.clearance)
-                          const offPct = pd?.salePrice != null ? Math.round((1 - pd.salePrice / it.rspIncVat) * 100) : null
+                          const offPct = offPctOf(it, pd)
                           const dr = parseDR(p.dateRange) || inferPeriodDate(p)
-                          const dateDisplay = p.dateRange || (dr ? `${MONTH_NAMES[dr.s.getMonth()]} ${dr.e.getFullYear()}` : '')
+                          const dateDisplay = p.dateRange || (dr ? `${MONTH_NAMES[dr.s.getMonth()]} ${dr.s.getFullYear()}` : '')
                           return (
                             <div key={p.name} className="ps-sched-bar"
                               style={{ left: `${pos.left}%`, width: `${pos.width}%`, background: bs.bg,
-                                boxShadow: 'inset 0 1px 0 rgba(255,255,255,.2)' }}
+                                boxShadow: `inset 0 1px 0 rgba(255,255,255,.25), 0 3px 12px -4px ${bs.clr}` }}
                               onMouseEnter={e => setBarTip({
                                 x: e.clientX, y: e.clientY,
                                 brand: it.brand, product: it.product,
@@ -623,6 +608,7 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
 
           </div>
         </div>
+      </>
     )
   }
 
@@ -682,8 +668,27 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
 
   // Spotlight view — live feed: Live Now / Next Up / Ended tabs
   function Spotlight() {
+    const liveOffs = spotLive.filter(i => i.offPct > 0)
+    const avgOff = liveOffs.length ? Math.round(liveOffs.reduce((a, i) => a + i.offPct, 0) / liveOffs.length) : null
+    const nextDate = nextIdx >= 0 ? (periods[nextIdx]?.dateRange || periods[nextIdx]?.name || '') : ''
+    const stats = [
+      { label: 'Live promos', val: spotLive.length, sub: 'running right now', c: GOLD_A },
+      { label: 'Avg discount', val: avgOff != null ? `−${avgOff}%` : '—', sub: 'across live promos', c: t.green },
+      { label: 'Next wave', val: spotNext.length, sub: nextDate || 'no upcoming period', c: t.blue || '#58a6ff' },
+    ]
     return (
       <div style={{ padding: isMobile ? '12px 14px' : '16px 20px' }}>
+
+        {/* Stat strip — quick-read KPIs, gives Spotlight its dashboard identity */}
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr 1fr' : 'repeat(3,1fr)', gap: 8, marginBottom: 12 }}>
+          {stats.map(({ label, val, sub, c }) => (
+            <div key={label} style={{ padding: isMobile ? '9px 10px' : '11px 14px', background: s2, border: `1px solid ${bdr}`, borderTop: `3px solid ${c}`, borderRadius: 10 }}>
+              <div style={{ fontSize: 9.5, fontWeight: 700, color: mu, textTransform: 'uppercase', letterSpacing: '.08em' }}>{label}</div>
+              <div style={{ fontSize: isMobile ? 18 : 22, fontWeight: 800, color: c, lineHeight: 1.15, fontFamily: 'ui-monospace,monospace', textShadow: `0 0 16px ${c}44` }}>{val}</div>
+              <div style={{ fontSize: 9.5, color: mu, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sub}</div>
+            </div>
+          ))}
+        </div>
 
         {/* Period progress bar */}
         {periodProgress ? (
@@ -748,7 +753,7 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
               </div>
               {spotTab === 'live' && spotNext.length > 0 && (
                 <div style={{ marginTop: 12, padding: '8px 14px', border: `1px dashed ${dim}`, borderRadius: 9, display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11, color: mu }}>
-                  <span>↓ NEXT — {periods[currentIdx + 1]?.dateRange || 'coming soon'}</span>
+                  <span>↓ NEXT — {(nextIdx >= 0 && periods[nextIdx]?.dateRange) || 'coming soon'}</span>
                   <span style={{ color: dim }}>{[...new Set(spotNext.map(i => i.brand))].slice(0, 3).join(' · ')}</span>
                 </div>
               )}
@@ -908,11 +913,14 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
             {periods[0]?.dateRange?.split('-')[0] || ''} → {periods[periods.length - 1]?.dateRange?.split('-')[1] || ''}
           </span>
         </div>
+        {/* views are invoked as functions (not JSX components) — they are re-defined on
+            every render, and rendering them as <Component /> would remount the whole
+            subtree on each state change, resetting scroll position and hover state */}
         {items.length === 0
           ? <div style={{ padding: '56px 0', textAlign: 'center', color: mu }}>ไม่พบข้อมูลที่ตรงกับ filter</div>
-          : layout === 'grid' ? <Calendar />
-          : tlView === 'schedule' ? <Schedule />
-          : <Spotlight />
+          : layout === 'grid' ? Calendar()
+          : tlView === 'schedule' ? Schedule()
+          : Spotlight()
         }
       </div>
 

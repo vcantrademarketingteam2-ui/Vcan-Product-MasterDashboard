@@ -48,11 +48,6 @@
 .ps-cal-cell { flex: 1 0 82px; min-width: 82px; display: flex; align-items: center; justify-content: center; padding: 5px; position: relative; }
 .ps-cal-cell-empty::after { content: "·"; opacity: .35; font-size: 15px; }
 
-/* glow line — both sides of the NOW column */
-.ps-now .ps-cal-ph::before, .ps-now .ps-cal-cell::before { content: ""; position: absolute; left: -1px; top: 0; bottom: 0; width: 2px; pointer-events: none; }
-.ps-cal-ph.ps-now-ph::before, .ps-cal-cell.ps-now-cell::before { content: ""; position: absolute; left: -1px; top: 0; bottom: 0; width: 2px; pointer-events: none; }
-.ps-cal-ph.ps-now-ph, .ps-cal-cell.ps-now-cell { box-shadow: inset -2px 0 10px rgba(240,192,64,.28); }
-
 /* price chip */
 .ps-chip { display: inline-flex; flex-direction: column; align-items: center; gap: 2px; min-width: 56px; padding: 5px 8px; border-radius: 9px; cursor: pointer; transition: transform .14s, box-shadow .2s; position: relative; }
 .ps-chip:hover { transform: translateY(-1px); }
@@ -90,10 +85,6 @@
 .ps-tl-pill:hover { transform: translateY(-1px); }
 .ps-tl-pill-pr { font-size: 12px; font-weight: 800; font-family: ui-monospace, monospace; line-height: 1; }
 .ps-tl-pill-off { font-size: 8.5px; font-weight: 600; font-family: ui-monospace, monospace; }
-
-/* glow line — timeline now slot */
-.ps-tl-slot.ps-now-slot { position: relative; box-shadow: inset -2px 0 10px rgba(240,192,64,.28); }
-.ps-tl-slot.ps-now-slot::before { content: ""; position: absolute; left: -1px; top: 0; bottom: 0; width: 2px; pointer-events: none; }
 
 /* ---------- calculator modal ---------- */
 .ps-modal-backdrop { position: fixed; inset: 0; z-index: 3000; display: flex; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(3px); }
@@ -167,14 +158,20 @@
 .ps-sched-lead { position: sticky; left: 0; z-index: 1; width: 252px; min-width: 252px; flex: none;
   padding: 8px 14px 8px 18px; display: flex; flex-direction: column; justify-content: center; cursor: pointer; }
 .ps-sched-lane { flex: 1; min-width: 0; display: flex; align-items: center; padding: 8px 12px 8px 6px; }
-.ps-sched-track { position: relative; width: 100%; height: 36px; border-radius: 6px; }
-.ps-sched-bar { position: absolute; height: 100%; border-radius: 6px; display: flex; flex-direction: column;
-  justify-content: center; align-items: flex-start; padding: 0 9px; overflow: hidden;
+.ps-sched-track { position: relative; width: 100%; height: 38px; }
+.ps-sched-bar { position: absolute; top: 4px; height: 30px; border-radius: 99px; display: flex; flex-direction: column;
+  justify-content: center; align-items: flex-start; padding: 0 12px; overflow: hidden;
   cursor: pointer; transition: filter .14s, transform .12s; z-index: 1; }
 .ps-sched-bar:hover { filter: brightness(1.18); z-index: 2; }
 .ps-sched-bar-txt { font-size: 12.5px; font-weight: 800; font-family: ui-monospace, monospace; color: #fff;
   text-shadow: 0 1px 3px rgba(0,0,0,.55); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; line-height: 1.1; }
 .ps-sched-bar-off { font-size: 9px; font-weight: 700; color: rgba(255,255,255,.8); white-space: nowrap; line-height: 1; margin-top: 1px; }
+
+/* ---------- mobile ---------- */
+@media (max-width: 767px) {
+  .ps-cal-rh, .ps-cal-rail { width: 168px; min-width: 168px; padding-left: 12px; padding-right: 10px; }
+  .ps-sched-axis-lead, .ps-sched-lead { width: 158px; min-width: 158px; padding-left: 12px; }
+}
 
 /* ---------- hover discount tooltip ---------- */
 .ps-tip {

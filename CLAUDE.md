@@ -95,10 +95,27 @@ The app supports mobile (`isMobile` = `window.innerWidth < 768`). **Every UI cha
 - **Touch targets** — interactive elements on mobile should be at least 40px tall. Use `isMobile ? '...mobile...' : '...desktop...'` inline for padding/size adjustments.
 - Sidebar is a slide-in drawer on mobile (fixed, `transform: translateX`). Filters inside it are always accessible via the hamburger menu.
 
+## Current redesign task (v2.18.0, June 2026)
+
+Reference design: https://topsnonsaletracker.pages.dev/ — clean theme, neon accents, analytics-style graphs.
+
+**Status: all three tasks completed in v2.18.0.**
+
+1. ✅ **Grid** — glowline effect fully removed (overlay div, `calNowX`/`calInnerRef` measurement, and the `.ps-now-ph`/`.ps-now-cell` glow CSS). Current period is now highlighted with a clean gold column: `nowBg` tint + crisp 2px inset edges (`boxShadow: inset ±2px 0 0`) + NOW tag. No glow anywhere in Grid.
+2. ✅ **Schedule/Spotlight bugs + redesign** —
+   - **Critical remount bug fixed**: views were rendered as `<Calendar />`/`<Schedule />`/`<Spotlight />` but defined *inside* the component, so every state change (e.g. bar tooltip mousemove) remounted the subtree and reset scroll. They are now invoked as plain function calls (`Calendar()` etc.) — keep it that way.
+   - Schedule: Window selector moved *outside* the scroll container (it was sticky top:0 and collided with the sticky month axis); glow NOW line replaced with a clean dashed TODAY marker; lanes redesigned as wire-line tracks with floating pill bars (radius 99) + soft neon drop shadow — visually distinct from Grid's chip matrix.
+   - Spotlight: added neon stat strip (Live promos / Avg discount / Next wave); "next period" now resolves to the first *future* period when nothing is current (was wrongly `periods[0]`); discount % guarded against missing/zero RSP (`offPctOf` module helper — use it for all discount math); date-display year bug fixed (`dr.s` not `dr.e`).
+   - Mobile: sticky lead columns narrowed via media query in PromoSection.css.
+3. ✅ **Analytics tab** — KPI cards got neon top border + glowing value; new "Brand Portfolio" horizontal neon bar chart (active SKUs per brand, vendor-colored); Retailer Scorecard bars rounded with neon glow.
+
+No pending tasks from this redesign.
+
 ## Version history (recent)
 
 | Version | What changed |
 |---------|-------------|
+| v2.18.0 | Grid glowline removed (clean current-period highlight); Schedule/Spotlight remount+scroll bug fixed, pill-bar Gantt redesign, Spotlight stat strip; Analytics neon graph upgrade + Brand Portfolio chart |
 | v2.14.0 | Fix NOW glow line (useLayoutEffect pixel measurement); Timeline redesigned as Gantt/swimlane (month-only axis, colored bars, brand strips) |
 | v2.13.0 | Promotion Plan launched: PromoSection.jsx extracted component, Calendar + Timeline views, hover discount tooltip (−%), activity ribbon, customer logo pills |
 | v2.12.x | Timeline NOW glow line continuity fixes (multiple attempts before v2.14 pixel approach) |
