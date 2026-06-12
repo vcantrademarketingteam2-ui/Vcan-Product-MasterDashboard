@@ -160,7 +160,7 @@
 .ps-sched-lane { flex: 1; min-width: 0; display: flex; align-items: center; padding: 8px 12px 8px 6px; }
 .ps-sched-track { position: relative; width: 100%; height: 38px; }
 .ps-sched-bar { position: absolute; top: 4px; height: 30px; border-radius: 99px; display: flex; flex-direction: column;
-  justify-content: center; align-items: flex-start; padding: 0 12px; overflow: hidden;
+  justify-content: center; align-items: center; text-align: center; padding: 0 10px; overflow: hidden;
   cursor: pointer; transition: filter .14s, transform .12s; z-index: 1; }
 .ps-sched-bar:hover { filter: brightness(1.18); z-index: 2; }
 .ps-sched-bar-txt { font-size: 12.5px; font-weight: 800; font-family: ui-monospace, monospace; color: #fff;
@@ -172,6 +172,15 @@
   .ps-cal-rh, .ps-cal-rail { width: 168px; min-width: 168px; padding-left: 12px; padding-right: 10px; }
   .ps-sched-axis-lead, .ps-sched-lead { width: 158px; min-width: 158px; padding-left: 12px; }
 }
+
+/* ---------- neon interactivity (v2.19.1) ---------- */
+/* --g is the per-element glow color, set inline. !important beats inline box-shadows. */
+.ps-glow { transition: box-shadow .16s, filter .16s, transform .13s; }
+.ps-glow:hover { box-shadow: 0 0 13px -2px var(--g, #d4a86a) !important; filter: brightness(1.07); }
+.ps-glow-on { box-shadow: 0 0 7px -1px var(--g, #d4a86a), 0 0 20px -4px var(--g, #d4a86a) !important; }
+.ps-glow-on:hover { box-shadow: 0 0 9px 0 var(--g, #d4a86a), 0 0 26px -4px var(--g, #d4a86a) !important; }
+@keyframes ps-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+.ps-pulse { animation: ps-pulse 1.6s ease-in-out infinite; }
 
 /* ---------- hover discount tooltip ---------- */
 .ps-tip {

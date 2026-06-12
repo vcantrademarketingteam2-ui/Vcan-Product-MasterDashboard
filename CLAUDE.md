@@ -91,6 +91,9 @@ Implemented in [src/PromoSection.jsx](src/PromoSection.jsx) + [src/PromoSection.
 - `clearance` → `#f43f5e` (neon coral, `CLEAR_COLOR` constant) — moved off cyan so media owns it
 - **No-activity promos** get an **ice-silver frosted-glass pill** via `getBarStyle()` (`bs.ice` flag, `bs.txt` text color) — the old gold-gradient price pill is removed and must NOT come back
 - `GOLD_A`/`GOLD_B` are now **bronze** (`#d4a86a`/`#9c6b35`) and are chrome-accent only (selection states, NOW markers, Calc button) — never price pills
+- **Light-mode contrast:** the `neon(c)` helper (uses module map `NEON_DEEP`) maps each neon hue to a deeper variant in light mode — route ALL activity-color rendering through it, never use `ACT[a].color` raw
+- **Hover/active glow:** `.ps-glow` / `.ps-glow-on` CSS classes + inline `'--g'` custom property = the neon hover/selected system for buttons & filter pills; use these instead of hand-rolled hover handlers
+- Icons are inline SVG components (`IcoTimeline`/`IcoGrid`/`IcoCalc`, module scope) — don't reintroduce emoji glyphs
 
 **RetailerLogo:** passed as a prop from App.jsx (`RetailerLogo` component). Customer selector pills use logo images, not plain text. Do not replace with text.
 
@@ -135,6 +138,7 @@ No pending tasks from this redesign.
 
 | Version | What changed |
 |---------|-------------|
+| v2.19.1 | Refinements: light-mode deep-neon contrast (`neon()`/`NEON_DEEP`), `.ps-glow` hover/active neon system, SVG icons replace emoji, Gantt bar text centered, solid neon NOW glowline, labeled Plan-period header, Spotlight status tiles (replace stat strip + pill tabs) |
 | v2.19.0 | Porcelain glass redesign: app-wide warm-cream light theme + aurora glows, glassmorphism panels (Promotion Plan + Analytics), neon activity palette (media cyan / looks fuchsia / clearance coral), gold price pill → ice-silver glass, bronze chrome. Spec: docs/superpowers/specs/2026-06-12-porcelain-glass-redesign-design.md |
 | v2.18.0 | Grid glowline removed (clean current-period highlight); Schedule/Spotlight remount+scroll bug fixed, pill-bar Gantt redesign, Spotlight stat strip; Analytics neon graph upgrade + Brand Portfolio chart |
 | v2.14.0 | Fix NOW glow line (useLayoutEffect pixel measurement); Timeline redesigned as Gantt/swimlane (month-only axis, colored bars, brand strips) |

@@ -29,6 +29,35 @@ const CLEAR_COLOR = '#f43f5e'
 // Bronze chrome accent (selection states, NOW markers, Calc button) — never price pills
 const GOLD_A = '#d4a86a'
 const GOLD_B = '#9c6b35'
+
+// Light mode renders neon hues too pale on the cream background — map each to a
+// deeper variant for text/borders/fills there. Dark mode keeps the bright neon.
+const NEON_DEEP = {
+  '#22d3ee': '#0891b2', // media cyan
+  '#f061ff': '#c026d3', // looks fuchsia
+  '#f97316': '#ea580c', // field orange
+  '#f43f5e': '#e11d48', // clearance coral
+}
+
+// Inline SVG icons — neon/glass friendly, replace the old emoji glyphs
+const IcoTimeline = ({ size = 13 }) => (
+  <svg width={size} height={size} viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+    <path d="M1.5 3.5h6" /><path d="M4.5 7h8" /><path d="M2.5 10.5h5.5" />
+  </svg>
+)
+const IcoGrid = ({ size = 13 }) => (
+  <svg width={size} height={size} viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
+    <rect x="1" y="1" width="5" height="5" rx="1.2" /><rect x="8" y="1" width="5" height="5" rx="1.2" />
+    <rect x="1" y="8" width="5" height="5" rx="1.2" /><rect x="8" y="8" width="5" height="5" rx="1.2" />
+  </svg>
+)
+const IcoCalc = ({ size = 14 }) => (
+  <svg width={size} height={size} viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+    <rect x="2.5" y="1" width="9" height="12" rx="2" />
+    <path d="M5 4h4" />
+    <path d="M5 7.5h.01M7 7.5h.01M9 7.5h.01M5 10h.01M7 10h.01M9 10h.01" />
+  </svg>
+)
 const GOLD_GRAD = `linear-gradient(135deg,${GOLD_A},${GOLD_B})`
 const TODAY = new Date()
 
@@ -343,6 +372,7 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
   }, [items])
 
   // ── helpers ─────────────────────────────────────────────────────────────────
+  const neon = c => dark ? c : (NEON_DEEP[c] || c)
   const gpColor = gp => gp == null ? t.muted : gp >= 0.30 ? t.green : gp >= 0.20 ? t.yellow : t.red
   const coColor = c => c === 'Vcan' ? t.vcanClr : t.moolaClr
   const priceTxt = pd => pd.salePrice != null ? '฿' + pd.salePrice.toLocaleString('th-TH') : (pd.saleLabel || '')
@@ -352,9 +382,9 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
   // No-activity promos get an ice-silver frosted-glass pill (txt = theme text),
   // not the old gold gradient.
   const getBarStyle = (activities, clearance) => {
-    if (clearance) return { bg: `linear-gradient(135deg,${CLEAR_COLOR}e8,${CLEAR_COLOR}99)`, clr: CLEAR_COLOR, txt: '#fff' }
+    if (clearance) { const c = neon(CLEAR_COLOR); return { bg: `linear-gradient(135deg,${c}e8,${c}99)`, clr: c, txt: '#fff' } }
     for (const a of (activities || [])) {
-      if (ACT[a]) return { bg: `linear-gradient(135deg,${ACT[a].color}e8,${ACT[a].color}99)`, clr: ACT[a].color, txt: '#fff' }
+      if (ACT[a]) { const c = neon(ACT[a].color); return { bg: `linear-gradient(135deg,${c}e8,${c}99)`, clr: c, txt: '#fff' } }
     }
     return {
       bg: dark ? 'rgba(203,225,243,.13)' : 'rgba(255,255,255,.6)',
@@ -395,7 +425,7 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
   function ActDots({ acts, size = 5 }) {
     return acts.map(a => ACT[a] ? (
       <i key={a} className="ps-chip-dot" title={ACT[a].label}
-        style={{ background: ACT[a].color, boxShadow: `0 0 4px -1px ${ACT[a].color}`, width: size, height: size }} />
+        style={{ background: neon(ACT[a].color), boxShadow: `0 0 4px -1px ${neon(ACT[a].color)}`, width: size, height: size }} />
     ) : null)
   }
 
@@ -420,7 +450,7 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
                   <div className="ps-cal-ph-code" style={{ color: isNow ? t.accent : tx }}>{periodLabel(p.name)}</div>
                   {p.dateRange && <div className="ps-cal-ph-rng" style={{ color: mu }}>{p.dateRange}</div>}
                   {isNow ? <div className="ps-now-tag" style={{ background: GOLD_GRAD, color: '#fff' }}>NOW</div>
-                    : <div className="ps-cal-ph-caps">{acts.map(a => ACT[a] && <i key={a} style={{ width: 6, height: 6, borderRadius: 99, background: ACT[a].color, boxShadow: `0 0 4px -1px ${ACT[a].color}` }} />)}</div>}
+                    : <div className="ps-cal-ph-caps">{acts.map(a => ACT[a] && <i key={a} style={{ width: 6, height: 6, borderRadius: 99, background: neon(ACT[a].color), boxShadow: `0 0 4px -1px ${neon(ACT[a].color)}` }} />)}</div>}
                 </div>
               )
             })}
@@ -441,14 +471,14 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
                     <div className="ps-cal-rail-sub">
                       <span className="ps-cal-rail-rsp" style={{ color: mu }}>RSP ฿{it.rspIncVat}</span>
                       {unlocked && <span className="ps-cal-rail-gp" style={{ color: gpColor(it.gp) }}>GP {Math.round(it.gp * 100)}%</span>}
-                      {it.clearance && <span className="ps-cal-rail-tag" style={{ color: CLEAR_COLOR, background: 'rgba(34,211,238,.14)' }}>CLEAR</span>}
+                      {it.clearance && <span className="ps-cal-rail-tag" style={{ color: neon(CLEAR_COLOR), background: `${neon(CLEAR_COLOR)}22` }}>CLEAR</span>}
                     </div>
                   </div>
                   {periods.map((p, i) => {
                     const pd = it.periods?.[p.name]
                     const isNow = i === currentIdx
                     const prim = (pd?.activities || []).find(a => ACT[a])
-                    const mc = prim ? ACT[prim].color : it.clearance ? CLEAR_COLOR : t.accent
+                    const mc = prim ? neon(ACT[prim].color) : it.clearance ? neon(CLEAR_COLOR) : t.accent
                     const ckey = it.barcode + '|' + p.name
                     const pctOff = off(it, pd)
                     const nowEdge = isNow ? `inset 2px 0 0 ${nowLine}, inset -2px 0 0 ${nowLine}` : 'none'
@@ -461,7 +491,7 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
                         style={{ borderLeft: `1px solid ${dim}`, background: isNow ? nowBg : 'transparent',
                           boxShadow: nowEdge }}>
                         <span className="ps-chip" onClick={e => toggleChip(ckey, e)}
-                          style={{ background: (prim || it.clearance) ? `color-mix(in srgb, ${mc} 16%, ${s2})`
+                          style={{ background: (prim || it.clearance) ? `color-mix(in srgb, ${mc} ${dark ? 16 : 24}%, ${s2})`
                               : dark ? 'rgba(203,225,243,.10)' : 'rgba(255,255,255,.72)',
                             border: `1px solid ${(prim || it.clearance) ? mc + '88' : (dark ? 'rgba(168,197,218,.4)' : 'rgba(143,169,189,.45)')}`,
                             boxShadow: (prim || it.clearance) ? `0 0 8px -4px ${mc}` : 'none' }}>
@@ -498,12 +528,14 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
         }}>
           <span style={{ fontSize: 10.5, fontWeight: 700, color: mu, textTransform: 'uppercase', letterSpacing: '.08em' }}>Window</span>
           {[['3mo','3 mo'],['6mo','6 mo'],['full','Full']].map(([k, l]) => (
-            <button key={k} onClick={() => setSchedWindow(k)} style={{
+            <button key={k} onClick={() => setSchedWindow(k)}
+              className={`ps-glow${schedWindow === k ? ' ps-glow-on' : ''}`} style={{
+              '--g': GOLD_A,
               fontSize: 11, padding: '3px 10px', borderRadius: 6,
               border: `1px solid ${schedWindow === k ? GOLD_A : bdr}`,
               background: schedWindow === k ? `${GOLD_A}22` : s2,
-              color: schedWindow === k ? GOLD_A : mu,
-              cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700, transition: '.12s',
+              color: schedWindow === k ? (dark ? GOLD_A : GOLD_B) : mu,
+              cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700, transition: 'border-color .12s, background .12s',
             }}>{l}</button>
           ))}
           <span style={{ marginLeft: 'auto', fontSize: 10, color: mu, fontStyle: 'italic' }}>hover bars for details</span>
@@ -512,12 +544,12 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
           onMouseLeave={() => setBarTip(null)}>
           <div className="ps-sched-inner" ref={tlInnerRef} style={{ position: 'relative' }}>
 
-            {/* TODAY marker — bronze dashed line, soft glow */}
+            {/* TODAY marker — solid neon glowline */}
             {tlNowX !== null && (
               <div style={{
                 position: 'absolute', top: 0, bottom: 0, pointerEvents: 'none', zIndex: 2,
-                left: tlNowX, width: 0, borderLeft: `2px dashed ${GOLD_A}`,
-                filter: `drop-shadow(0 0 4px ${GOLD_A}88)`,
+                left: tlNowX, width: 2, background: GOLD_A,
+                boxShadow: `0 0 8px 1px ${GOLD_A}cc, 0 0 22px 4px ${GOLD_A}55`,
               }} />
             )}
 
@@ -575,7 +607,7 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
                         <span style={{ fontSize: 11, fontFamily: 'ui-monospace,monospace', fontWeight: 700, color: mu }}>RSP ฿{it.rspIncVat}</span>
                         {unlocked && <span style={{ fontSize: 10, fontFamily: 'ui-monospace,monospace', fontWeight: 700, color: gpColor(it.gp) }}>GP {Math.round(it.gp * 100)}%</span>}
-                        {it.clearance && <span style={{ fontSize: 8.5, fontWeight: 800, color: CLEAR_COLOR, background: 'rgba(34,211,238,.14)', borderRadius: 4, padding: '1px 5px', letterSpacing: '.04em' }}>CLEAR</span>}
+                        {it.clearance && <span style={{ fontSize: 8.5, fontWeight: 800, color: neon(CLEAR_COLOR), background: `${neon(CLEAR_COLOR)}22`, borderRadius: 4, padding: '1px 5px', letterSpacing: '.04em' }}>CLEAR</span>}
                       </div>
                     </div>
 
@@ -653,9 +685,9 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
           <div style={{ fontSize: 12, fontWeight: 600, color: tx, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.3 }}>{it.product}</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3 }}>
             <span style={{ fontSize: 10, color: mu }}>฿{it.rspIncVat}</span>
-            {it.clearance && <span style={{ fontSize: 9, fontWeight: 800, color: CLEAR_COLOR }}>CLEAR</span>}
+            {it.clearance && <span style={{ fontSize: 9, fontWeight: 800, color: neon(CLEAR_COLOR) }}>CLEAR</span>}
             {(it.pd?.activities || []).map(a => ACT[a] ? (
-              <i key={a} style={{ width: 6, height: 6, borderRadius: 99, background: ACT[a].color, display: 'inline-block', flexShrink: 0 }} />
+              <i key={a} style={{ width: 6, height: 6, borderRadius: 99, background: neon(ACT[a].color), display: 'inline-block', flexShrink: 0 }} />
             ) : null)}
           </div>
         </div>
@@ -695,27 +727,44 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
     const liveOffs = spotLive.filter(i => i.offPct > 0)
     const avgOff = liveOffs.length ? Math.round(liveOffs.reduce((a, i) => a + i.offPct, 0) / liveOffs.length) : null
     const nextDate = nextIdx >= 0 ? (periods[nextIdx]?.dateRange || periods[nextIdx]?.name || '') : ''
-    const stats = [
-      { label: 'Live promos', val: spotLive.length, sub: 'running right now', c: GOLD_A },
-      { label: 'Avg discount', val: avgOff != null ? `−${avgOff}%` : '—', sub: 'across live promos', c: t.green },
-      { label: 'Next wave', val: spotNext.length, sub: nextDate || 'no upcoming period', c: t.blue || '#58a6ff' },
+    // Status tiles — structured hierarchy (label / big count / period dates),
+    // double as the Live/Next/Ended tabs. Active tile lights up like a neon sign.
+    const tiles = [
+      { key: 'live', label: 'Live now', count: spotLive.length, c: t.green, pulse: true,
+        sub: periodProgress ? `${periodProgress.dateRange}${avgOff != null ? ` · −${avgOff}% avg` : ''}` : 'no active period' },
+      { key: 'next', label: 'Next up', count: spotNext.length, c: t.blue || '#58a6ff',
+        sub: nextDate || 'no upcoming period' },
+      { key: 'ended', label: 'Ended', count: spotEnded.length, c: dark ? GOLD_A : GOLD_B,
+        sub: 'recent past periods' },
     ]
     return (
       <div style={{ padding: isMobile ? '12px 14px' : '16px 20px' }}>
 
-        {/* Stat strip — quick-read KPIs, gives Spotlight its dashboard identity */}
-        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr 1fr' : 'repeat(3,1fr)', gap: 8, marginBottom: 12 }}>
-          {stats.map(({ label, val, sub, c }) => (
-            <div key={label} style={{ padding: isMobile ? '9px 10px' : '11px 14px',
-              background: dark ? 'rgba(255,255,255,.045)' : 'rgba(255,255,255,.55)',
-              backdropFilter: 'blur(12px) saturate(1.4)', WebkitBackdropFilter: 'blur(12px) saturate(1.4)',
-              border: `1px solid ${bdr}`, borderTop: `3px solid ${c}`, borderRadius: 10,
-              boxShadow: `0 0 18px -8px ${c}` }}>
-              <div style={{ fontSize: 9.5, fontWeight: 700, color: mu, textTransform: 'uppercase', letterSpacing: '.08em' }}>{label}</div>
-              <div style={{ fontSize: isMobile ? 18 : 22, fontWeight: 800, color: c, lineHeight: 1.15, fontFamily: 'ui-monospace,monospace', textShadow: `0 0 16px ${c}44` }}>{val}</div>
-              <div style={{ fontSize: 9.5, color: mu, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sub}</div>
-            </div>
-          ))}
+        {/* Status tiles */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8, marginBottom: 12 }}>
+          {tiles.map(({ key, label, count, c, sub, pulse }) => {
+            const isActive = spotTab === key
+            return (
+              <button key={key} onClick={() => setSpotTab(key)} className={`ps-glow${isActive ? ' ps-glow-on' : ''}`}
+                style={{
+                  '--g': c, textAlign: 'left', padding: isMobile ? '9px 10px' : '11px 14px', borderRadius: 12,
+                  cursor: 'pointer', fontFamily: 'inherit',
+                  border: `1.5px solid ${isActive ? c : bdr}`,
+                  background: isActive ? `${c}16` : (dark ? 'rgba(255,255,255,.035)' : 'rgba(255,255,255,.5)'),
+                  backdropFilter: 'blur(10px) saturate(1.35)', WebkitBackdropFilter: 'blur(10px) saturate(1.35)',
+                  transition: 'border-color .15s, background .15s',
+                }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span className={pulse && isActive ? 'ps-pulse' : ''} style={{ width: 7, height: 7, borderRadius: 99, flexShrink: 0,
+                    background: isActive ? c : mu, boxShadow: isActive ? `0 0 8px ${c}` : 'none' }} />
+                  <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: isActive ? c : mu }}>{label}</span>
+                </div>
+                <div style={{ fontSize: isMobile ? 18 : 22, fontWeight: 800, fontFamily: 'ui-monospace,monospace', lineHeight: 1.25,
+                  color: isActive ? c : tx, textShadow: isActive ? `0 0 16px ${c}66` : 'none' }}>{count}</div>
+                <div style={{ fontSize: 9.5, color: mu, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sub}</div>
+              </button>
+            )
+          })}
         </div>
 
         {/* Period progress bar */}
@@ -739,30 +788,6 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
             ไม่มีช่วงโปรโมชันที่กำลังดำเนินอยู่ในขณะนี้
           </div>
         )}
-
-        {/* Tabs */}
-        <div style={{ display: 'flex', gap: 7, marginBottom: 16 }}>
-          {[
-            ['live', '● LIVE NOW', spotLive.length],
-            ['next', 'NEXT UP', spotNext.length],
-            ['ended', 'ENDED', spotEnded.length],
-          ].map(([key, label, count]) => {
-            const isActive = spotTab === key
-            const isLive = key === 'live'
-            return (
-              <button key={key} onClick={() => setSpotTab(key)} style={{
-                flex: 1, padding: '9px 4px', textAlign: 'center', fontSize: isMobile ? 11.5 : 12.5, fontWeight: 700,
-                borderRadius: 20, cursor: 'pointer', fontFamily: 'inherit',
-                border: `1.5px solid ${isActive ? GOLD_A : bdr}`,
-                background: isActive && isLive ? GOLD_GRAD : isActive ? `${GOLD_A}18` : s2,
-                color: isActive && isLive ? '#fff' : isActive ? (dark ? GOLD_A : GOLD_B) : mu,
-                transition: '.15s',
-              }}>
-                {label}&nbsp;<b style={{ opacity: .65, fontSize: 11 }}>{count}</b>
-              </button>
-            )
-          })}
-        </div>
 
         {/* Live Now / Next Up — brand tree view, 2-column grid per brand */}
         {spotTab !== 'ended' && (() => {
@@ -832,14 +857,15 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
       <div className="ps-pills">
         <span className="ps-label" style={{ color: mu }}>Customer</span>
         {PROMO_RETAILERS.map(r => (
-          <button key={r} onClick={() => { setRetailer(r); setBrandFilter([]) }} title={r} style={{
+          <button key={r} onClick={() => { setRetailer(r); setBrandFilter([]) }} title={r}
+            className={`ps-glow${retailer === r ? ' ps-glow-on' : ''}`} style={{
+            '--g': GOLD_A,
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
             width: isMobile ? 60 : 76, height: isMobile ? 42 : 38,
             padding: '4px 6px', cursor: 'pointer', fontFamily: 'inherit',
             background: retailer === r ? `${GOLD_A}1e` : s2,
             border: `1.5px solid ${retailer === r ? GOLD_A : bdr}`,
-            borderRadius: 10,
-            boxShadow: retailer === r ? `0 0 0 3px ${GOLD_A}22` : 'none', transition: '.15s',
+            borderRadius: 10, transition: 'border-color .15s, background .15s',
           }}>
             {RetailerLogo
               ? <RetailerLogo name={r} h={isMobile ? 24 : 20} maxW={isMobile ? 54 : 68}
@@ -854,13 +880,16 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
       {brandList.length > 0 && (
         <div className="ps-pills">
           <span className="ps-label" style={{ color: mu }}>Brand</span>
-          <button className="ps-brand-pill" onClick={() => setBrandFilter([])} style={{
+          <button className={`ps-brand-pill ps-glow${!brandFilter.length ? ' ps-glow-on' : ''}`} onClick={() => setBrandFilter([])} style={{
+            '--g': GOLD_A,
             background: !brandFilter.length ? GOLD_GRAD : s2, color: !brandFilter.length ? '#fff' : tx,
             border: `1.5px solid ${!brandFilter.length ? GOLD_A : bdr}`,
             borderRadius: 99, padding: '6px 14px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
           }}>All</button>
           {brandList.map(b => (
-            <button key={b} onClick={() => toggleBrand(b)} style={{
+            <button key={b} onClick={() => toggleBrand(b)}
+              className={`ps-glow${brandFilter.includes(b) ? ' ps-glow-on' : ''}`} style={{
+              '--g': GOLD_A,
               background: brandFilter.includes(b) ? GOLD_GRAD : s2,
               color: brandFilter.includes(b) ? '#fff' : tx,
               border: `1.5px solid ${brandFilter.includes(b) ? GOLD_A : bdr}`,
@@ -876,11 +905,12 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 8 }}>
           {/* main view toggle */}
           <div className="ps-seg" style={{ background: s2, border: `1px solid ${bdr}` }}>
-            {[['timeline','📊 Timeline'], ['grid','📋 Grid']].map(([k, l]) => (
-              <button key={k} className={layout === k ? 'on' : ''} onClick={() => setLayout(k)} style={{
+            {[['timeline', 'Timeline', IcoTimeline], ['grid', 'Grid', IcoGrid]].map(([k, l, Ico]) => (
+              <button key={k} className={`ps-glow${layout === k ? ' on ps-glow-on' : ''}`} onClick={() => setLayout(k)} style={{
+                '--g': GOLD_A,
                 background: layout === k ? GOLD_GRAD : 'none',
                 color: layout === k ? '#fff' : mu,
-              }}>{l}</button>
+              }}><Ico size={13} />{l}</button>
             ))}
           </div>
           {/* sub-toggle — directly under main toggle when Timeline is selected */}
@@ -889,11 +919,12 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
               <span style={{ fontSize: 10.5, color: dim, fontWeight: 600 }}>view:</span>
               <div className="ps-seg" style={{ background: s2, border: `1px solid ${bdr}`, padding: 2 }}>
                 {[['schedule','Schedule'], ['spotlight','Spotlight']].map(([k, l]) => (
-                  <button key={k} className={tlView === k ? 'on' : ''} onClick={() => setTlView(k)} style={{
+                  <button key={k} className={`ps-glow${tlView === k ? ' on ps-glow-on' : ''}`} onClick={() => setTlView(k)} style={{
+                    '--g': GOLD_A,
                     fontSize: 11.5, padding: '5px 12px',
                     background: tlView === k ? `${GOLD_A}22` : 'none',
-                    color: tlView === k ? GOLD_A : mu,
-                    border: tlView === k ? `1px solid ${GOLD_A}44` : '1px solid transparent',
+                    color: tlView === k ? (dark ? GOLD_A : GOLD_B) : mu,
+                    border: tlView === k ? `1px solid ${GOLD_A}66` : '1px solid transparent',
                     borderRadius: 7,
                   }}>{l}</button>
                 ))}
@@ -904,21 +935,22 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
         <div style={{ display: 'flex', gap: 13, alignItems: 'center', flexWrap: 'wrap' }}>
           {Object.entries(ACT).map(([k, a]) => (
             <span key={k} className="ps-actleg" style={{ color: mu }}>
-              <span className="ps-actleg-dot" style={{ background: a.color, boxShadow: `0 0 5px -1px ${a.color}` }} />
+              <span className="ps-actleg-dot" style={{ background: neon(a.color), boxShadow: `0 0 5px -1px ${neon(a.color)}` }} />
               {a.label}
             </span>
           ))}
           <span className="ps-actleg" style={{ color: mu }}>
-            <span className="ps-actleg-dot" style={{ background: CLEAR_COLOR, boxShadow: `0 0 5px -1px ${CLEAR_COLOR}` }} />
+            <span className="ps-actleg-dot" style={{ background: neon(CLEAR_COLOR), boxShadow: `0 0 5px -1px ${neon(CLEAR_COLOR)}` }} />
             เคลียร์สินค้า
           </span>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginLeft: 'auto' }}>
-          <button onClick={() => setCalcOpen(true)} style={{
+          <button onClick={() => setCalcOpen(true)} className="ps-glow" style={{
+            '--g': GOLD_A,
             display: 'inline-flex', alignItems: 'center', gap: 6, background: GOLD_GRAD, border: 'none',
             borderRadius: 8, color: '#fff', fontSize: 12, fontWeight: 700, padding: '7px 14px',
             cursor: 'pointer', fontFamily: 'inherit',
-          }}>🧮 Compensate Calc</button>
+          }}><IcoCalc size={14} />Compensate Calc</button>
           {unlocked ? (
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 11, fontWeight: 600, color: t.green, background: `${t.green}22`, padding: '6px 11px', borderRadius: 8 }}>
               🔓 {unlocked}
@@ -930,7 +962,7 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
                 onChange={e => { setPin(e.target.value); setPinErr(false) }}
                 placeholder="PIN — unlock GP"
                 style={{ width: isMobile ? 145 : 160, background: 'none', border: 0, outline: 0, color: tx, fontFamily: 'monospace', fontSize: 12, letterSpacing: 2, padding: '8px 11px' }} />
-              <button type="submit" style={{ border: 0, borderLeft: `1px solid ${bdr}`, background: s, color: mu, fontSize: 11, fontWeight: 700, padding: '0 12px', cursor: 'pointer', fontFamily: 'inherit' }}>Unlock</button>
+              <button type="submit" className="ps-glow" style={{ '--g': GOLD_A, border: 0, borderLeft: `1px solid ${bdr}`, background: s, color: mu, fontSize: 11, fontWeight: 700, padding: '0 12px', cursor: 'pointer', fontFamily: 'inherit' }}>Unlock</button>
             </form>
           )}
         </div>
@@ -946,9 +978,12 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 20px', borderBottom: `1px solid ${bdr}`, background: dark ? 'rgba(255,255,255,.025)' : 'rgba(0,0,0,.02)' }}>
           <span style={{ fontSize: 17, fontWeight: 700, letterSpacing: '-.02em', color: tx }}>{retailer}</span>
           <span style={{ fontSize: 12, color: mu, fontWeight: 600 }}>{items.length} products · {periods.length} periods</span>
-          <span style={{ marginLeft: 'auto', fontSize: 11, color: mu, fontFamily: 'monospace' }}>
-            {periods[0]?.dateRange?.split('-')[0] || ''} → {periods[periods.length - 1]?.dateRange?.split('-')[1] || ''}
-          </span>
+          <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
+            <div style={{ fontSize: 9, fontWeight: 800, color: mu, textTransform: 'uppercase', letterSpacing: '.12em' }}>Plan period</div>
+            <div style={{ fontSize: isMobile ? 12 : 14.5, fontWeight: 700, color: tx, fontFamily: 'ui-monospace,monospace', whiteSpace: 'nowrap' }}>
+              {periods[0]?.dateRange?.split('-')[0] || ''} → {periods[periods.length - 1]?.dateRange?.split('-')[1] || ''}
+            </div>
+          </div>
         </div>
         {/* views are invoked as functions (not JSX components) — they are re-defined on
             every render, and rendering them as <Component /> would remount the whole
@@ -993,14 +1028,14 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
               <div style={{ height: 1, background: bdr, margin: '9px 0 7px' }} />
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
                 {barTip.activities.map(a => ACT[a] ? (
-                  <span key={a} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 5, background: `${ACT[a].color}18`, color: ACT[a].color, border: `1px solid ${ACT[a].color}33` }}>
-                    <i style={{ width: 5, height: 5, borderRadius: 99, background: ACT[a].color, display: 'inline-block' }} />
+                  <span key={a} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 5, background: `${neon(ACT[a].color)}18`, color: neon(ACT[a].color), border: `1px solid ${neon(ACT[a].color)}33` }}>
+                    <i style={{ width: 5, height: 5, borderRadius: 99, background: neon(ACT[a].color), display: 'inline-block' }} />
                     {ACT[a].label}
                   </span>
                 ) : null)}
                 {barTip.clearance && (
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 5, background: `${CLEAR_COLOR}18`, color: CLEAR_COLOR, border: `1px solid ${CLEAR_COLOR}33` }}>
-                    <i style={{ width: 5, height: 5, borderRadius: 99, background: CLEAR_COLOR, display: 'inline-block' }} />
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 5, background: `${neon(CLEAR_COLOR)}18`, color: neon(CLEAR_COLOR), border: `1px solid ${neon(CLEAR_COLOR)}33` }}>
+                    <i style={{ width: 5, height: 5, borderRadius: 99, background: neon(CLEAR_COLOR), display: 'inline-block' }} />
                     เคลียร์สินค้า
                   </span>
                 )}
