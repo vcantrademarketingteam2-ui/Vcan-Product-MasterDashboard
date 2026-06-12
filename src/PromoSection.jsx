@@ -60,6 +60,7 @@ const IcoCalc = ({ size = 14 }) => (
 )
 const GOLD_GRAD = `linear-gradient(135deg,${GOLD_A},${GOLD_B})`
 const TODAY = new Date()
+const TODAY_ISO = `${TODAY.getFullYear()}-${String(TODAY.getMonth() + 1).padStart(2, '0')}-${String(TODAY.getDate()).padStart(2, '0')}`
 
 // ── date helpers ──────────────────────────────────────────────────────────────
 function parseDR(dr = '') {
@@ -381,13 +382,16 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
   // Bar color: driven by activity type, with clearance override.
   // No-activity promos get an ice-silver frosted-glass pill (txt = theme text),
   // not the old gold gradient.
+  // Bar backgrounds are OPAQUE (alpha gradient layered over a solid base) so the
+  // NOW glowline can never bleed through the pill text.
+  const barBase = dark ? '#0d1117' : '#f4efe9'
   const getBarStyle = (activities, clearance) => {
-    if (clearance) { const c = neon(CLEAR_COLOR); return { bg: `linear-gradient(135deg,${c}e8,${c}99)`, clr: c, txt: '#fff' } }
+    if (clearance) { const c = neon(CLEAR_COLOR); return { bg: `linear-gradient(135deg,${c}e8,${c}99), ${barBase}`, clr: c, txt: '#fff' } }
     for (const a of (activities || [])) {
-      if (ACT[a]) { const c = neon(ACT[a].color); return { bg: `linear-gradient(135deg,${c}e8,${c}99)`, clr: c, txt: '#fff' } }
+      if (ACT[a]) { const c = neon(ACT[a].color); return { bg: `linear-gradient(135deg,${c}e8,${c}99), ${barBase}`, clr: c, txt: '#fff' } }
     }
     return {
-      bg: dark ? 'rgba(203,225,243,.13)' : 'rgba(255,255,255,.6)',
+      bg: dark ? '#1c2630' : '#fbf9f5',
       clr: dark ? '#a8c5da' : '#8fa9bd',
       txt: t.text, ice: true,
     }
@@ -404,6 +408,13 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
     const left  = (barStart - start.getTime()) / totalMs * 100
     const width = (barEnd - barStart) / totalMs * 100
     return { left: Math.max(0, left), width: Math.max(0.5, width) }
+  }
+
+  // Open the product popup with the full master record (promo items lack the
+  // retailers map / status fields the popup needs — passing them raw crashes it)
+  const openProduct = it => {
+    const m = rawData?.find(r => r.barcode === it.barcode)
+    onSelect?.(m || { retailers: {}, status: '', rsp: it.rspIncVat ?? null, packSize: '', ...it })
   }
 
   const toggleBrand = b => setBrandFilter(prev => prev.includes(b) ? prev.filter(x => x !== b) : [...prev, b])
@@ -466,7 +477,7 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
               </div>
               {list.map(it => (
                 <div key={it.barcode} className="ps-cal-row" style={{ borderColor: dim, background: dark ? 'rgba(255,255,255,.015)' : 'rgba(255,255,255,.28)' }}>
-                  <div className="ps-cal-rail" style={{ background: s, borderRight: `1px solid ${bdr}` }} onClick={() => onSelect?.(it)}>
+                  <div className="ps-cal-rail" style={{ background: s, borderRight: `1px solid ${bdr}` }} onClick={() => openProduct(it)}>
                     <div className="ps-cal-rail-name" style={{ color: tx }}>{it.product}</div>
                     <div className="ps-cal-rail-sub">
                       <span className="ps-cal-rail-rsp" style={{ color: mu }}>RSP ฿{it.rspIncVat}</span>
@@ -544,10 +555,11 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
           onMouseLeave={() => setBarTip(null)}>
           <div className="ps-sched-inner" ref={tlInnerRef} style={{ position: 'relative' }}>
 
-            {/* TODAY marker — solid neon glowline */}
+            {/* TODAY marker — solid neon glowline. zIndex 0 keeps it BELOW the
+                price pills (.ps-sched-bar is zIndex 1), so pills sit cleanly on top */}
             {tlNowX !== null && (
               <div style={{
-                position: 'absolute', top: 0, bottom: 0, pointerEvents: 'none', zIndex: 2,
+                position: 'absolute', top: 0, bottom: 0, pointerEvents: 'none', zIndex: 0,
                 left: tlNowX, width: 2, background: GOLD_A,
                 boxShadow: `0 0 8px 1px ${GOLD_A}cc, 0 0 22px 4px ${GOLD_A}55`,
               }} />
@@ -602,7 +614,7 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
                   <div key={it.barcode} className="ps-sched-row" style={{ borderColor: dim, background: dark ? 'rgba(255,255,255,.015)' : 'rgba(255,255,255,.28)' }}>
                     {/* Left sticky panel */}
                     <div className="ps-sched-lead" style={{ background: s, borderRight: `1px solid ${bdr}` }}
-                      onClick={() => onSelect?.(it)}>
+                      onClick={() => openProduct(it)}>
                       <div style={{ fontSize: 12.5, fontWeight: 600, color: tx, lineHeight: 1.35, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.product}</div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
                         <span style={{ fontSize: 11, fontFamily: 'ui-monospace,monospace', fontWeight: 700, color: mu }}>RSP ฿{it.rspIncVat}</span>
@@ -629,9 +641,7 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
                             <div key={p.name} className="ps-sched-bar"
                               style={{ left: `${pos.left}%`, width: `${pos.width}%`, background: bs.bg,
                                 border: `1px solid ${bs.clr}${bs.ice ? '66' : '55'}`,
-                                backdropFilter: bs.ice ? 'blur(8px) saturate(1.3)' : undefined,
-                                WebkitBackdropFilter: bs.ice ? 'blur(8px) saturate(1.3)' : undefined,
-                                boxShadow: `inset 0 1px 0 rgba(255,255,255,.3), 0 0 14px -3px ${bs.clr}` }}
+                                boxShadow: `inset 0 1px 0 rgba(255,255,255,.3), 0 0 7px ${bs.clr}66, 0 0 16px -3px ${bs.clr}` }}
                               onMouseEnter={e => setBarTip({
                                 x: e.clientX, y: e.clientY,
                                 brand: it.brand, product: it.product,
@@ -669,7 +679,7 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
   function FeedCard({ it }) {
     const bs = getBarStyle(it.pd?.activities, it.clearance)
     return (
-      <div onClick={() => onSelect?.(it)}
+      <div onClick={() => openProduct(it)}
         style={{
           display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px',
           background: dark ? 'rgba(255,255,255,.04)' : 'rgba(255,255,255,.58)',
@@ -779,8 +789,9 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
                 {periodProgress.pct >= 95 ? 'ends today' : `${Math.round(periodProgress.pct)}% through`}
               </span>
             </div>
-            <div style={{ height: 5, background: dim, borderRadius: 99, overflow: 'hidden' }}>
-              <div style={{ height: '100%', width: `${periodProgress.pct}%`, background: `linear-gradient(90deg,${GOLD_A},${GOLD_B})`, borderRadius: 99, transition: 'width .4s' }} />
+            <div style={{ height: 5, background: dark ? 'rgba(0,0,0,.45)' : dim, borderRadius: 99, overflow: 'visible' }}>
+              <div style={{ height: '100%', width: `${periodProgress.pct}%`, background: `linear-gradient(90deg,${GOLD_A},${GOLD_B})`, borderRadius: 99, transition: 'width .4s',
+                boxShadow: `0 0 7px ${GOLD_A}aa, 0 0 16px -2px ${GOLD_A}66` }} />
             </div>
           </div>
         ) : (
@@ -979,9 +990,11 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
           <span style={{ fontSize: 17, fontWeight: 700, letterSpacing: '-.02em', color: tx }}>{retailer}</span>
           <span style={{ fontSize: 12, color: mu, fontWeight: 600 }}>{items.length} products · {periods.length} periods</span>
           <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
-            <div style={{ fontSize: 9, fontWeight: 800, color: mu, textTransform: 'uppercase', letterSpacing: '.12em' }}>Plan period</div>
-            <div style={{ fontSize: isMobile ? 12 : 14.5, fontWeight: 700, color: tx, fontFamily: 'ui-monospace,monospace', whiteSpace: 'nowrap' }}>
-              {periods[0]?.dateRange?.split('-')[0] || ''} → {periods[periods.length - 1]?.dateRange?.split('-')[1] || ''}
+            <div style={{ fontSize: 9.5, fontWeight: 800, color: mu, textTransform: 'uppercase', letterSpacing: '.12em' }}>Planning Date</div>
+            <div style={{ fontSize: isMobile ? 14 : 17, fontWeight: 800, fontFamily: 'ui-monospace,monospace', whiteSpace: 'nowrap',
+              color: dark ? GOLD_A : GOLD_B,
+              textShadow: `0 0 10px ${GOLD_A}aa, 0 0 24px ${GOLD_A}55` }}>
+              {TODAY_ISO}
             </div>
           </div>
         </div>

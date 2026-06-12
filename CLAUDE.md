@@ -138,6 +138,7 @@ No pending tasks from this redesign.
 
 | Version | What changed |
 |---------|-------------|
+| v2.19.2 | Bug fixes + neon bloom: Spotlight/Grid/Schedule product-click crash fixed (`openProduct` resolves master record by barcode — promo items lack `retailers`; popup also guards `product.retailers`), NOW glowline zIndex 0 + opaque bar backgrounds (no bleed-through), packshot cache-busting `?v=GENERATED_AT`, "Planning Date" neon header, chart bloom (dark tracks `rgba(0,0,0,.45)` + layered glows) |
 | v2.19.1 | Refinements: light-mode deep-neon contrast (`neon()`/`NEON_DEEP`), `.ps-glow` hover/active neon system, SVG icons replace emoji, Gantt bar text centered, solid neon NOW glowline, labeled Plan-period header, Spotlight status tiles (replace stat strip + pill tabs) |
 | v2.19.0 | Porcelain glass redesign: app-wide warm-cream light theme + aurora glows, glassmorphism panels (Promotion Plan + Analytics), neon activity palette (media cyan / looks fuchsia / clearance coral), gold price pill → ice-silver glass, bronze chrome. Spec: docs/superpowers/specs/2026-06-12-porcelain-glass-redesign-design.md |
 | v2.18.0 | Grid glowline removed (clean current-period highlight); Schedule/Spotlight remount+scroll bug fixed, pill-bar Gantt redesign, Spotlight stat strip; Analytics neon graph upgrade + Brand Portfolio chart |

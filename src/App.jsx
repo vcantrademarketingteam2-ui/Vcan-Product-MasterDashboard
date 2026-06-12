@@ -152,7 +152,9 @@ function PackshotImg({ barcode, side = 'front', style = {}, placeholderSize = 40
   const [idx, setIdx] = useState(0)
   const [failed, setFailed] = useState(false)
   useEffect(() => { setIdx(0); setFailed(false) }, [barcode, side])
-  const src = `/packshots/${barcode}_${side}.${EXTS[idx]}`
+  // cache-bust per data build — a stale CDN/browser cache can otherwise keep
+  // serving an old image (or old 404) for an updated packshot on one device
+  const src = `/packshots/${barcode}_${side}.${EXTS[idx]}?v=${encodeURIComponent(GENERATED_AT)}`
   if (failed) return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(128,128,128,0.08)', borderRadius: 8, gap: 6, ...style }}>
       <span style={{ fontSize: placeholderSize * 0.9, opacity: 0.3 }}>📦</span>
@@ -412,7 +414,7 @@ function ProductPopup({ product, onClose, t, dark, isMobile = false, pricing = {
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: cols, gap: 6 }}>
         {RETAILERS.map(r => {
-          const v = product.retailers[r] || ''
+          const v = (product.retailers || {})[r] || ''
           const isActive = v === 'A'
           const isPending = v === 'รอขาย' || v === 'On Process'
           const isDiscon = v === 'ยกเลิกขาย'
@@ -1084,7 +1086,7 @@ export default function App() {
             <div style={{ fontWeight: 800, fontSize: isMobile ? 14 : 17, color: t.text, letterSpacing: 0.2, whiteSpace: 'nowrap', flexShrink: 0 }}>
               Product Master
             </div>
-            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v2.19.1</span>
+            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v2.19.2</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: isMobile ? 11 : 13, background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, padding: isMobile ? '3px 8px' : '5px 12px', overflow: 'hidden', minWidth: 0, flexShrink: 1 }}>
               <span style={{ width: isMobile ? 6 : 7, height: isMobile ? 6 : 7, borderRadius: '50%', flexShrink: 0, background: dataSource === 'csv' ? t.blue : t.green }} />
               <span style={{ fontWeight: 800, color: dataSource === 'csv' ? t.blue : t.green, flexShrink: 0 }}>
@@ -1373,8 +1375,9 @@ export default function App() {
                       return (
                         <div key={b.brand} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                           <span style={{ width: isMobile ? 88 : 130, flexShrink: 0, fontSize: 11.5, fontWeight: 700, color: t.text, textAlign: 'right', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.brand}</span>
-                          <div style={{ flex: 1, height: 14, background: dark ? 'rgba(255,255,255,.06)' : 'rgba(38,32,25,.07)', borderRadius: 99, overflow: 'hidden' }}>
-                            <div style={{ height: '100%', width: `${Math.max(4, Math.round(b.active / maxA * 100))}%`, borderRadius: 99, background: `linear-gradient(90deg, ${clr}, ${clr}88)`, boxShadow: `0 0 10px -2px ${clr}` }} />
+                          <div style={{ flex: 1, height: 14, background: dark ? 'rgba(0,0,0,.45)' : 'rgba(38,32,25,.07)', borderRadius: 99, overflow: 'visible' }}>
+                            <div style={{ height: '100%', width: `${Math.max(4, Math.round(b.active / maxA * 100))}%`, borderRadius: 99, background: `linear-gradient(90deg, ${clr}, ${clr}88)`,
+                              boxShadow: dark ? `0 0 6px ${clr}aa, 0 0 16px -2px ${clr}77` : `0 0 10px -2px ${clr}` }} />
                           </div>
                           <span style={{ width: 28, flexShrink: 0, fontSize: 12, fontWeight: 800, color: clr, fontFamily: 'ui-monospace,monospace', textAlign: 'right' }}>{b.active}</span>
                         </div>
@@ -1502,8 +1505,9 @@ export default function App() {
                             </td>
                             <td style={{ padding: '9px 10px' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <div style={{ flex: 1, minWidth: 60, height: 8, background: dark ? 'rgba(255,255,255,.06)' : 'rgba(38,32,25,.07)', borderRadius: 99, overflow: 'hidden' }}>
-                                  <div style={{ height: '100%', width: `${Math.round(r.active / maxRetailerActive * 100)}%`, background: 'linear-gradient(90deg,#58a6ff,#7c3aed)', borderRadius: 99, boxShadow: '0 0 8px -1px #7c3aed' }} />
+                                <div style={{ flex: 1, minWidth: 60, height: 8, background: dark ? 'rgba(0,0,0,.45)' : 'rgba(38,32,25,.07)', borderRadius: 99, overflow: 'visible' }}>
+                                  <div style={{ height: '100%', width: `${Math.round(r.active / maxRetailerActive * 100)}%`, background: 'linear-gradient(90deg,#58a6ff,#7c3aed)', borderRadius: 99,
+                                    boxShadow: dark ? '0 0 6px #7c3aedaa, 0 0 14px -2px #58a6ff88' : '0 0 8px -1px #7c3aed' }} />
                                 </div>
                                 <span style={{ fontSize: 12, fontWeight: 700, color: t.text, width: 26, textAlign: 'right' }}>{r.active}</span>
                               </div>
