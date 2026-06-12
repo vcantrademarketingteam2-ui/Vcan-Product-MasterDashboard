@@ -596,7 +596,7 @@ export default function App() {
   // so light mode doesn't show a dark bar that makes the page look like dimmed dark mode.
   useEffect(() => {
     const meta = document.querySelector('meta[name="theme-color"]')
-    if (meta) meta.setAttribute('content', dark ? '#010409' : '#edf0f4')
+    if (meta) meta.setAttribute('content', dark ? '#010409' : '#f4efe9')
   }, [dark])
 
   const handleImportCSV = (e) => {
@@ -631,11 +631,19 @@ export default function App() {
     orange: '#e3b341', rowHover: '#1c2128', sidebarBg: '#010409', headerBg: '#010409',
     vcanClr: '#f0c040', moolaClr: '#f25757',
   } : {
-    bg: '#edf0f4', surface: '#f4f6f9', surface2: '#e4e9f0', border: '#c6ccd8',
-    text: '#1a1f28', muted: '#57606a', dim: '#c6ccd8', accent: '#b8850a',
+    bg: '#f4efe9', surface: '#fbf8f3', surface2: '#f3ede4', border: '#ded3c2',
+    text: '#262019', muted: '#70634f', dim: '#e3dacb', accent: '#a5784a',
     green: '#1a7f37', yellow: '#9a6700', red: '#cf222e', blue: '#0969da',
-    orange: '#953800', rowHover: '#e4e9f0', sidebarBg: '#e4e9f0', headerBg: '#edf0f4',
-    vcanClr: '#8b6914', moolaClr: '#c0392b',
+    orange: '#953800', rowHover: '#f6f1e9', sidebarBg: '#efe7dc', headerBg: '#f4efe9',
+    vcanClr: '#9c6b35', moolaClr: '#c0392b',
+  }
+
+  // frosted-glass panel (porcelain glass redesign) — spread into card containers
+  const glassPanel = {
+    background: dark ? 'rgba(22,27,34,.6)' : 'rgba(251,248,243,.66)',
+    backdropFilter: 'blur(16px) saturate(1.45)', WebkitBackdropFilter: 'blur(16px) saturate(1.45)',
+    border: `1px solid ${dark ? t.border : 'rgba(255,255,255,.65)'}`,
+    boxShadow: dark ? '0 8px 28px rgba(0,0,0,.35)' : '0 8px 28px rgba(82,62,40,.10), inset 0 1px 0 rgba(255,255,255,.7)',
   }
 
   const visibleBrands = VENDOR_BRANDS[vendorFilter] || VENDOR_BRANDS.ALL
@@ -911,7 +919,11 @@ export default function App() {
   )
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: t.bg, color: t.text, fontSize: 14, zoom: 1.05 }}>
+    <div style={{ display: 'flex', minHeight: '100vh', color: t.text, fontSize: 14, zoom: 1.05,
+      // porcelain base + soft sage/coral aurora glows in light mode (glass-wave reference)
+      background: dark ? t.bg
+        : `radial-gradient(900px 600px at 88% -8%, rgba(122,168,116,.13), transparent 62%), radial-gradient(820px 620px at -6% 96%, rgba(214,106,90,.11), transparent 62%), ${t.bg}`,
+      backgroundAttachment: dark ? undefined : 'fixed' }}>
       <style>{`
         *{box-sizing:border-box;margin:0;padding:0;}
         html,body{background:${t.bg};}
@@ -1072,7 +1084,7 @@ export default function App() {
             <div style={{ fontWeight: 800, fontSize: isMobile ? 14 : 17, color: t.text, letterSpacing: 0.2, whiteSpace: 'nowrap', flexShrink: 0 }}>
               Product Master
             </div>
-            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v2.18.0</span>
+            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v2.19.0</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: isMobile ? 11 : 13, background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, padding: isMobile ? '3px 8px' : '5px 12px', overflow: 'hidden', minWidth: 0, flexShrink: 1 }}>
               <span style={{ width: isMobile ? 6 : 7, height: isMobile ? 6 : 7, borderRadius: '50%', flexShrink: 0, background: dataSource === 'csv' ? t.blue : t.green }} />
               <span style={{ fontWeight: 800, color: dataSource === 'csv' ? t.blue : t.green, flexShrink: 0 }}>
@@ -1339,7 +1351,8 @@ export default function App() {
                   { label: 'Avg Coverage', val: intel.summary.avgCoverage.toFixed(1), sub: `of ${RETAILERS.length} retailers / brand`, c: t.accent },
                   { label: 'Pending Pipeline', val: intel.summary.totalPending, sub: 'awaiting listing', c: t.yellow },
                 ].map(({ label, val, sub, c }) => (
-                  <div key={label} style={{ background: t.surface, border: `1px solid ${t.border}`, borderTop: `3px solid ${c}`, borderRadius: 12, padding: isMobile ? '14px 16px' : '18px 20px' }}>
+                  <div key={label} style={{ ...glassPanel, borderTop: `3px solid ${c}`, borderRadius: 12, padding: isMobile ? '14px 16px' : '18px 20px',
+                    boxShadow: `${glassPanel.boxShadow}, 0 0 22px -10px ${c}, inset 0 22px 44px -34px ${c}` }}>
                     <div style={{ fontSize: 11, color: t.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 6 }}>{label}</div>
                     <div style={{ fontSize: isMobile ? 26 : 32, fontWeight: 800, color: c, lineHeight: 1, textShadow: `0 0 22px ${c}55` }}>{val}</div>
                     <div style={{ fontSize: 11, color: t.muted, marginTop: 4 }}>{sub}</div>
@@ -1348,7 +1361,7 @@ export default function App() {
               </div>
 
               {/* ── Brand Portfolio bar chart ── */}
-              <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 12, padding: isMobile ? 16 : 24 }}>
+              <div style={{ ...glassPanel, borderRadius: 12, padding: isMobile ? 16 : 24 }}>
                 <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 4 }}>Brand Portfolio</div>
                 <div style={{ color: t.muted, fontSize: 12, marginBottom: 16 }}>Active SKUs per brand — bar color shows the vendor (Vcan / Moola).</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -1360,7 +1373,7 @@ export default function App() {
                       return (
                         <div key={b.brand} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                           <span style={{ width: isMobile ? 88 : 130, flexShrink: 0, fontSize: 11.5, fontWeight: 700, color: t.text, textAlign: 'right', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.brand}</span>
-                          <div style={{ flex: 1, height: 14, background: t.surface2, borderRadius: 99, overflow: 'hidden' }}>
+                          <div style={{ flex: 1, height: 14, background: dark ? 'rgba(255,255,255,.06)' : 'rgba(38,32,25,.07)', borderRadius: 99, overflow: 'hidden' }}>
                             <div style={{ height: '100%', width: `${Math.max(4, Math.round(b.active / maxA * 100))}%`, borderRadius: 99, background: `linear-gradient(90deg, ${clr}, ${clr}88)`, boxShadow: `0 0 10px -2px ${clr}` }} />
                           </div>
                           <span style={{ width: 28, flexShrink: 0, fontSize: 12, fontWeight: 800, color: clr, fontFamily: 'ui-monospace,monospace', textAlign: 'right' }}>{b.active}</span>
@@ -1372,7 +1385,7 @@ export default function App() {
               </div>
 
               {/* ── Brand Distribution Matrix ── */}
-              <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 12, padding: isMobile ? 16 : 24 }}>
+              <div style={{ ...glassPanel, borderRadius: 12, padding: isMobile ? 16 : 24 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', flexWrap: 'wrap', gap: 8, marginBottom: 4 }}>
                   <div style={{ fontWeight: 700, fontSize: 15 }}>Brand Distribution Matrix</div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 14, fontSize: 11, color: t.muted }}>
@@ -1425,7 +1438,7 @@ export default function App() {
               </div>
 
               {/* ── Distribution Gaps ── */}
-              <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 12, padding: isMobile ? 16 : 24 }}>
+              <div style={{ ...glassPanel, borderRadius: 12, padding: isMobile ? 16 : 24 }}>
                 <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 4 }}>Distribution Gaps</div>
                 <div style={{ color: t.muted, fontSize: 12, marginBottom: 16 }}>
                   Live brands (≥2 active SKUs) not yet in every core door — measured against {intel.coreRetailers.map(r => RETAILER_SHORT[r]).join(' · ')}
@@ -1435,7 +1448,9 @@ export default function App() {
                 ) : (
                   <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(300px, 1fr))', gap: 12 }}>
                     {intel.gaps.map(g => (
-                      <div key={g.brand} style={{ padding: '14px 16px', borderRadius: 12, background: t.surface2, border: `1px solid ${t.border}` }}>
+                      <div key={g.brand} style={{ padding: '14px 16px', borderRadius: 12,
+                        background: dark ? 'rgba(255,255,255,.035)' : 'rgba(255,255,255,.5)',
+                        border: `1px solid ${t.border}`, boxShadow: `inset 0 18px 36px -30px ${t.red}99` }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 10 }}>
                           <div style={{ minWidth: 0 }}>
                             <div style={{ fontSize: 13.5, fontWeight: 800, color: t.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g.brand}</div>
@@ -1449,7 +1464,7 @@ export default function App() {
                           {intel.coreRetailers.map(r => {
                             const inStore = g.present.includes(r)
                             return (
-                              <span key={r} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 10.5, fontWeight: 700, padding: '3px 9px', borderRadius: 6, background: inStore ? `${t.green}1e` : 'transparent', color: inStore ? t.green : t.muted, border: `1px solid ${inStore ? t.green + '44' : t.border}`, opacity: inStore ? 1 : 0.85 }}>
+                              <span key={r} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 10.5, fontWeight: 700, padding: '3px 9px', borderRadius: 6, background: inStore ? `${t.green}1e` : `${t.red}0d`, color: inStore ? t.green : t.muted, border: `1px solid ${inStore ? t.green + '44' : t.red + '33'}`, opacity: inStore ? 1 : 0.9 }}>
                                 <span>{inStore ? '✓' : '+'}</span><RetailerLogo name={r} h={20} maxW={56} fallbackStyle={{ fontSize: 10.5 }} />
                               </span>
                             )
@@ -1462,7 +1477,7 @@ export default function App() {
               </div>
 
               {/* ── Retailer Scorecard ── */}
-              <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 12, padding: isMobile ? 16 : 24 }}>
+              <div style={{ ...glassPanel, borderRadius: 12, padding: isMobile ? 16 : 24 }}>
                 <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 4 }}>Retailer Scorecard</div>
                 <div style={{ color: t.muted, fontSize: 12, marginBottom: 16 }}>Channel size at a glance — active SKUs, brands carried, pending listings, and the agreed average GP.</div>
                 <div style={{ overflowX: 'auto' }}>
@@ -1487,7 +1502,7 @@ export default function App() {
                             </td>
                             <td style={{ padding: '9px 10px' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <div style={{ flex: 1, minWidth: 60, height: 8, background: t.surface2, borderRadius: 99, overflow: 'hidden' }}>
+                                <div style={{ flex: 1, minWidth: 60, height: 8, background: dark ? 'rgba(255,255,255,.06)' : 'rgba(38,32,25,.07)', borderRadius: 99, overflow: 'hidden' }}>
                                   <div style={{ height: '100%', width: `${Math.round(r.active / maxRetailerActive * 100)}%`, background: 'linear-gradient(90deg,#58a6ff,#7c3aed)', borderRadius: 99, boxShadow: '0 0 8px -1px #7c3aed' }} />
                                 </div>
                                 <span style={{ fontSize: 12, fontWeight: 700, color: t.text, width: 26, textAlign: 'right' }}>{r.active}</span>

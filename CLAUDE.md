@@ -11,6 +11,21 @@ These apply to **every** change, not just large ones:
 3. **Ask before acting when in doubt.** If a request is ambiguous — unclear formula, layout choice, which data source, or any decision that would be costly to redo — ask the user a focused question *before* writing code, rather than guessing. Investigating the actual files/data first (to ask a well-informed question) is fine; guessing the intent is not.
 4. **Regenerate data after parser/source changes.** When you change [convert_promo.py](convert_promo.py) or [convert_to_data.py](convert_to_data.py), or the user says the source xlsx changed, re-run the relevant script so the generated [src/promo_data.js](src/promo_data.js) / [src/data.js](src/data.js) reflect it, then commit the regenerated files together with the code change. Don't ship a parser change without regenerating.
 
+## Token management & task priority
+
+- **Resource awareness:** Always monitor token usage and the context limit.
+- **Priority shifting:** If the context limit is approaching and the overall task is incomplete, immediately pause secondary styling tasks and shift full priority to completing the most critical/core functional components.
+- **Pending tasks report:** If you run out of tokens or must stop before completing the entire request, you MUST generate a `[PENDING TASKS REPORT]` at the end of your response. The report must explicitly list:
+  1. What has been successfully implemented.
+  2. What is partially done.
+  3. What is left to do (written so it can be used as the prompt for the next session).
+
+## Code efficiency & safety constraints
+
+- **Modular & DRY code:** Write clean, modular, DRY code to naturally optimize token usage. Do not sacrifice core functionality, error handling, or readability just to make the code arbitrarily shorter.
+- **Targeted modifications:** When editing existing files, focus ONLY on the specific logic or UI components being changed to save tokens. Avoid rewriting entire files when only small sections require updates.
+- **Strictly NO lazy placeholders:** NEVER use lazy placeholders (e.g., `// ... rest of the code ...`, `// existing code`) if it risks breaking the script during automated file patching. Always provide complete, functional blocks for the sections being modified.
+
 ## Commands
 
 ```bash
@@ -50,6 +65,8 @@ Parsed products have this shape: `{ company, brand, barcode, product, packSize, 
 
 The `t` object (computed from `dark` state) provides all colors used in inline styles throughout the component. All styling uses inline styles — there are no CSS class utilities in use (Tailwind config files exist in the repo but Tailwind is not installed).
 
+Since v2.19.0 light mode is a **warm porcelain** palette (bg `#f4efe9`, bronze accent `#a5784a`) with soft green/coral aurora radial-gradients on the app root; dark mode palette is unchanged. A shared `glassPanel` style object (defined next to `t` in App.jsx) provides the frosted-glass card treatment — spread it into card containers instead of hand-rolling `backdrop-filter` styles. `t` values stay **solid hexes** on purpose: sticky headers/rails need opaque backgrounds to mask scrolling content; translucency is applied per-component only where safe.
+
 ### Tabs
 
 - **Products** — filterable table with vendor/brand/status/search filters + stat cards; row click opens `ProductPopup` (data-forward `variant`)
@@ -67,10 +84,13 @@ Implemented in [src/PromoSection.jsx](src/PromoSection.jsx) + [src/PromoSection.
 
 **Data source:** `promo_data.js` exports `default` (promo items array), `PROMO_META` (per-retailer period list), `PROMO_ACTIVITY` (activity type definitions), `PROMO_RETAILERS` (ordered retailer list).
 
-**Activity color overrides (in PromoSection, NOT in promo_data.js):**
-- `field` → `#f97316` (orange) — distinct from clearance cyan
-- `media` → `#3b82f6` (blue)
-- `clearance` → `#22d3ee` (`CLEAR_COLOR` constant)
+**Activity color overrides (in PromoSection, NOT in promo_data.js) — v2.19.0 neon palette:**
+- `field` → `#f97316` (orange)
+- `media` → `#22d3ee` (neon cyan)
+- `looks` → `#f061ff` (neon fuchsia)
+- `clearance` → `#f43f5e` (neon coral, `CLEAR_COLOR` constant) — moved off cyan so media owns it
+- **No-activity promos** get an **ice-silver frosted-glass pill** via `getBarStyle()` (`bs.ice` flag, `bs.txt` text color) — the old gold-gradient price pill is removed and must NOT come back
+- `GOLD_A`/`GOLD_B` are now **bronze** (`#d4a86a`/`#9c6b35`) and are chrome-accent only (selection states, NOW markers, Calc button) — never price pills
 
 **RetailerLogo:** passed as a prop from App.jsx (`RetailerLogo` component). Customer selector pills use logo images, not plain text. Do not replace with text.
 
@@ -115,6 +135,7 @@ No pending tasks from this redesign.
 
 | Version | What changed |
 |---------|-------------|
+| v2.19.0 | Porcelain glass redesign: app-wide warm-cream light theme + aurora glows, glassmorphism panels (Promotion Plan + Analytics), neon activity palette (media cyan / looks fuchsia / clearance coral), gold price pill → ice-silver glass, bronze chrome. Spec: docs/superpowers/specs/2026-06-12-porcelain-glass-redesign-design.md |
 | v2.18.0 | Grid glowline removed (clean current-period highlight); Schedule/Spotlight remount+scroll bug fixed, pill-bar Gantt redesign, Spotlight stat strip; Analytics neon graph upgrade + Brand Portfolio chart |
 | v2.14.0 | Fix NOW glow line (useLayoutEffect pixel measurement); Timeline redesigned as Gantt/swimlane (month-only axis, colored bars, brand strips) |
 | v2.13.0 | Promotion Plan launched: PromoSection.jsx extracted component, Calendar + Timeline views, hover discount tooltip (−%), activity ribbon, customer logo pills |

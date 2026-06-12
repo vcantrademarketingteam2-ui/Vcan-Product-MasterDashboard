@@ -92,7 +92,7 @@
 .ps-modal-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom-width: 1px; border-bottom-style: solid; }
 .ps-modal-body { padding: 18px 20px 22px; }
 .ps-fld { width: 100%; border-radius: 9px; border-width: 1px; border-style: solid; font-family: inherit; font-size: 13px; padding: 9px 12px; outline: 0; }
-.ps-fld:focus { box-shadow: 0 0 0 3px rgba(240,192,64,.2); }
+.ps-fld:focus { box-shadow: 0 0 0 3px rgba(212,168,106,.28); }
 .ps-calc-out { margin-top: 14px; padding: 16px; border-radius: 12px; border-width: 1px; border-style: solid; text-align: center; }
 .ps-calc-big { font-size: 30px; font-weight: 800; font-family: ui-monospace, monospace; letter-spacing: -.02em; }
 .ps-calc-ref { font-size: 11px; margin-top: 6px; }
