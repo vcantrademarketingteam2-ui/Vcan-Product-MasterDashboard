@@ -5,6 +5,28 @@ import promoData, { PROMO_META, PROMO_ACTIVITY, PROMO_RETAILERS } from './promo_
 import vcanLogo from './VCAN.png'
 import PromoSection from './PromoSection.jsx'
 
+// Count-up animation for KPI / bento numbers — respects prefers-reduced-motion.
+function useCountUp(target, dur = 1100) {
+  const [v, setV] = useState(0)
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) { setV(target); return }
+    let raf, t0
+    const step = (ts) => {
+      if (!t0) t0 = ts
+      const p = Math.min(1, (ts - t0) / dur)
+      setV(target * (1 - Math.pow(1 - p, 3)))
+      if (p < 1) raf = requestAnimationFrame(step)
+    }
+    raf = requestAnimationFrame(step)
+    return () => cancelAnimationFrame(raf)
+  }, [target, dur])
+  return v
+}
+function CountUp({ v, dec = 0 }) {
+  const n = useCountUp(v)
+  return dec ? n.toFixed(dec) : Math.round(n).toLocaleString()
+}
+
 const RETAILERS = ['Tops', 'Villa', 'The Mall', 'Lotus', 'Homepro', 'Big C', 'TWD', 'Boots', 'Foodland', 'Central Department', "Pet'n me", 'Fuji']
 
 // Department PINs — values come from .env (VITE_ prefix = compiled into bundle)
@@ -583,6 +605,7 @@ export default function App() {
   const [calcPromo, setCalcPromo] = useState('')
   const [calcCopied, setCalcCopied] = useState(false)
   const clearCalc = () => { setCalcProductBc(''); setCalcPromo(''); setCalcCopied(false) }
+  const [anaVendor, setAnaVendor] = useState('ALL')   // Analytics page vendor scope: 'ALL' | 'Vcan' | 'Moola'
 
   useEffect(() => {
     const onResize = () => {
@@ -719,11 +742,13 @@ export default function App() {
   const intel = useMemo(() => {
     const isActive = (v) => v === 'A'
     const isPending = (v) => v === 'รอขาย' || v === 'On Process'
+    // Scope the whole page by the Analytics vendor selector (ALL / Vcan / Moola).
+    const data = anaVendor === 'ALL' ? rawData : rawData.filter(p => p.company === anaVendor)
 
     // Retailer-level aggregates
     const retailers = RETAILERS.map(r => {
-      const skus = rawData.filter(p => isActive(p.retailers[r]))
-      const pending = rawData.filter(p => isPending(p.retailers[r])).length
+      const skus = data.filter(p => isActive(p.retailers[r]))
+      const pending = data.filter(p => isPending(p.retailers[r])).length
       const brandsSet = new Set(skus.map(p => p.brand.trim()))
       let gpSum = 0, gpN = 0
       skus.forEach(p => {
@@ -740,7 +765,7 @@ export default function App() {
 
     // Brand-level aggregates
     const map = {}
-    rawData.forEach(p => {
+    data.forEach(p => {
       const b = p.brand.trim()
       if (!map[b]) map[b] = { brand: b, company: p.company, total: 0, active: 0, pending: 0, discon: 0, activeRetailers: {}, gpSum: 0, gpN: 0 }
       const m = map[b]
@@ -774,14 +799,22 @@ export default function App() {
       .sort((a, b) => a.missing.length - b.missing.length || b.active - a.active)
 
     const activeBrandCount = brands.filter(b => b.active > 0).length
+    const cActive = data.filter(p => p.status === 'ขาย').length
+    const cPending = data.filter(p => p.status === 'รอขาย').length
+    const cDiscon = data.filter(p => p.status === 'ยกเลิกขาย').length
+    const dTot = Math.max(cActive + cPending + cDiscon, 1)
     const summary = {
-      totalActive: rawData.filter(p => p.status === 'ขาย').length,
-      totalPending: rawData.filter(p => p.status === 'รอขาย').length,
+      totalActive: cActive,
+      totalPending: cPending,
+      totalDiscon: cDiscon,
+      total: data.length,
+      aDeg: cActive / dTot * 360,
+      pDeg: (cActive + cPending) / dTot * 360,
       brandCount: activeBrandCount,
       avgCoverage: activeBrandCount ? brands.filter(b => b.active > 0).reduce((s, b) => s + b.coverage, 0) / activeBrandCount : 0,
     }
     return { brands, retailers, retailersByActive, coreRetailers, gaps, summary }
-  }, [rawData])
+  }, [rawData, anaVendor])
 
   // Promo tab derived data — enriches promoData with brand/company from product master.
   // Promo barcodes not in the master (e.g. Vernel) fall back to the product name's first
@@ -878,9 +911,16 @@ export default function App() {
     return <div style={{ width: 6, height: 1, background: t.dim, margin: 'auto' }} />
   }
 
+  const BentoHead = ({ title, desc }) => (
+    <div>
+      <div style={{ fontWeight: 700, fontSize: 14.5, color: t.text, letterSpacing: '-0.01em' }}>{title}</div>
+      <div style={{ fontSize: 11, color: t.muted, marginTop: 3, lineHeight: 1.45 }}>{desc}</div>
+    </div>
+  )
+
   function StatCard({ label, value, sub, color }) {
     return (
-      <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 12, padding: isMobile ? '14px 16px' : '20px 24px', boxShadow: dark ? 'none' : '0 2px 6px rgba(0,0,0,0.07)' }}>
+      <div style={{ ...glassPanel, borderRadius: 12, padding: isMobile ? '14px 16px' : '20px 24px' }}>
         <div style={{ fontSize: 11, color: t.muted, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>{label}</div>
         <div style={{ fontSize: isMobile ? 28 : 36, fontWeight: 800, color: color || t.text, lineHeight: 1, marginBottom: 4 }}>{value}</div>
         {sub && <div style={{ fontSize: 11, color: t.muted }}>{sub}</div>}
@@ -1086,7 +1126,7 @@ export default function App() {
             <div style={{ fontWeight: 800, fontSize: isMobile ? 14 : 17, color: t.text, letterSpacing: 0.2, whiteSpace: 'nowrap', flexShrink: 0 }}>
               Product Master
             </div>
-            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v2.19.2</span>
+            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v2.20.0</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: isMobile ? 11 : 13, background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, padding: isMobile ? '3px 8px' : '5px 12px', overflow: 'hidden', minWidth: 0, flexShrink: 1 }}>
               <span style={{ width: isMobile ? 6 : 7, height: isMobile ? 6 : 7, borderRadius: '50%', flexShrink: 0, background: dataSource === 'csv' ? t.blue : t.green }} />
               <span style={{ fontWeight: 800, color: dataSource === 'csv' ? t.blue : t.green, flexShrink: 0 }}>
@@ -1135,9 +1175,7 @@ export default function App() {
               <div style={{ position: 'sticky', top: 0, zIndex: 10, background: t.bg, paddingBottom: 16, paddingTop: 4 }}>
                 {/* Search + Clear all */}
                 <div style={{
-                  background: t.surface, border: `1px solid ${t.border}`,
-                  borderRadius: 12, padding: '10px 14px', marginBottom: 10,
-                  boxShadow: dark ? 'none' : '0 1px 4px rgba(0,0,0,0.06)',
+                  ...glassPanel, borderRadius: 12, padding: '10px 14px', marginBottom: 10,
                 }}>
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                     <div style={{ flex: 1, position: 'relative' }}>
@@ -1168,9 +1206,7 @@ export default function App() {
 
                 {/* Retailer logo pills — desktop only (mobile table has no retailer columns) */}
                 {!isMobile && <div style={{
-                  background: t.surface, border: `1px solid ${t.border}`,
-                  borderRadius: 12, padding: '10px 14px', marginBottom: 10,
-                  boxShadow: dark ? 'none' : '0 1px 4px rgba(0,0,0,0.06)',
+                  ...glassPanel, borderRadius: 12, padding: '10px 14px', marginBottom: 10,
                 }}>
                   <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', alignItems: 'center' }}>
                     <span style={{ fontSize: 11, color: t.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, flexShrink: 0 }}>Customer</span>
@@ -1196,9 +1232,7 @@ export default function App() {
 
                 {/* Brand pills — card background for contrast */}
                 <div style={{
-                  background: t.surface, border: `1px solid ${t.border}`,
-                  borderRadius: 12, padding: '10px 14px',
-                  boxShadow: dark ? 'none' : '0 1px 4px rgba(0,0,0,0.06)',
+                  ...glassPanel, borderRadius: 12, padding: '10px 14px',
                 }}>
                   <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', alignItems: 'center' }}>
                     {visibleBrands.map(b => {
@@ -1219,7 +1253,7 @@ export default function App() {
               </div>
 
               {/* Table */}
-              <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 12, overflow: 'hidden' }}>
+              <div style={{ ...glassPanel, borderRadius: 12, overflow: 'hidden' }}>
                 {/* Table info bar */}
                 <div style={{ padding: '10px 18px', borderBottom: `1px solid ${t.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: t.surface, flexWrap: 'wrap', gap: 8 }}>
                   <span style={{ fontSize: 13, color: t.muted, fontWeight: 500 }}>
@@ -1344,22 +1378,103 @@ export default function App() {
 
           {/* ANALYTICS */}
           {tab === 'analytics' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-              {/* ── Portfolio overview ── */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? 14 : 20 }}>
+              {/* ── Page header + vendor scope ── */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                <div style={{ fontSize: isMobile ? 17 : 20, fontWeight: 800, color: t.text, letterSpacing: '-0.02em' }}>Mission Control</div>
+                <div style={{ display: 'inline-flex', gap: 4, marginLeft: isMobile ? 0 : 'auto', background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 99, padding: 3 }}>
+                  {['ALL', 'Vcan', 'Moola'].map(v => {
+                    const on = anaVendor === v
+                    const clr = v === 'Vcan' ? t.vcanClr : v === 'Moola' ? t.moolaClr : t.accent
+                    return (
+                      <button key={v} onClick={() => setAnaVendor(v)} style={{ border: 'none', cursor: 'pointer', borderRadius: 99, padding: isMobile ? '7px 16px' : '6px 18px', minHeight: isMobile ? 38 : 'auto', fontSize: 12.5, fontWeight: 700, background: on ? clr : 'transparent', color: on ? (dark ? '#0d1117' : '#fff') : t.muted, boxShadow: on ? `0 0 14px -4px ${clr}` : 'none', transition: 'background .18s' }}>{v === 'ALL' ? 'All' : v}</button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* ── Portfolio overview KPIs ── */}
               <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', gap: 12 }}>
                 {[
-                  { label: 'Active SKUs', val: intel.summary.totalActive, sub: 'currently on shelf', c: t.green },
-                  { label: 'Active Brands', val: intel.summary.brandCount, sub: 'with ≥1 live SKU', c: t.blue },
-                  { label: 'Avg Coverage', val: intel.summary.avgCoverage.toFixed(1), sub: `of ${RETAILERS.length} retailers / brand`, c: t.accent },
-                  { label: 'Pending Pipeline', val: intel.summary.totalPending, sub: 'awaiting listing', c: t.yellow },
-                ].map(({ label, val, sub, c }) => (
+                  { label: 'Active SKUs', val: intel.summary.totalActive, dec: 0, sub: 'currently on shelf', c: t.green },
+                  { label: 'Active Brands', val: intel.summary.brandCount, dec: 0, sub: 'with ≥1 live SKU', c: t.blue },
+                  { label: 'Avg Coverage', val: intel.summary.avgCoverage, dec: 1, sub: `of ${RETAILERS.length} retailers / brand`, c: t.accent },
+                  { label: 'Pending Pipeline', val: intel.summary.totalPending, dec: 0, sub: 'awaiting listing', c: t.yellow },
+                ].map(({ label, val, dec, sub, c }) => (
                   <div key={label} style={{ ...glassPanel, borderTop: `3px solid ${c}`, borderRadius: 12, padding: isMobile ? '14px 16px' : '18px 20px',
                     boxShadow: `${glassPanel.boxShadow}, 0 0 22px -10px ${c}, inset 0 22px 44px -34px ${c}` }}>
                     <div style={{ fontSize: 11, color: t.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 6 }}>{label}</div>
-                    <div style={{ fontSize: isMobile ? 26 : 32, fontWeight: 800, color: c, lineHeight: 1, textShadow: `0 0 22px ${c}55` }}>{val}</div>
+                    <div style={{ fontSize: isMobile ? 26 : 32, fontWeight: 800, color: c, lineHeight: 1, textShadow: dark ? `0 0 22px ${c}55` : 'none', fontVariantNumeric: 'tabular-nums' }}><CountUp v={val} dec={dec} /></div>
                     <div style={{ fontSize: 11, color: t.muted, marginTop: 4 }}>{sub}</div>
                   </div>
                 ))}
+              </div>
+
+              {/* ── Mission-control bento band: donut · channel share · coverage rings ── */}
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(12, minmax(0,1fr))', gap: 12 }}>
+                {/* Portfolio Status donut */}
+                <div style={{ ...glassPanel, borderRadius: 14, padding: isMobile ? 16 : 20, gridColumn: isMobile ? 'auto' : 'span 4' }}>
+                  <BentoHead title="Portfolio Status" desc="All SKUs by lifecycle state" />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 18, marginTop: 16, flexWrap: 'wrap' }}>
+                    <div style={{ width: 132, height: 132, borderRadius: '50%', flexShrink: 0, position: 'relative', display: 'grid', placeItems: 'center',
+                      background: `conic-gradient(${t.green} 0deg ${intel.summary.aDeg}deg, ${t.yellow} ${intel.summary.aDeg}deg ${intel.summary.pDeg}deg, ${t.red} ${intel.summary.pDeg}deg 360deg)`,
+                      boxShadow: dark ? `0 0 28px -8px ${t.accent}66` : '0 6px 18px -10px rgba(82,62,40,.4)' }}>
+                      <div style={{ width: 90, height: 90, borderRadius: '50%', background: t.surface, border: `1px solid ${t.border}`, display: 'grid', placeContent: 'center', textAlign: 'center' }}>
+                        <div style={{ fontSize: 24, fontWeight: 800, color: t.text, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}><CountUp v={intel.summary.total} /></div>
+                        <div style={{ fontSize: 9, fontWeight: 700, color: t.muted, letterSpacing: 1.4, textTransform: 'uppercase', marginTop: 3 }}>SKUs</div>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 9, minWidth: 0, flex: 1 }}>
+                      {[['Active', intel.summary.totalActive, t.green], ['Pending', intel.summary.totalPending, t.yellow], ['Discontinued', intel.summary.totalDiscon, t.red]].map(([lbl, n, c]) => (
+                        <div key={lbl} style={{ display: 'flex', alignItems: 'center', gap: 9, fontSize: 12, fontWeight: 600 }}>
+                          <span style={{ width: 9, height: 9, borderRadius: 3, background: c, boxShadow: `0 0 7px -1px ${c}`, flexShrink: 0 }} />
+                          <span style={{ color: t.text }}>{lbl}</span>
+                          <span style={{ marginLeft: 'auto', fontWeight: 800, color: c, fontFamily: 'ui-monospace,monospace' }}>{n}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Channel Share bars */}
+                <div style={{ ...glassPanel, borderRadius: 14, padding: isMobile ? 16 : 20, gridColumn: isMobile ? 'auto' : 'span 8' }}>
+                  <BentoHead title="Channel Share" desc="Active SKUs per retailer — share of total shelf presence" />
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 9, marginTop: 16 }}>
+                    {intel.retailersByActive.slice(0, 8).map(r => (
+                      <div key={r.name} style={{ display: 'grid', gridTemplateColumns: isMobile ? '52px 1fr 62px' : '60px 1fr 74px', alignItems: 'center', gap: 10 }}>
+                        <RetailerLogo name={r.name} h={20} maxW={56} fallbackStyle={{ fontSize: 10.5, fontWeight: 700, color: t.text }} />
+                        <div style={{ height: 9, borderRadius: 6, background: dark ? 'rgba(0,0,0,.45)' : 'rgba(38,32,25,.07)', overflow: 'hidden' }}>
+                          <div style={{ height: '100%', width: `${Math.round(r.active / maxRetailerActive * 100)}%`, borderRadius: 6, background: `linear-gradient(90deg, ${t.accent}, ${t.blue})`, boxShadow: dark ? `0 0 9px -1px ${t.accent}` : 'none', transition: 'width .6s ease' }} />
+                        </div>
+                        <span style={{ fontSize: 12, fontWeight: 800, color: t.text, fontFamily: 'ui-monospace,monospace', textAlign: 'right', whiteSpace: 'nowrap' }}>{r.active} <small style={{ color: t.muted, fontWeight: 600 }}>· {r.sharePct}%</small></span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Coverage rings */}
+                <div style={{ ...glassPanel, borderRadius: 14, padding: isMobile ? 16 : 20, gridColumn: isMobile ? 'auto' : 'span 12' }}>
+                  <BentoHead title="Coverage Leaders" desc="Brands in the most doors — distribution reach across the retailer network" />
+                  <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(220px,1fr))', gap: 14, marginTop: 16 }}>
+                    {intel.brands.filter(b => b.active > 0).slice(0, 5).map(b => {
+                      const pct = Math.round(b.coverage / RETAILERS.length * 100)
+                      const clr = b.company === 'Vcan' ? t.vcanClr : t.moolaClr
+                      return (
+                        <div key={b.brand} style={{ display: 'flex', alignItems: 'center', gap: 13 }}>
+                          <div style={{ width: 46, height: 46, borderRadius: '50%', flexShrink: 0, display: 'grid', placeItems: 'center', position: 'relative',
+                            background: `conic-gradient(${t.accent} ${pct * 3.6}deg, ${dark ? 'rgba(255,255,255,.09)' : 'rgba(38,32,25,.1)'} 0deg)` }}>
+                            <div style={{ position: 'absolute', inset: 5, borderRadius: '50%', background: t.surface, border: `1px solid ${t.border}` }} />
+                            <span style={{ position: 'relative', fontSize: 10, fontWeight: 800, color: t.text, fontFamily: 'ui-monospace,monospace' }}>{b.coverage}/{RETAILERS.length}</span>
+                          </div>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: t.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.brand}</div>
+                            <div style={{ fontSize: 10.5, fontWeight: 600, fontFamily: 'ui-monospace,monospace' }}><span style={{ color: clr }}>{b.company}</span><span style={{ color: t.muted }}> · {b.active} active</span></div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
               </div>
 
               {/* ── Brand Portfolio bar chart ── */}
@@ -1581,9 +1696,9 @@ export default function App() {
               {/* ── Grid ── */}
               <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill, minmax(${isMobile ? '130px' : '160px'}, 1fr))`, gap: isMobile ? 10 : 12 }}>
                 {psFiltered.map((p, i) => (
-                  <div key={p.barcode + i} onClick={() => setSelectedProduct(p)} style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 12, overflow: 'hidden', cursor: 'pointer', transition: 'transform 0.18s, box-shadow 0.18s' }}
+                  <div key={p.barcode + i} onClick={() => setSelectedProduct(p)} style={{ ...glassPanel, borderRadius: 12, overflow: 'hidden', cursor: 'pointer', transition: 'transform 0.18s, box-shadow 0.18s' }}
                     onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-5px) scale(1.02)'; e.currentTarget.style.boxShadow = `0 16px 40px rgba(0,0,0,0.28), 0 0 0 2px ${t.accent}66` }}
-                    onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '' }}
+                    onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = glassPanel.boxShadow }}
                   >
                     <PackshotImg barcode={p.barcode} side="front" style={{ width: '100%', height: 150, background: dark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)' }} placeholderSize={40} />
                     <div style={{ padding: '10px 12px' }}>

@@ -169,8 +169,43 @@
 
 /* ---------- mobile ---------- */
 @media (max-width: 767px) {
-  .ps-cal-rh, .ps-cal-rail { width: 168px; min-width: 168px; padding-left: 12px; padding-right: 10px; }
-  .ps-sched-axis-lead, .ps-sched-lead { width: 158px; min-width: 158px; padding-left: 12px; }
+  /* Slim, consistent sticky lead columns across all three views so the data
+     cells get real estate instead of being squeezed off-screen. */
+  .ps-cal-rh, .ps-cal-rail,
+  .ps-tl-lead, .ps-tl-ribbon-lead, .ps-tl-row-lead,
+  .ps-sched-axis-lead, .ps-sched-lead {
+    width: 138px; min-width: 138px; padding-left: 11px; padding-right: 9px;
+  }
+  .ps-cal-rh, .ps-tl-lead, .ps-sched-axis-lead { font-size: 10px; letter-spacing: .06em; }
+  .ps-cal-rail-name, .ps-tl-row-lead .ps-cal-rail-name { font-size: 11.5px; }
+  .ps-cal-rail-rsp, .ps-cal-rail-gp { font-size: 10.5px; }
+
+  /* Tighter period columns → more periods visible before horizontal scroll. */
+  .ps-cal-ph, .ps-cal-cell { flex-basis: 64px; min-width: 64px; }
+  .ps-cal-ph { padding: 8px 3px 7px; }
+  .ps-cal-cell { padding: 4px 2px; }
+  .ps-cal-ph-code { font-size: 10.5px; }
+  .ps-cal-ph-rng { font-size: 8px; }
+
+  /* Trim row/band horizontal padding to match the slimmer lead columns. */
+  .ps-cal-band, .ps-tl-band, .ps-tl-brand-hdr { padding-left: 11px; padding-right: 11px; }
+
+  /* Compact price chips/pills/bars so they fit the narrower cells. */
+  .ps-chip { min-width: 46px; padding: 5px 5px; }
+  .ps-chip-pr { font-size: 12px; }
+  .ps-tl-pill { padding: 4px 6px; }
+  .ps-tl-pill-pr { font-size: 11px; }
+  .ps-bar { width: 94%; min-height: 42px; padding: 5px 6px; }
+  .ps-bar-pr { font-size: 12.5px; }
+
+  /* Touch-friendly toolbar: bigger tap targets, graceful wrapping. */
+  .ps-toolbar { gap: 10px; row-gap: 10px; }
+  .ps-seg button { min-height: 40px; padding: 8px 14px; }
+  .ps-pills { gap: 6px; }
+
+  /* Schedule keeps a usable proportional width and scrolls horizontally. */
+  .ps-sched-inner { min-width: 600px; }
+  .ps-sched-bar-txt { font-size: 11.5px; }
 }
 
 /* ---------- neon interactivity (v2.19.1) ---------- */
