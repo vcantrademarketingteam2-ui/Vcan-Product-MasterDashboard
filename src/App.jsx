@@ -379,7 +379,7 @@ function ProductPopup({ product, onClose, t, dark, isMobile = false, pricing = {
               onChange={e => { setPwInput(e.target.value); setPwError(false) }}
               placeholder="PIN"
               style={{ width: isMobile ? 110 : 90, background: t.surface, border: `1.5px solid ${pwError ? '#f85149' : t.border}`, borderRadius: 8, color: t.text, padding: isMobile ? '10px 14px' : '8px 12px', fontSize: isMobile ? 18 : 14, textAlign: 'center', outline: 'none', letterSpacing: 4 }}
-              autoFocus
+              autoFocus={!isMobile}
             />
             <button
               type="submit"
@@ -510,7 +510,7 @@ function ProductPopup({ product, onClose, t, dark, isMobile = false, pricing = {
       )}
       {/* ── Popup backdrop + card ── */}
       <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.72)', zIndex: 2000, display: 'flex', alignItems: isMobile ? 'flex-end' : 'center', justifyContent: 'center', padding: isMobile ? 0 : 24, backdropFilter: 'blur(3px)' }}>
-        <div onClick={e => e.stopPropagation()} style={{ background: t.surface, borderRadius: isMobile ? '16px 16px 0 0' : 18, width: '100%', maxWidth: isMobile ? '100%' : 860, maxHeight: isMobile ? '95dvh' : '90vh', overflow: 'auto', boxShadow: '0 32px 80px rgba(0,0,0,0.5)', border: `1px solid ${t.border}` }}>
+        <div onClick={e => e.stopPropagation()} style={{ background: dark ? 'rgba(22,27,34,.85)' : 'rgba(251,248,243,.88)', backdropFilter: 'blur(22px) saturate(1.4)', WebkitBackdropFilter: 'blur(22px) saturate(1.4)', borderRadius: isMobile ? '16px 16px 0 0' : 18, width: '100%', maxWidth: isMobile ? '100%' : 860, maxHeight: isMobile ? '95dvh' : '90vh', overflow: 'auto', boxShadow: '0 32px 80px rgba(0,0,0,0.5)', border: `1px solid ${dark ? t.border : 'rgba(255,255,255,.65)'}` }}>
           {/* Mobile drag handle */}
           {isMobile && (
             <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 10, paddingBottom: 6 }}>
@@ -920,7 +920,7 @@ export default function App() {
 
   function StatCard({ label, value, sub, color }) {
     return (
-      <div style={{ ...glassPanel, borderRadius: 12, padding: isMobile ? '14px 16px' : '20px 24px' }}>
+      <div className="vc-rise vc-lift" style={{ ...glassPanel, borderRadius: 12, padding: isMobile ? '14px 16px' : '20px 24px' }}>
         <div style={{ fontSize: 11, color: t.muted, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>{label}</div>
         <div style={{ fontSize: isMobile ? 28 : 36, fontWeight: 800, color: color || t.text, lineHeight: 1, marginBottom: 4 }}>{value}</div>
         {sub && <div style={{ fontSize: 11, color: t.muted }}>{sub}</div>}
@@ -962,10 +962,12 @@ export default function App() {
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', color: t.text, fontSize: 14, zoom: 1.05,
-      // porcelain base + soft sage/coral aurora glows in light mode (glass-wave reference)
-      background: dark ? t.bg
+      // Aurora glows behind everything so glass panels actually refract on every page.
+      // Light = warm sage/coral porcelain; dark = subtle gold/blue over the deep base.
+      background: dark
+        ? `radial-gradient(950px 620px at 86% -10%, rgba(240,192,64,.07), transparent 60%), radial-gradient(820px 600px at -8% 104%, rgba(88,166,255,.06), transparent 60%), ${t.bg}`
         : `radial-gradient(900px 600px at 88% -8%, rgba(122,168,116,.13), transparent 62%), radial-gradient(820px 620px at -6% 96%, rgba(214,106,90,.11), transparent 62%), ${t.bg}`,
-      backgroundAttachment: dark ? undefined : 'fixed' }}>
+      backgroundAttachment: 'fixed' }}>
       <style>{`
         *{box-sizing:border-box;margin:0;padding:0;}
         html,body{background:${t.bg};}
@@ -983,10 +985,27 @@ export default function App() {
         .sb-btn:hover{background:${t.surface2}!important;}
         .clr-btn{transition:all 0.15s;cursor:pointer;}
         .clr-btn:hover{box-shadow:0 0 8px 3px rgba(248,81,73,0.4)!important;border-color:#f85149!important;color:#f85149!important;}
+
+        /* ── universal motion system (v2.21.0) ── */
+        @keyframes vcRise{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:none;}}
+        @keyframes vcFade{from{opacity:0;}to{opacity:1;}}
+        .vc-lift{transition:transform .22s cubic-bezier(.22,.61,.36,1),box-shadow .25s;}
+        @media(prefers-reduced-motion:no-preference){
+          .vc-fade{animation:vcFade .34s ease both;}
+          .vc-rise{animation:vcRise .5s cubic-bezier(.22,.61,.36,1) both;}
+          .vc-rise:nth-child(1){animation-delay:.02s;}
+          .vc-rise:nth-child(2){animation-delay:.07s;}
+          .vc-rise:nth-child(3){animation-delay:.12s;}
+          .vc-rise:nth-child(4){animation-delay:.17s;}
+          .vc-rise:nth-child(5){animation-delay:.22s;}
+          .vc-rise:nth-child(6){animation-delay:.27s;}
+          .vc-lift:hover{transform:translateY(-3px);}
+        }
         @media(max-width:767px){
           .rhover:hover{background:unset!important;}
           .bpill:hover{background:unset!important;color:unset!important;border-color:unset!important;}
           .bpill:active{background:${t.accent}!important;color:#000!important;border-color:${t.accent}!important;}
+          .vc-lift:hover{transform:none;}
         }
       `}</style>
 
@@ -999,7 +1018,9 @@ export default function App() {
       {/* height divided by the root zoom (1.05) so the pinned credit isn't pushed off-screen */}
       <aside style={{
         width: isMobile ? 260 : SIDEBAR_W,
-        minHeight: 'calc(100vh / 1.05)', background: t.sidebarBg,
+        minHeight: 'calc(100vh / 1.05)',
+        background: dark ? 'rgba(1,4,9,.72)' : 'rgba(239,231,220,.72)',
+        backdropFilter: 'blur(18px) saturate(1.3)', WebkitBackdropFilter: 'blur(18px) saturate(1.3)',
         borderRight: `1px solid ${t.border}`, display: 'flex', flexDirection: 'column',
         position: isMobile ? 'fixed' : 'sticky',
         top: 0, left: 0, height: 'calc(100vh / 1.05)', overflow: 'hidden',
@@ -1109,7 +1130,9 @@ export default function App() {
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         {/* Header */}
         <header style={{
-          background: t.headerBg, borderBottom: `1px solid ${t.border}`,
+          background: dark ? 'rgba(1,4,9,.68)' : 'rgba(244,239,233,.68)',
+          backdropFilter: 'blur(16px) saturate(1.4)', WebkitBackdropFilter: 'blur(16px) saturate(1.4)',
+          borderBottom: `1px solid ${t.border}`,
           padding: isMobile ? '0 12px' : '0 24px', height: 56, display: 'flex', alignItems: 'center',
           gap: isMobile ? 8 : 10, position: 'sticky', top: 0, zIndex: 50,
         }}>
@@ -1126,7 +1149,7 @@ export default function App() {
             <div style={{ fontWeight: 800, fontSize: isMobile ? 14 : 17, color: t.text, letterSpacing: 0.2, whiteSpace: 'nowrap', flexShrink: 0 }}>
               Product Master
             </div>
-            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v2.20.0</span>
+            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v2.21.0</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: isMobile ? 11 : 13, background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, padding: isMobile ? '3px 8px' : '5px 12px', overflow: 'hidden', minWidth: 0, flexShrink: 1 }}>
               <span style={{ width: isMobile ? 6 : 7, height: isMobile ? 6 : 7, borderRadius: '50%', flexShrink: 0, background: dataSource === 'csv' ? t.blue : t.green }} />
               <span style={{ fontWeight: 800, color: dataSource === 'csv' ? t.blue : t.green, flexShrink: 0 }}>
@@ -1159,6 +1182,8 @@ export default function App() {
 
         {/* Content */}
         <main style={{ flex: 1, padding: isMobile ? '16px 12px' : '24px', overflowY: 'auto' }}>
+         {/* keyed by tab → re-mounts and fades on every page switch (vc-fade is opacity-only, safe for sticky children) */}
+         <div key={tab} className="vc-fade">
 
           {/* PRODUCTS */}
           {tab === 'products' && (
@@ -1401,7 +1426,7 @@ export default function App() {
                   { label: 'Avg Coverage', val: intel.summary.avgCoverage, dec: 1, sub: `of ${RETAILERS.length} retailers / brand`, c: t.accent },
                   { label: 'Pending Pipeline', val: intel.summary.totalPending, dec: 0, sub: 'awaiting listing', c: t.yellow },
                 ].map(({ label, val, dec, sub, c }) => (
-                  <div key={label} style={{ ...glassPanel, borderTop: `3px solid ${c}`, borderRadius: 12, padding: isMobile ? '14px 16px' : '18px 20px',
+                  <div key={label} className="vc-rise vc-lift" style={{ ...glassPanel, borderTop: `3px solid ${c}`, borderRadius: 12, padding: isMobile ? '14px 16px' : '18px 20px',
                     boxShadow: `${glassPanel.boxShadow}, 0 0 22px -10px ${c}, inset 0 22px 44px -34px ${c}` }}>
                     <div style={{ fontSize: 11, color: t.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 6 }}>{label}</div>
                     <div style={{ fontSize: isMobile ? 26 : 32, fontWeight: 800, color: c, lineHeight: 1, textShadow: dark ? `0 0 22px ${c}55` : 'none', fontVariantNumeric: 'tabular-nums' }}><CountUp v={val} dec={dec} /></div>
@@ -1413,7 +1438,7 @@ export default function App() {
               {/* ── Mission-control bento band: donut · channel share · coverage rings ── */}
               <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(12, minmax(0,1fr))', gap: 12 }}>
                 {/* Portfolio Status donut */}
-                <div style={{ ...glassPanel, borderRadius: 14, padding: isMobile ? 16 : 20, gridColumn: isMobile ? 'auto' : 'span 4' }}>
+                <div className="vc-rise vc-lift" style={{ ...glassPanel, borderRadius: 14, padding: isMobile ? 16 : 20, gridColumn: isMobile ? 'auto' : 'span 4' }}>
                   <BentoHead title="Portfolio Status" desc="All SKUs by lifecycle state" />
                   <div style={{ display: 'flex', alignItems: 'center', gap: 18, marginTop: 16, flexWrap: 'wrap' }}>
                     <div style={{ width: 132, height: 132, borderRadius: '50%', flexShrink: 0, position: 'relative', display: 'grid', placeItems: 'center',
@@ -1437,7 +1462,7 @@ export default function App() {
                 </div>
 
                 {/* Channel Share bars */}
-                <div style={{ ...glassPanel, borderRadius: 14, padding: isMobile ? 16 : 20, gridColumn: isMobile ? 'auto' : 'span 8' }}>
+                <div className="vc-rise vc-lift" style={{ ...glassPanel, borderRadius: 14, padding: isMobile ? 16 : 20, gridColumn: isMobile ? 'auto' : 'span 8' }}>
                   <BentoHead title="Channel Share" desc="Active SKUs per retailer — share of total shelf presence" />
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 9, marginTop: 16 }}>
                     {intel.retailersByActive.slice(0, 8).map(r => (
@@ -1453,7 +1478,7 @@ export default function App() {
                 </div>
 
                 {/* Coverage rings */}
-                <div style={{ ...glassPanel, borderRadius: 14, padding: isMobile ? 16 : 20, gridColumn: isMobile ? 'auto' : 'span 12' }}>
+                <div className="vc-rise vc-lift" style={{ ...glassPanel, borderRadius: 14, padding: isMobile ? 16 : 20, gridColumn: isMobile ? 'auto' : 'span 12' }}>
                   <BentoHead title="Coverage Leaders" desc="Brands in the most doors — distribution reach across the retailer network" />
                   <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(220px,1fr))', gap: 14, marginTop: 16 }}>
                     {intel.brands.filter(b => b.active > 0).slice(0, 5).map(b => {
@@ -1734,6 +1759,7 @@ export default function App() {
             />
           )}
 
+         </div>{/* end vc-fade page wrapper */}
         </main>
       </div>
 
@@ -1785,7 +1811,7 @@ export default function App() {
         const TYPES = [{ k: 'single', label: 'Single' }, { k: '2for', label: '2 for X' }, { k: 'b2g1', label: 'B2G1' }]
         return (
         <div onClick={() => setCalcOpen(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 3000, display: 'flex', alignItems: isMobile ? 'flex-end' : 'center', justifyContent: 'center', padding: isMobile ? 0 : 20, backdropFilter: 'blur(2px)' }}>
-          <div onClick={e => e.stopPropagation()} style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: isMobile ? '16px 16px 0 0' : 14, width: isMobile ? '100%' : 470, maxWidth: '100%', maxHeight: isMobile ? '92dvh' : 'unset', overflowY: 'auto', boxShadow: '0 16px 48px rgba(0,0,0,0.4)' }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: dark ? 'rgba(22,27,34,.85)' : 'rgba(251,248,243,.88)', backdropFilter: 'blur(22px) saturate(1.4)', WebkitBackdropFilter: 'blur(22px) saturate(1.4)', border: `1px solid ${dark ? t.border : 'rgba(255,255,255,.65)'}`, borderRadius: isMobile ? '16px 16px 0 0' : 14, width: isMobile ? '100%' : 470, maxWidth: '100%', maxHeight: isMobile ? '92dvh' : 'unset', overflowY: 'auto', boxShadow: '0 16px 48px rgba(0,0,0,0.4)' }}>
             {/* Header */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: `1px solid ${t.border}` }}>
               <div>
@@ -1807,7 +1833,7 @@ export default function App() {
                   if (dept) { setPromoUnlocked(true); setPromoUnlockedDept(dept); sessionStorage.setItem('pu', '1'); sessionStorage.setItem('puDept', dept); logPricingAccess(dept, 'Compensate Calculator'); setPromoPwInput('') }
                   else { setPromoPwError(true); setPromoPwInput('') }
                 }} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <input type="password" inputMode="numeric" maxLength={10} value={promoPwInput} onChange={e => { setPromoPwInput(e.target.value); setPromoPwError(false) }} placeholder="PIN" autoFocus
+                  <input type="password" inputMode="numeric" maxLength={10} value={promoPwInput} onChange={e => { setPromoPwInput(e.target.value); setPromoPwError(false) }} placeholder="PIN" autoFocus={!isMobile}
                     style={{ width: isMobile ? 120 : 100, background: t.surface2, border: `1.5px solid ${promoPwError ? '#f85149' : t.border}`, borderRadius: 8, color: t.text, padding: isMobile ? '10px 14px' : '8px 12px', fontSize: isMobile ? 18 : 14, textAlign: 'center', outline: 'none', letterSpacing: 4 }} />
                   <button type="submit" style={{ background: t.accent, border: 'none', borderRadius: 8, color: '#000', fontWeight: 700, fontSize: 13, padding: isMobile ? '10px 20px' : '8px 16px', cursor: 'pointer', minHeight: isMobile ? 44 : 'unset' }}>Unlock</button>
                 </form>

@@ -654,9 +654,11 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
                               onMouseLeave={e => { e.stopPropagation(); setBarTip(null) }}
                               onMouseMove={e => setBarTip(prev => prev ? { ...prev, x: e.clientX, y: e.clientY } : prev)}
                             >
-                              {pos.width >= 4 && <span className="ps-sched-bar-txt"
-                                style={bs.ice ? { color: bs.txt, textShadow: 'none' } : undefined}>{priceTxt(pd)}</span>}
-                              {pos.width >= 8 && offPct != null && offPct > 0 && (
+                              {/* min-width on .ps-sched-bar guarantees room, so the price
+                                  always shows — bars stay identifiable even in Full view. */}
+                              <span className="ps-sched-bar-txt"
+                                style={bs.ice ? { color: bs.txt, textShadow: 'none' } : undefined}>{priceTxt(pd)}</span>
+                              {pos.width >= 6 && offPct != null && offPct > 0 && (
                                 <span className="ps-sched-bar-off" style={bs.ice ? { color: mu } : undefined}>−{offPct}%</span>
                               )}
                             </div>
@@ -675,16 +677,20 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
     )
   }
 
-  // Reusable feed card for Spotlight (compact, brand shown in parent header)
-  function FeedCard({ it }) {
+  // Reusable feed card for Spotlight (compact, brand shown in parent header).
+  // `ended` = past promo: use a more opaque card + full-contrast text so the
+  // history stays clearly legible instead of fading into the background.
+  function FeedCard({ it, ended }) {
     const bs = getBarStyle(it.pd?.activities, it.clearance)
+    const prClr = ended ? tx : (bs.ice ? tx : bs.clr)
     return (
       <div onClick={() => openProduct(it)}
         style={{
           display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px',
-          background: dark ? 'rgba(255,255,255,.04)' : 'rgba(255,255,255,.58)',
+          background: ended ? (dark ? 'rgba(255,255,255,.07)' : 'rgba(255,255,255,.78)')
+                            : (dark ? 'rgba(255,255,255,.04)' : 'rgba(255,255,255,.58)'),
           backdropFilter: 'blur(10px) saturate(1.35)', WebkitBackdropFilter: 'blur(10px) saturate(1.35)',
-          border: `1px solid ${bs.clr}33`,
+          border: `1px solid ${ended ? bdr : `${bs.clr}33`}`,
           borderLeft: `3px solid ${bs.clr}`,
           borderRadius: 9, cursor: 'pointer', transition: 'filter .14s, box-shadow .18s',
         }}
@@ -692,9 +698,9 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
         onMouseLeave={e => { e.currentTarget.style.filter = ''; e.currentTarget.style.boxShadow = '' }}
       >
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: tx, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.3 }}>{it.product}</div>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: tx, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.3 }}>{it.product}</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3 }}>
-            <span style={{ fontSize: 10, color: mu }}>฿{it.rspIncVat}</span>
+            <span style={{ fontSize: 10.5, color: ended ? tx : mu, fontWeight: 600 }}>RSP ฿{it.rspIncVat}</span>
             {it.clearance && <span style={{ fontSize: 9, fontWeight: 800, color: neon(CLEAR_COLOR) }}>CLEAR</span>}
             {(it.pd?.activities || []).map(a => ACT[a] ? (
               <i key={a} style={{ width: 6, height: 6, borderRadius: 99, background: neon(ACT[a].color), display: 'inline-block', flexShrink: 0 }} />
@@ -702,9 +708,9 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
           </div>
         </div>
         <div style={{ textAlign: 'right', flexShrink: 0 }}>
-          <div style={{ fontSize: 16, fontWeight: 800, fontFamily: 'ui-monospace,monospace', color: bs.ice ? tx : bs.clr, lineHeight: 1.1 }}>{priceTxt(it.pd)}</div>
+          <div style={{ fontSize: 16, fontWeight: 800, fontFamily: 'ui-monospace,monospace', color: prClr, lineHeight: 1.1 }}>{priceTxt(it.pd)}</div>
           {it.offPct != null && it.offPct > 0 && (
-            <div style={{ fontSize: 10.5, fontWeight: 700, color: bs.ice ? mu : bs.clr }}>−{it.offPct}%</div>
+            <div style={{ fontSize: 10.5, fontWeight: 700, color: ended ? (dark ? GOLD_A : GOLD_B) : (bs.ice ? mu : bs.clr) }}>−{it.offPct}%</div>
           )}
         </div>
       </div>
@@ -843,14 +849,14 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
                   border: `1px solid ${bdr}`,
                   borderLeft: `3px solid ${GOLD_A}`, borderRadius: 9,
                 }}>
-                  <span style={{ fontSize: 12, fontWeight: 800, color: GOLD_A, fontFamily: 'ui-monospace,monospace' }}>{group.periodName}</span>
-                  {group.dateDisplay && <span style={{ fontSize: 10.5, color: mu }}>{group.dateDisplay}</span>}
+                  <span style={{ fontSize: 12.5, fontWeight: 800, color: dark ? GOLD_A : GOLD_B, fontFamily: 'ui-monospace,monospace' }}>{group.periodName}</span>
+                  {group.dateDisplay && <span style={{ fontSize: 10.5, color: dark ? mu : tx, fontWeight: 600 }}>{group.dateDisplay}</span>}
                   <span style={{ marginLeft: 'auto', fontSize: 10.5, color: mu }}>
                     {group.items.length} SKU{group.items.length > 1 ? 's' : ''}
                   </span>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 6, paddingLeft: isMobile ? 0 : 12 }}>
-                  {group.items.map((it, idx) => <FeedCard key={it.barcode + idx} it={it} />)}
+                  {group.items.map((it, idx) => <FeedCard key={it.barcode + idx} it={it} ended />)}
                 </div>
               </div>
             ))}
