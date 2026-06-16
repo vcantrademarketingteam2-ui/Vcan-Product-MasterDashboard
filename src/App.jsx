@@ -69,13 +69,6 @@ const RETAILER_LOGOS = {
   'Fuji': '/retailers/fuji.png',
 }
 
-// Wide wordmark logos (ratio ≫ 1) get a bigger width budget so they aren't capped
-// down to a tiny height. Multiplies maxW only — rendered height stays uniform.
-const RETAILER_LOGO_SCALE = {
-  'Central Department': 2.4, // "CENTRAL RETAIL" wordmark, ~4:1
-  "Pet'n me": 1.9,           // ~3.75:1
-}
-
 // Activity badge colors for Promotion Plan — defined here (not imported) so colors are
 // independent of the generated promo_data.js
 const PROMO_ACTIVITY_DISPLAY = {
@@ -90,15 +83,17 @@ function RetailerLogo({ name, h = 28, maxW = 76, fallbackStyle = {} }) {
   const [err, setErr] = useState(false)
   const src = RETAILER_LOGOS[name]
   if (err || !src) return <span style={{ whiteSpace: 'nowrap', ...fallbackStyle }}>{RETAILER_SHORT[name] || name}</span>
-  const mw = maxW * (RETAILER_LOGO_SCALE[name] || 1)
+  // Fixed-size frame: every logo sits in the same maxW×h box and is scaled to fit
+  // (contain) — wide wordmarks shrink to fit width, square logos get side whitespace,
+  // so all chips stay uniform and nothing overflows. No per-logo scale needed.
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: '#fff', borderRadius: 4, padding: '1px 2px', lineHeight: 0, boxShadow: '0 0 0 1px rgba(0,0,0,0.06)' }}>
+    <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: maxW, height: h, background: '#fff', borderRadius: 4, padding: '1px 2px', boxSizing: 'border-box', lineHeight: 0, boxShadow: '0 0 0 1px rgba(0,0,0,0.06)' }}>
       <img
         src={src}
         alt={RETAILER_SHORT[name] || name}
         title={name}
         onError={() => setErr(true)}
-        style={{ height: h, width: 'auto', maxWidth: mw, objectFit: 'contain', display: 'block' }}
+        style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', display: 'block' }}
       />
     </span>
   )
@@ -1149,7 +1144,7 @@ export default function App() {
             <div style={{ fontWeight: 800, fontSize: isMobile ? 14 : 17, color: t.text, letterSpacing: 0.2, whiteSpace: 'nowrap', flexShrink: 0 }}>
               Product Master
             </div>
-            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v2.21.0</span>
+            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v2.21.1</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: isMobile ? 11 : 13, background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, padding: isMobile ? '3px 8px' : '5px 12px', overflow: 'hidden', minWidth: 0, flexShrink: 1 }}>
               <span style={{ width: isMobile ? 6 : 7, height: isMobile ? 6 : 7, borderRadius: '50%', flexShrink: 0, background: dataSource === 'csv' ? t.blue : t.green }} />
               <span style={{ fontWeight: 800, color: dataSource === 'csv' ? t.blue : t.green, flexShrink: 0 }}>

@@ -95,8 +95,10 @@ CONFIG = {
     'Lotus': {
         'file': 'Lotus - Activity Promotion 2026.xlsx',
         'sheets': None,
-        'header_row': 8,
-        'cols': {'barcode': 1, 'product': 2, 'pack': 3, 'cost': 4, 'rsp': 5, 'gp': 6, 'period_start': 7},
+        'header_row': 7,
+        # A=Barcode, B=TPNA item code, C=Product, D=Pack size, E=Cost, F=RSP, G=GP%, H+=periods
+        # (was off-by-one: read the TPNA code as the product name, leaking it into brand pills)
+        'cols': {'barcode': 1, 'product': 3, 'pack': 4, 'cost': 5, 'rsp': 6, 'gp': 7, 'period_start': 8},
     },
     'TWD': {
         'file': 'TWD - Activity Promotion 2026.xlsx',
@@ -236,7 +238,12 @@ def parse_sheet(ws, cfg, retailer):
     # unlike a fixed row number which only matched one sheet.
     if cfg.get('period_names_above'):
         name_row_i = h - 1
-        date_row_i = None  # Villa's date rows are stale/inconsistent — show name only
+        # Date range sits 2 rows above the period-name row on Villa's "Plan Update" (VCAN)
+        # sheet → real 2026 ranges. The "Moola" sheet is offset differently, so this lands on
+        # an empty row there, dodging its stale 2022/23 template dates. Plan Update is parsed
+        # first and the period union keeps first-seen, so Villa gets the good dates.
+        # ponytail: row-offset coincidence; if Villa's sheet layout shifts, re-check this.
+        date_row_i = name_row_i - 2
     else:
         name_row_i = (cfg['period_name_row'] - 1) if cfg.get('period_name_row') else h
         date_row_i = (cfg['period_date_row'] - 1) if cfg.get('period_date_row') else h + 1
