@@ -25,7 +25,7 @@
   display: flex; align-items: flex-end; padding: 0 18px 9px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .12em; }
 .ps-cal-ph { flex: 1 0 82px; min-width: 82px; padding: 9px 6px 8px; text-align: center; position: relative; }
 .ps-cal-ph-code { font-size: 11.5px; font-weight: 700; font-family: ui-monospace, monospace; white-space: nowrap; }
-.ps-cal-ph-rng { font-size: 9px; font-family: ui-monospace, monospace; margin-top: 2px; white-space: nowrap; }
+.ps-cal-ph-rng { font-size: 10.5px; font-weight: 600; font-family: ui-monospace, monospace; margin-top: 2px; white-space: nowrap; }
 .ps-cal-ph-caps { display: flex; gap: 3px; justify-content: center; margin-top: 5px; min-height: 7px; }
 .ps-now-tag { display: inline-block; font-size: 8px; font-weight: 800; font-family: ui-monospace, monospace;
   padding: 1px 5px; border-radius: 4px; letter-spacing: .08em; margin-top: 4px; }
@@ -188,7 +188,7 @@
   .ps-cal-ph { padding: 8px 3px 7px; }
   .ps-cal-cell { padding: 4px 2px; }
   .ps-cal-ph-code { font-size: 10.5px; }
-  .ps-cal-ph-rng { font-size: 8px; }
+  .ps-cal-ph-rng { font-size: 9.5px; }
 
   /* Trim row/band horizontal padding to match the slimmer lead columns. */
   .ps-cal-band, .ps-tl-band, .ps-tl-brand-hdr { padding-left: 11px; padding-right: 11px; }

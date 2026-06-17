@@ -2,7 +2,11 @@
   "permissions": {
     "allow": [
       "Bash(node -e ' *)",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Bash(mkdir -p backups/__TRACKED_VAR__)",
+      "Bash(cp src/PromoSection.jsx src/PromoSection.css src/App.jsx package.json CLAUDE.md backups/__TRACKED_VAR__/)",
+      "Read(//c/c/Users/V-Can Nantawan/vcan-dashboard/src/**)",
+      "Bash(python -c ' *)"
     ]
   }
 }

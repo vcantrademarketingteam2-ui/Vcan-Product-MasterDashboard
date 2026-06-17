@@ -658,12 +658,19 @@ export default function App() {
     vcanClr: '#9c6b35', moolaClr: '#c0392b',
   }
 
-  // frosted-glass panel (porcelain glass redesign) — spread into card containers
-  const glassPanel = {
-    background: dark ? 'rgba(22,27,34,.6)' : 'rgba(251,248,243,.66)',
-    backdropFilter: 'blur(16px) saturate(1.45)', WebkitBackdropFilter: 'blur(16px) saturate(1.45)',
-    border: `1px solid ${dark ? t.border : 'rgba(255,255,255,.65)'}`,
-    boxShadow: dark ? '0 8px 28px rgba(0,0,0,.35)' : '0 8px 28px rgba(82,62,40,.10), inset 0 1px 0 rgba(255,255,255,.7)',
+  // frosted-glass panel (v2.22.0 "real glass") — translucent enough to refract the aurora
+  // behind it, strong saturated frost, a light rim (inset top-left), layered depth shadows,
+  // and a faint top specular sheen (the leading linear-gradient background layer).
+  const glassPanel = dark ? {
+    background: 'linear-gradient(180deg, rgba(255,255,255,.06), transparent 38%), rgba(22,27,34,.42)',
+    backdropFilter: 'blur(24px) saturate(1.8)', WebkitBackdropFilter: 'blur(24px) saturate(1.8)',
+    border: '1px solid rgba(255,255,255,.10)',
+    boxShadow: '0 12px 40px rgba(0,0,0,.45), 0 2px 8px rgba(0,0,0,.35), inset 1px 1px 0 rgba(255,255,255,.10)',
+  } : {
+    background: 'linear-gradient(180deg, rgba(255,255,255,.55), transparent 42%), rgba(251,248,243,.40)',
+    backdropFilter: 'blur(24px) saturate(1.8)', WebkitBackdropFilter: 'blur(24px) saturate(1.8)',
+    border: '1px solid rgba(255,255,255,.7)',
+    boxShadow: '0 12px 40px rgba(82,62,40,.14), 0 2px 8px rgba(82,62,40,.10), inset 1px 1px 0 rgba(255,255,255,.85)',
   }
 
   const visibleBrands = VENDOR_BRANDS[vendorFilter] || VENDOR_BRANDS.ALL
@@ -959,9 +966,10 @@ export default function App() {
     <div style={{ display: 'flex', minHeight: '100vh', color: t.text, fontSize: 14, zoom: 1.05,
       // Aurora glows behind everything so glass panels actually refract on every page.
       // Light = warm sage/coral porcelain; dark = subtle gold/blue over the deep base.
+      // Slightly stronger so the new translucent glass has something to refract.
       background: dark
-        ? `radial-gradient(950px 620px at 86% -10%, rgba(240,192,64,.07), transparent 60%), radial-gradient(820px 600px at -8% 104%, rgba(88,166,255,.06), transparent 60%), ${t.bg}`
-        : `radial-gradient(900px 600px at 88% -8%, rgba(122,168,116,.13), transparent 62%), radial-gradient(820px 620px at -6% 96%, rgba(214,106,90,.11), transparent 62%), ${t.bg}`,
+        ? `radial-gradient(950px 620px at 86% -10%, rgba(240,192,64,.10), transparent 60%), radial-gradient(820px 600px at -8% 104%, rgba(88,166,255,.09), transparent 60%), ${t.bg}`
+        : `radial-gradient(900px 600px at 88% -8%, rgba(122,168,116,.17), transparent 62%), radial-gradient(820px 620px at -6% 96%, rgba(214,106,90,.15), transparent 62%), ${t.bg}`,
       backgroundAttachment: 'fixed' }}>
       <style>{`
         *{box-sizing:border-box;margin:0;padding:0;}
@@ -1144,7 +1152,7 @@ export default function App() {
             <div style={{ fontWeight: 800, fontSize: isMobile ? 14 : 17, color: t.text, letterSpacing: 0.2, whiteSpace: 'nowrap', flexShrink: 0 }}>
               Product Master
             </div>
-            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v2.21.1</span>
+            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v2.22.0</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: isMobile ? 11 : 13, background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, padding: isMobile ? '3px 8px' : '5px 12px', overflow: 'hidden', minWidth: 0, flexShrink: 1 }}>
               <span style={{ width: isMobile ? 6 : 7, height: isMobile ? 6 : 7, borderRadius: '50%', flexShrink: 0, background: dataSource === 'csv' ? t.blue : t.green }} />
               <span style={{ fontWeight: 800, color: dataSource === 'csv' ? t.blue : t.green, flexShrink: 0 }}>
@@ -1159,10 +1167,21 @@ export default function App() {
           </div>
           <div style={{ display: 'flex', gap: isMobile ? 6 : 8, alignItems: 'center', flexShrink: 0 }}>
             {/* Dark mode */}
-            <button onClick={() => setDark(d => !d)} className="sb-btn" style={{
-              background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8,
-              color: t.muted, fontSize: 15, padding: isMobile ? '5px 8px' : '5px 10px', cursor: 'pointer',
-            }}>{dark ? '☀' : '🌙'}</button>
+            <button onClick={() => setDark(d => !d)} className="sb-btn" aria-label={dark ? 'Switch to light mode' : 'Switch to dark mode'} style={{
+              background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, color: t.muted,
+              padding: isMobile ? '5px 8px' : '5px 10px', cursor: 'pointer',
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              {dark ? (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+                </svg>
+              ) : (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+                </svg>
+              )}
+            </button>
             {/* Import CSV */}
             <label style={{
               background: t.accent, border: 'none', borderRadius: 8,
@@ -1240,7 +1259,7 @@ export default function App() {
                           borderRadius: 10, padding: '3px 7px', cursor: 'pointer',
                           boxShadow: sel ? `0 0 0 3px ${t.accent}22` : 'none',
                         }}>
-                          <RetailerLogo name={r} h={22} maxW={58} fallbackStyle={{ fontSize: 11, fontWeight: 700, color: t.text }} />
+                          <RetailerLogo name={r} h={26} maxW={66} fallbackStyle={{ fontSize: 11, fontWeight: 700, color: t.text }} />
                         </button>
                       )
                     })}

@@ -878,14 +878,14 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
             className={`ps-glow${retailer === r ? ' ps-glow-on' : ''}`} style={{
             '--g': GOLD_A,
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-            width: isMobile ? 60 : 76, height: isMobile ? 42 : 38,
+            width: isMobile ? 66 : 86, height: isMobile ? 46 : 44,
             padding: '4px 6px', cursor: 'pointer', fontFamily: 'inherit',
             background: retailer === r ? `${GOLD_A}1e` : s2,
             border: `1.5px solid ${retailer === r ? GOLD_A : bdr}`,
             borderRadius: 10, transition: 'border-color .15s, background .15s',
           }}>
             {RetailerLogo
-              ? <RetailerLogo name={r} h={isMobile ? 24 : 20} maxW={isMobile ? 54 : 68}
+              ? <RetailerLogo name={r} h={isMobile ? 32 : 30} maxW={isMobile ? 52 : 72}
                   fallbackStyle={{ fontSize: 10, fontWeight: 700, color: retailer === r ? GOLD_A : tx, textAlign: 'center', lineHeight: 1.2 }} />
               : <span style={{ fontSize: 11, fontWeight: 700, color: retailer === r ? GOLD_A : tx }}>{r}</span>
             }
