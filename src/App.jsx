@@ -202,26 +202,36 @@ function ProductPopup({ product, onClose, t, dark, isMobile = false, pricing = {
   const [unlockedDept, setUnlockedDept] = useState(() => sessionStorage.getItem('puDept') || '')
   const [pwInput, setPwInput] = useState('')
   const [pwError, setPwError] = useState(false)
-  const [dlMaxPx, setDlMaxPx] = useState(null)  // null=original, 800, 1200, 2000
+  const [dlW, setDlW] = useState('')  // export width  (''=original)
+  const [dlH, setDlH] = useState('')  // export height (''=original)
   const lbRef = useRef(null)
   const dragRef = useRef(null)
 
   const downloadAs = (format) => {
     if (!loadedSrc) return
     const ext = format  // 'jpg' | 'png' | 'webp'
-    if (ext === 'webp' && !dlMaxPx) {
+    const tw = dlW ? Math.round(Number(dlW)) : null
+    const th = dlH ? Math.round(Number(dlH)) : null
+    const isOriginal = !tw && !th
+    const srcExt = loadedSrc.split('?')[0].split('.').pop().toLowerCase()  // jpg | png | webp
+    // Same format as the source at original size → no re-encode, just hand back the file.
+    if (isOriginal && ext === srcExt) {
+      if (ext === 'png') alert('รูปนี้เป็นไฟล์ PNG อยู่แล้ว — ดาวน์โหลดไฟล์ต้นฉบับ')
       const a = document.createElement('a'); a.href = loadedSrc; a.download = dlName; a.click(); return
     }
     const img = new Image(); img.crossOrigin = 'anonymous'
     img.onload = () => {
-      const aspect = img.height / img.width
-      // honour the chosen width exactly (resize up or down); null = keep original
-      const w = dlMaxPx || img.width
-      const h = Math.round(w * aspect)
-      const canvas = document.createElement('canvas'); canvas.width = w; canvas.height = h
+      // Fit the image (contain, centered, undistorted) into the target W×H box.
+      // Original = native box (scale 1, no padding). One missing side mirrors the other (square).
+      const boxW = tw || th || img.width
+      const boxH = th || tw || img.height
+      const scale = Math.min(boxW / img.width, boxH / img.height)
+      const dw = img.width * scale, dh = img.height * scale
+      const dx = (boxW - dw) / 2, dy = (boxH - dh) / 2
+      const canvas = document.createElement('canvas'); canvas.width = boxW; canvas.height = boxH
       const ctx = canvas.getContext('2d')
-      if (ext === 'jpg') { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h) }
-      ctx.drawImage(img, 0, 0, w, h)
+      if (ext === 'jpg') { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, boxW, boxH) }
+      ctx.drawImage(img, dx, dy, dw, dh)
       const mime = ext === 'jpg' ? 'image/jpeg' : ext === 'png' ? 'image/png' : 'image/webp'
       const q = ext === 'jpg' ? 0.92 : undefined
       canvas.toBlob(blob => {
@@ -302,19 +312,29 @@ function ProductPopup({ product, onClose, t, dark, isMobile = false, pricing = {
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}>
             <div style={{ display: 'flex', gap: 4 }}>
               {[{ fmt: 'webp', label: 'WebP' }, { fmt: 'jpg', label: 'JPG' }, { fmt: 'png', label: 'PNG' }].map(({ fmt, label }) => (
-                <button key={fmt} onClick={() => downloadAs(fmt)} title={`Download as ${label}${dlMaxPx ? ` @${dlMaxPx}px` : ''}`}
+                <button key={fmt} onClick={() => downloadAs(fmt)} title={`Download as ${label}${(dlW || dlH) ? ` @${dlW || dlH}×${dlH || dlW}` : ''}`}
                   style={{ padding: '5px 9px', borderRadius: 7, cursor: 'pointer', background: t.surface2, color: t.text, border: `1px solid ${t.border}`, display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600 }}>
                   <IconDl />{label}
                 </button>
               ))}
             </div>
-            <div style={{ display: 'flex', gap: 3 }}>
-              {[{ px: null, label: 'Orig' }, { px: 800, label: '800px' }, { px: 1200, label: '1200px' }, { px: 2000, label: '2000px' }].map(({ px, label }) => (
-                <button key={label} onClick={() => setDlMaxPx(px)}
-                  style={{ padding: '3px 7px', borderRadius: 5, cursor: 'pointer', fontSize: 10, fontWeight: 600, background: dlMaxPx === px ? t.accent : t.surface2, color: dlMaxPx === px ? '#000' : t.muted, border: `1px solid ${dlMaxPx === px ? t.accent : t.border}` }}>
-                  {label}
-                </button>
-              ))}
+            {/* Resolution: Original · custom W×H · square presets */}
+            <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center', maxWidth: 240 }}>
+              {(() => {
+                const isOrig = !dlW && !dlH
+                const chip = (on) => ({ padding: '3px 7px', borderRadius: 5, cursor: 'pointer', fontSize: 10, fontWeight: 600, background: on ? t.accent : t.surface2, color: on ? '#000' : t.muted, border: `1px solid ${on ? t.accent : t.border}` })
+                const box = { width: 42, padding: '3px 5px', borderRadius: 5, fontSize: 10, fontWeight: 600, textAlign: 'center', background: t.surface2, color: t.text, border: `1px solid ${t.border}` }
+                return (<>
+                  <button onClick={() => { setDlW(''); setDlH('') }} style={chip(isOrig)}>Original</button>
+                  <input type="number" min="1" value={dlW} placeholder="W" onChange={e => setDlW(e.target.value)} style={box} />
+                  <span style={{ color: t.muted, fontSize: 10 }}>×</span>
+                  <input type="number" min="1" value={dlH} placeholder="H" onChange={e => setDlH(e.target.value)} style={box} />
+                  <span style={{ color: t.muted, fontSize: 9 }}>px</span>
+                  {[800, 1200, 2000].map(n => (
+                    <button key={n} title={`${n}×${n}`} onClick={() => { setDlW(String(n)); setDlH(String(n)) }} style={chip(Number(dlW) === n && Number(dlH) === n)}>{n}²</button>
+                  ))}
+                </>)
+              })()}
             </div>
           </div>
         ) : (
@@ -1152,7 +1172,7 @@ export default function App() {
             <div style={{ fontWeight: 800, fontSize: isMobile ? 14 : 17, color: t.text, letterSpacing: 0.2, whiteSpace: 'nowrap', flexShrink: 0 }}>
               Product Master
             </div>
-            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v2.22.0</span>
+            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v2.22.2</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: isMobile ? 11 : 13, background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, padding: isMobile ? '3px 8px' : '5px 12px', overflow: 'hidden', minWidth: 0, flexShrink: 1 }}>
               <span style={{ width: isMobile ? 6 : 7, height: isMobile ? 6 : 7, borderRadius: '50%', flexShrink: 0, background: dataSource === 'csv' ? t.blue : t.green }} />
               <span style={{ fontWeight: 800, color: dataSource === 'csv' ? t.blue : t.green, flexShrink: 0 }}>
