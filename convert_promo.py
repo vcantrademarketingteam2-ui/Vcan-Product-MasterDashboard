@@ -43,6 +43,28 @@ RETAILER_ACTIVITY_OVERRIDE = {
 LOOKS_KEYWORDS = ['looks', 'magazine']
 SKIP_HEADER_KEYWORDS = {'total', 'remark', 'note', 'หมายเหตุ', 'grand total', 'sub total'}
 
+# Brands sold WITHOUT 7% VAT (pet food). Their RSP is already net, so dividing by
+# 1.07 understates ex-VAT price and overstates the compensate. Matched by barcode via
+# the master data.js brand (promo rows have blank brand), prefix so all VITAKRAFT
+# sub-brands (CAT/DOG/Bird/Rabbit/Rodent) qualify.
+NON_VAT_BRAND_PREFIXES = ('VITAKRAFT',)
+
+
+def load_non_vat_barcodes():
+    """Read src/data.js (generated first by convert_to_data.py) and return the set of
+    barcodes whose master brand is a non-VAT brand. The array is valid JSON."""
+    try:
+        txt = Path('src/data.js').read_text(encoding='utf-8')
+        start = txt.index('[', txt.index('PRODUCT_DATA'))
+        end = txt.rindex(']') + 1
+        items = json.loads(txt[start:end])
+    except Exception as e:
+        print(f'  (!)  Could not load data.js for non-VAT brands: {e}')
+        return set()
+    s = {str(it.get('barcode', '')) for it in items
+         if str(it.get('brand', '')).upper().startswith(NON_VAT_BRAND_PREFIXES)}
+    return s
+
 # Per-retailer config: file name, sheets, and which row the header is on (1-indexed)
 # Adjust header_row and column indices if the script misreads a file.
 CONFIG = {
@@ -221,7 +243,7 @@ def looks_like_period(name, date_range):
     return True
 
 
-def parse_sheet(ws, cfg, retailer):
+def parse_sheet(ws, cfg, retailer, non_vat=frozenset()):
     """Parse one worksheet, return (products list, periods list)."""
     rows = list(ws.iter_rows(values_only=False))
     h = detect_header_row(rows, cfg['header_row'])
@@ -330,9 +352,12 @@ def parse_sheet(ws, cfg, retailer):
         cost_cell = row[c['cost'] - 1] if c['cost'] - 1 < len(row) else None
         cost = num(cost_cell.value if cost_cell else None)
 
+        # Non-VAT (pet food) RSP is already net — don't strip a 7% that isn't there.
+        vat_div = 1.0 if barcode in non_vat else 1.07
+
         rsp_cell = row[c['rsp'] - 1] if c['rsp'] - 1 < len(row) else None
         rsp_inc = num(rsp_cell.value if rsp_cell else None)
-        rsp_ex = round(rsp_inc / 1.07, 4) if rsp_inc else None
+        rsp_ex = round(rsp_inc / vat_div, 4) if rsp_inc else None
 
         gp_cell = row[c['gp'] - 1] if c['gp'] - 1 < len(row) else None
         gp_raw = num(gp_cell.value if gp_cell else None)
@@ -385,10 +410,10 @@ def parse_sheet(ws, cfg, retailer):
                     if v is None:
                         sale_label = str(val).strip()  # e.g. "Buy2Get1", "3for499"
 
-            # Compensate = RSP_ex - (sale_price_inc / 1.07)
+            # Compensate = RSP_ex - (sale_price_inc / vat_div)
             compensate = None
             if sale_price is not None and rsp_ex is not None:
-                compensate = round(rsp_ex - (sale_price / 1.07), 4)
+                compensate = round(rsp_ex - (sale_price / vat_div), 4)
 
             period_data[p['name']] = {
                 'salePrice': sale_price,
@@ -421,6 +446,10 @@ def main():
     promo_meta = {}
     promo_retailers = []
 
+    non_vat_barcodes = load_non_vat_barcodes()
+    print(f'  Non-VAT barcodes loaded: {len(non_vat_barcodes)}')
+    assert non_vat_barcodes, 'No non-VAT barcodes found — data.js missing/changed? (Vitakraft lookup failed)'
+
     for retailer, cfg in CONFIG.items():
         fpath = BASE_DIR / cfg['file']
         if not fpath.exists():
@@ -445,7 +474,7 @@ def main():
                 print(f'    (!)  Sheet "{sheet_name}" not found — trying first sheet')
                 sheet_name = wb.sheetnames[0]
             ws = wb[sheet_name]
-            products, periods = parse_sheet(ws, cfg, retailer)
+            products, periods = parse_sheet(ws, cfg, retailer, non_vat_barcodes)
             for prod in products:
                 bc = prod['barcode']
                 if bc in by_barcode:
