@@ -40,19 +40,21 @@ const NEON_DEEP = {
 }
 
 // Inline SVG icons — neon/glass friendly, replace the old emoji glyphs
+// ponytail: restrained neon glow keyed to the icon's own (current) colour
+const ICO_GLOW = { filter: 'drop-shadow(0 0 2px currentColor)' }
 const IcoTimeline = ({ size = 13 }) => (
-  <svg width={size} height={size} viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+  <svg width={size} height={size} viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" style={ICO_GLOW}>
     <path d="M1.5 3.5h6" /><path d="M4.5 7h8" /><path d="M2.5 10.5h5.5" />
   </svg>
 )
 const IcoGrid = ({ size = 13 }) => (
-  <svg width={size} height={size} viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
+  <svg width={size} height={size} viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" style={ICO_GLOW}>
     <rect x="1" y="1" width="5" height="5" rx="1.2" /><rect x="8" y="1" width="5" height="5" rx="1.2" />
     <rect x="1" y="8" width="5" height="5" rx="1.2" /><rect x="8" y="8" width="5" height="5" rx="1.2" />
   </svg>
 )
 const IcoCalc = ({ size = 14 }) => (
-  <svg width={size} height={size} viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+  <svg width={size} height={size} viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" style={ICO_GLOW}>
     <rect x="2.5" y="1" width="9" height="12" rx="2" />
     <path d="M5 4h4" />
     <path d="M5 7.5h.01M7 7.5h.01M9 7.5h.01M5 10h.01M7 10h.01M9 10h.01" />

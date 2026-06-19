@@ -957,11 +957,27 @@ export default function App() {
       <rect x="10.5" y="1" width="3" height="12.5" rx="0.6"/>
     </svg>
   )
+  const IconGrid = ({ size = 15 }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/>
+      <rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>
+    </svg>
+  )
+  const IconImage = ({ size = 15 }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="4" width="18" height="16" rx="2.5"/><circle cx="8.5" cy="9.5" r="1.6"/><path d="M21 16l-5-5L5 20"/>
+    </svg>
+  )
+  const IconCalendar = ({ size = 15 }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9h18M8 2.5v4M16 2.5v4"/>
+    </svg>
+  )
   const NAV_ITEMS = [
-    { key: 'products', icon: '⊞', label: 'Products' },
-    { key: 'analytics', icon: <IconBarChart />, label: 'Analytics' },
-    { key: 'packshot', icon: '⊡', label: 'Packshot' },
-    { key: 'promotion', icon: '☰', label: 'Promotion Plan' },
+    { key: 'products', icon: <IconGrid />, label: 'Products' },
+    { key: 'analytics', icon: <IconBarChart size={15} />, label: 'Analytics' },
+    { key: 'packshot', icon: <IconImage />, label: 'Packshot' },
+    { key: 'promotion', icon: <IconCalendar />, label: 'Promotion Plan' },
   ]
 
   const SIDEBAR_W = isMobile ? 0 : (sidebarOpen ? 244 : 164)
@@ -987,10 +1003,13 @@ export default function App() {
       // Aurora glows behind everything so glass panels actually refract on every page.
       // Light = warm sage/coral porcelain; dark = subtle gold/blue over the deep base.
       // Slightly stronger so the new translucent glass has something to refract.
-      background: dark
+      // Mobile: skip the big aurora + fixed-attachment (buggy on mobile). On a narrow screen
+      // the 900px radials cover the whole viewport and wash the porcelain in green/coral —
+      // it read as a dim tint, not light mode. Use the solid bg instead.
+      background: isMobile ? t.bg : (dark
         ? `radial-gradient(950px 620px at 86% -10%, rgba(240,192,64,.10), transparent 60%), radial-gradient(820px 600px at -8% 104%, rgba(88,166,255,.09), transparent 60%), ${t.bg}`
-        : `radial-gradient(900px 600px at 88% -8%, rgba(122,168,116,.17), transparent 62%), radial-gradient(820px 620px at -6% 96%, rgba(214,106,90,.15), transparent 62%), ${t.bg}`,
-      backgroundAttachment: 'fixed' }}>
+        : `radial-gradient(900px 600px at 88% -8%, rgba(122,168,116,.17), transparent 62%), radial-gradient(820px 620px at -6% 96%, rgba(214,106,90,.15), transparent 62%), ${t.bg}`),
+      backgroundAttachment: isMobile ? 'scroll' : 'fixed' }}>
       <style>{`
         *{box-sizing:border-box;margin:0;padding:0;}
         html,body{background:${t.bg};}
@@ -1006,6 +1025,10 @@ export default function App() {
         .nav-item:hover{background:${t.surface2}!important;}
         .sb-btn{transition:background 0.15s;cursor:pointer;}
         .sb-btn:hover{background:${t.surface2}!important;}
+        /* Restrained neon-glyph glow for chrome icons — keyed to the icon's own colour
+           (currentColor), so active/accent icons glow accent, muted ones stay subtle. */
+        .neon-ico{filter:drop-shadow(0 0 2px currentColor);transition:filter .15s;}
+        .neon-ico:hover{filter:drop-shadow(0 0 4px currentColor);}
         .clr-btn{transition:all 0.15s;cursor:pointer;}
         .clr-btn:hover{box-shadow:0 0 8px 3px rgba(248,81,73,0.4)!important;border-color:#f85149!important;color:#f85149!important;}
 
@@ -1059,7 +1082,7 @@ export default function App() {
           borderBottom: `1px solid ${t.border}`, flexShrink: 0,
         }}>
           {/* Hamburger always on left */}
-          <button onClick={() => isMobile ? setMobileNavOpen(false) : setSidebarOpen(o => !o)} className="sb-btn" style={{
+          <button onClick={() => isMobile ? setMobileNavOpen(false) : setSidebarOpen(o => !o)} className="sb-btn neon-ico" style={{
             background: 'none', border: 'none', color: t.muted, padding: '7px',
             borderRadius: 6, display: 'flex', flexDirection: 'column', gap: 4,
             alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0,
@@ -1089,7 +1112,7 @@ export default function App() {
                 borderRadius: '0 8px 8px 0',
                 opacity: active ? 1 : 0.7,
               }}>
-                <span style={{ fontSize: 17, flexShrink: 0, width: 22, textAlign: 'center', lineHeight: 1 }}>{icon}</span>
+                <span className="neon-ico" style={{ flexShrink: 0, width: 22, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}>{icon}</span>
                 <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</span>
               </button>
             )
@@ -1161,7 +1184,7 @@ export default function App() {
         }}>
           {/* Mobile hamburger */}
           {isMobile && (
-            <button onClick={() => setMobileNavOpen(o => !o)} className="sb-btn" style={{ background: 'none', border: 'none', color: t.muted, padding: '7px 6px', borderRadius: 6, display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
+            <button onClick={() => setMobileNavOpen(o => !o)} className="sb-btn neon-ico" style={{ background: 'none', border: 'none', color: t.muted, padding: '7px 6px', borderRadius: 6, display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
               <span style={{ display: 'block', width: 16, height: 1.5, background: t.muted, borderRadius: 2 }} />
               <span style={{ display: 'block', width: 16, height: 1.5, background: t.muted, borderRadius: 2 }} />
               <span style={{ display: 'block', width: 16, height: 1.5, background: t.muted, borderRadius: 2 }} />
@@ -1172,7 +1195,7 @@ export default function App() {
             <div style={{ fontWeight: 800, fontSize: isMobile ? 14 : 17, color: t.text, letterSpacing: 0.2, whiteSpace: 'nowrap', flexShrink: 0 }}>
               Product Master
             </div>
-            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v2.22.3</span>
+            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v2.25.1</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: isMobile ? 11 : 13, background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, padding: isMobile ? '3px 8px' : '5px 12px', overflow: 'hidden', minWidth: 0, flexShrink: 1 }}>
               <span style={{ width: isMobile ? 6 : 7, height: isMobile ? 6 : 7, borderRadius: '50%', flexShrink: 0, background: dataSource === 'csv' ? t.blue : t.green }} />
               <span style={{ fontWeight: 800, color: dataSource === 'csv' ? t.blue : t.green, flexShrink: 0 }}>
@@ -1187,7 +1210,7 @@ export default function App() {
           </div>
           <div style={{ display: 'flex', gap: isMobile ? 6 : 8, alignItems: 'center', flexShrink: 0 }}>
             {/* Dark mode */}
-            <button onClick={() => setDark(d => !d)} className="sb-btn" aria-label={dark ? 'Switch to light mode' : 'Switch to dark mode'} style={{
+            <button onClick={() => setDark(d => !d)} className="sb-btn neon-ico" aria-label={dark ? 'Switch to light mode' : 'Switch to dark mode'} style={{
               background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, color: t.muted,
               padding: isMobile ? '5px 8px' : '5px 10px', cursor: 'pointer',
               display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
@@ -1279,7 +1302,7 @@ export default function App() {
                           borderRadius: 10, padding: '3px 7px', cursor: 'pointer',
                           boxShadow: sel ? `0 0 0 3px ${t.accent}22` : 'none',
                         }}>
-                          <RetailerLogo name={r} h={26} maxW={66} fallbackStyle={{ fontSize: 11, fontWeight: 700, color: t.text }} />
+                          <RetailerLogo name={r} h={26} maxW={66} dark={dark} fallbackStyle={{ fontSize: 11, fontWeight: 700, color: t.text }} />
                         </button>
                       )
                     })}
@@ -1368,7 +1391,7 @@ export default function App() {
                               fontWeight: 700, fontSize: 10.5, whiteSpace: 'nowrap',
                               borderBottom: `2px solid ${t.border}`,
                               position: 'sticky', top: 0, background: t.surface2, zIndex: 1,
-                            }}><RetailerLogo name={r} h={28} maxW={74} fallbackStyle={{ fontSize: 10.5 }} /></th>
+                            }}><RetailerLogo name={r} h={28} maxW={74} dark={dark} fallbackStyle={{ fontSize: 10.5 }} /></th>
                           ))}
                         </tr>
                       )}
@@ -1501,7 +1524,7 @@ export default function App() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 9, marginTop: 16 }}>
                     {intel.retailersByActive.slice(0, 8).map(r => (
                       <div key={r.name} style={{ display: 'grid', gridTemplateColumns: isMobile ? '52px 1fr 62px' : '60px 1fr 74px', alignItems: 'center', gap: 10 }}>
-                        <RetailerLogo name={r.name} h={20} maxW={56} fallbackStyle={{ fontSize: 10.5, fontWeight: 700, color: t.text }} />
+                        <RetailerLogo name={r.name} h={20} maxW={56} dark={dark} fallbackStyle={{ fontSize: 10.5, fontWeight: 700, color: t.text }} />
                         <div style={{ height: 9, borderRadius: 6, background: dark ? 'rgba(0,0,0,.45)' : 'rgba(38,32,25,.07)', overflow: 'hidden' }}>
                           <div style={{ height: '100%', width: `${Math.round(r.active / maxRetailerActive * 100)}%`, borderRadius: 6, background: `linear-gradient(90deg, ${t.accent}, ${t.blue})`, boxShadow: dark ? `0 0 9px -1px ${t.accent}` : 'none', transition: 'width .6s ease' }} />
                         </div>
@@ -1580,7 +1603,7 @@ export default function App() {
                     <thead>
                       <tr style={{ borderBottom: `2px solid ${t.border}` }}>
                         <th style={{ padding: '9px 12px', textAlign: 'left', color: t.muted, fontWeight: 700, fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5, position: 'sticky', left: 0, background: t.surface, zIndex: 1 }}>Brand</th>
-                        {RETAILERS.map(r => <th key={r} style={{ padding: '9px 4px', textAlign: 'center', color: t.muted, fontWeight: 700, fontSize: 9.5, whiteSpace: 'nowrap' }}><RetailerLogo name={r} h={24} maxW={60} fallbackStyle={{ fontSize: 9.5 }} /></th>)}
+                        {RETAILERS.map(r => <th key={r} style={{ padding: '9px 4px', textAlign: 'center', color: t.muted, fontWeight: 700, fontSize: 9.5, whiteSpace: 'nowrap' }}><RetailerLogo name={r} h={24} maxW={60} dark={dark} fallbackStyle={{ fontSize: 9.5 }} /></th>)}
                         <th style={{ padding: '9px 10px', textAlign: 'center', color: t.muted, fontWeight: 700, fontSize: 11, textTransform: 'uppercase' }}>Cov.</th>
                       </tr>
                     </thead>
@@ -1642,7 +1665,7 @@ export default function App() {
                             const inStore = g.present.includes(r)
                             return (
                               <span key={r} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 10.5, fontWeight: 700, padding: '3px 9px', borderRadius: 6, background: inStore ? `${t.green}1e` : `${t.red}0d`, color: inStore ? t.green : t.muted, border: `1px solid ${inStore ? t.green + '44' : t.red + '33'}`, opacity: inStore ? 1 : 0.9 }}>
-                                <span>{inStore ? '✓' : '+'}</span><RetailerLogo name={r} h={20} maxW={56} fallbackStyle={{ fontSize: 10.5 }} />
+                                <span>{inStore ? '✓' : '+'}</span><RetailerLogo name={r} h={20} maxW={56} dark={dark} fallbackStyle={{ fontSize: 10.5 }} />
                               </span>
                             )
                           })}
@@ -1673,7 +1696,7 @@ export default function App() {
                           <tr key={r.name} className="rhover" style={{ borderBottom: `1px solid ${t.dim}` }}>
                             <td style={{ padding: '9px 10px', fontWeight: 700, color: t.text, whiteSpace: 'nowrap' }}>
                               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
-                                <RetailerLogo name={r.name} h={30} maxW={88} fallbackStyle={{ fontWeight: 700, color: t.text }} />
+                                <RetailerLogo name={r.name} h={30} maxW={88} dark={dark} fallbackStyle={{ fontWeight: 700, color: t.text }} />
                                 {isCore && <span style={{ fontSize: 9, fontWeight: 700, color: t.accent, border: `1px solid ${t.accent}66`, borderRadius: 4, padding: '1px 5px' }}>CORE</span>}
                               </span>
                             </td>
@@ -1719,7 +1742,7 @@ export default function App() {
                   const sel = psRetailers.includes(r)
                   return (
                     <button key={r} onClick={() => togglePsRetailer(r)} title={r} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: sel ? `${t.accent}18` : t.surface2, border: `2px solid ${sel ? t.accent : t.border}`, borderRadius: 10, cursor: 'pointer', boxShadow: sel ? `0 0 0 3px ${t.accent}22` : 'none', width: isMobile ? 60 : 76, height: isMobile ? 42 : 38 }}>
-                      <RetailerLogo name={r} h={isMobile ? 26 : 22} maxW={isMobile ? 68 : 58} fallbackStyle={{ fontSize: 11, fontWeight: 700, color: t.text }} />
+                      <RetailerLogo name={r} h={isMobile ? 26 : 22} maxW={isMobile ? 68 : 58} dark={dark} fallbackStyle={{ fontSize: 11, fontWeight: 700, color: t.text }} />
                     </button>
                   )
                 })}
@@ -1852,7 +1875,10 @@ export default function App() {
             {/* Header */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: `1px solid ${t.border}` }}>
               <div>
-                <div style={{ fontSize: 16, fontWeight: 800, color: t.text }}>🧮 Compensate Calculator</div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: t.text, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <svg className="neon-ico" style={{ color: t.accent, flexShrink: 0 }} width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="5" y="2.5" width="14" height="19" rx="2.5"/><path d="M8 6h8"/><path d="M8 11h.01M12 11h.01M16 11h.01M8 15h.01M12 15h.01M16 15h.01"/>
+                  </svg>Compensate Calculator</div>
                 <div style={{ fontSize: 11, color: t.muted, marginTop: 2 }}>{promoRetailer ? `Pick a ${promoRetailer} product → enter promo price` : 'Select a customer first'}</div>
               </div>
               <button onClick={() => setCalcOpen(false)} style={{ background: t.surface2, border: `1px solid ${t.border}`, borderRadius: '50%', width: 32, height: 32, cursor: 'pointer', color: t.muted, fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>✕</button>
@@ -2011,7 +2037,7 @@ export default function App() {
             <div style={{ padding: '12px 16px 10px', borderBottom: `1px solid ${t.border}`, position: 'sticky', top: 0, background: t.surface, zIndex: 1 }}>
               <div style={{ fontWeight: 800, fontSize: 13, color: t.text }}>{matrixPopover.brand}</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: t.muted, marginTop: 3 }}>
-                <RetailerLogo name={matrixPopover.retailer} h={18} maxW={56} fallbackStyle={{ fontSize: 11 }} />
+                <RetailerLogo name={matrixPopover.retailer} h={18} maxW={56} dark={dark} fallbackStyle={{ fontSize: 11 }} />
                 <span>· {matrixPopover.products.length} active SKU{matrixPopover.products.length !== 1 ? 's' : ''}</span>
               </div>
             </div>
