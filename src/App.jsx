@@ -191,8 +191,11 @@ function PackshotImg({ barcode, side = 'front', style = {}, placeholderSize = 40
 }
 
 // ── ProductPopup ────────────────────────────────────────────────────────────
-function ProductPopup({ product, onClose, t, dark, isMobile = false, pricing = {}, variant = 'products' }) {
+const ACT_COLORS = { field: '#f97316', media: '#22d3ee', looks: '#f061ff', clearance: '#f43f5e' }
+
+function ProductPopup({ product, onClose, t, dark, isMobile = false, pricing = {}, variant = 'products', promoItems = [], promoMeta = {} }) {
   const [side, setSide] = useState('front')
+  const [popTab, setPopTab] = useState('info')
   const [loadedSrc, setLoadedSrc] = useState(null)
   const [zoomed, setZoomed] = useState(false)
   const [zoomScale, setZoomScale] = useState(1)
@@ -250,6 +253,7 @@ function ProductPopup({ product, onClose, t, dark, isMobile = false, pricing = {
     setZoomed(false)
     setZoomScale(1)
     setPanPos({ x: 0, y: 0 })
+    setPopTab('info')
     // Esc: close lightbox first, then popup
     const h = (e) => {
       if (e.key === 'Escape') {
@@ -471,6 +475,55 @@ function ProductPopup({ product, onClose, t, dark, isMobile = false, pricing = {
 
   const isPackshotView = variant === 'packshot' && !isMobile
 
+  // Promo history: all periods with a salePrice for this barcode across all retailers
+  const myPromos = useMemo(() => {
+    const entries = []
+    promoItems.filter(it => String(it.barcode) === String(product.barcode)).forEach(it => {
+      const meta = promoMeta[it.retailer]?.periods || []
+      Object.entries(it.periods || {}).forEach(([pName, pd]) => {
+        if (!pd?.salePrice) return
+        const pm = meta.find(m => m.name === pName)
+        entries.push({ retailer: it.retailer, period: pName, dateRange: pm?.dateRange || '', price: pd.salePrice, label: pd.saleLabel || '', activities: pd.activities || [] })
+      })
+    })
+    return entries.sort((a, b) => a.retailer.localeCompare(b.retailer) || a.period.localeCompare(b.period))
+  }, [product.barcode, promoItems, promoMeta])
+
+  const promoBlock = (
+    <div>
+      {myPromos.length === 0
+        ? <div style={{ fontSize: 13, color: t.muted, padding: '20px 0', textAlign: 'center' }}>No promo entries found for this product.</div>
+        : <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, minWidth: 400 }}>
+              <thead>
+                <tr style={{ borderBottom: `1px solid ${t.border}` }}>
+                  {['Retailer', 'Period', 'Dates', 'Price', 'Type'].map(h => (
+                    <th key={h} style={{ padding: '4px 8px', textAlign: 'left', color: t.muted, fontWeight: 700, whiteSpace: 'nowrap' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {myPromos.map((e, i) => (
+                  <tr key={i} style={{ borderBottom: `1px solid ${t.border}`, opacity: 1 }}>
+                    <td style={{ padding: '5px 8px', fontWeight: 600, color: t.text, whiteSpace: 'nowrap' }}>{e.retailer}</td>
+                    <td style={{ padding: '5px 8px', color: t.muted, fontFamily: 'ui-monospace,monospace', fontSize: 11 }}>{e.period}</td>
+                    <td style={{ padding: '5px 8px', color: t.muted, whiteSpace: 'nowrap' }}>{e.dateRange || '—'}</td>
+                    <td style={{ padding: '5px 8px', fontWeight: 700, color: t.accent, whiteSpace: 'nowrap' }}>฿{e.price}{e.label ? ` ${e.label}` : ''}</td>
+                    <td style={{ padding: '5px 8px' }}>
+                      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                        {e.activities.map(a => <span key={a} style={{ fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 99, background: `${ACT_COLORS[a] || t.muted}22`, color: ACT_COLORS[a] || t.muted }}>{a}</span>)}
+                        {e.activities.length === 0 && <span style={{ fontSize: 10, color: t.muted }}>price</span>}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+      }
+    </div>
+  )
+
   return (
     <>
       {/* ── Lightbox ── */}
@@ -563,9 +616,17 @@ function ProductPopup({ product, onClose, t, dark, isMobile = false, pricing = {
             <div style={{ display: 'flex', gap: 0, flexDirection: isMobile ? 'column' : 'row', flexWrap: 'nowrap' }}>
               {imagePanel(false)}
               <div style={{ flex: 1, minWidth: 0, padding: isMobile ? '16px' : '20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
-                {statsRow}
-                {pricingBlock()}
-                {coverageBlock('repeat(3, 1fr)')}
+                {/* tab pills */}
+                <div style={{ display: 'flex', gap: 6 }}>
+                  {[['info', 'Info'], ['promos', `Promos${myPromos.length ? ` (${myPromos.length})` : ''}`]].map(([key, label]) => (
+                    <button key={key} onClick={() => setPopTab(key)} style={{ fontSize: 12, fontWeight: 700, padding: '4px 12px', borderRadius: 99, border: `1px solid ${popTab === key ? t.accent : t.border}`, background: popTab === key ? `${t.accent}22` : 'transparent', color: popTab === key ? t.accent : t.muted, cursor: 'pointer' }}>{label}</button>
+                  ))}
+                </div>
+                {popTab === 'info' ? <>
+                  {statsRow}
+                  {pricingBlock()}
+                  {coverageBlock('repeat(3, 1fr)')}
+                </> : promoBlock}
               </div>
             </div>
           )}
@@ -583,12 +644,20 @@ export default function App() {
   const [tab, setTab] = useState('products')
   const [alerts, setAlerts] = useState([])
   const [alertsOpen, setAlertsOpen] = useState(false)
+  const [alertsSeen, setAlertsSeen] = useState(() => sessionStorage.getItem('alertsSeen') === bangkokToday())
   useEffect(() => {
     fetch('/notification_schedule.json')
       .then(r => (r.ok ? r.json() : []))
       .then(sched => setAlerts(upcomingWithin(sched, bangkokToday(), 5)))
       .catch(() => {})
   }, [])
+  const alertsRef = useRef(null)
+  useEffect(() => {
+    if (!alertsOpen) return
+    const handler = (e) => { if (alertsRef.current && !alertsRef.current.contains(e.target)) setAlertsOpen(false) }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [alertsOpen])
   const [vendorFilter, setVendorFilter] = useState('ALL')
   const [search, setSearch] = useState('')
   const [selectedBrands, setSelectedBrands] = useState([])
@@ -628,6 +697,7 @@ export default function App() {
   const [calcProductBc, setCalcProductBc] = useState('')
   const [calcPromo, setCalcPromo] = useState('')
   const [calcCopied, setCalcCopied] = useState(false)
+  const [alertTestState, setAlertTestState] = useState('')  // '' | 'sending' | 'ok' | 'err'
   const clearCalc = () => { setCalcProductBc(''); setCalcPromo(''); setCalcCopied(false) }
   const [anaVendor, setAnaVendor] = useState('ALL')   // Analytics page vendor scope: 'ALL' | 'Vcan' | 'Moola'
 
@@ -1204,7 +1274,7 @@ export default function App() {
             <div style={{ fontWeight: 800, fontSize: isMobile ? 14 : 17, color: t.text, letterSpacing: 0.2, whiteSpace: 'nowrap', flexShrink: 0 }}>
               Product Master
             </div>
-            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v3.0.0</span>
+            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v3.1.0</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: isMobile ? 11 : 13, background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, padding: isMobile ? '3px 8px' : '5px 12px', overflow: 'hidden', minWidth: 0, flexShrink: 1 }}>
               <span style={{ width: isMobile ? 6 : 7, height: isMobile ? 6 : 7, borderRadius: '50%', flexShrink: 0, background: dataSource === 'csv' ? t.blue : t.green }} />
               <span style={{ fontWeight: 800, color: dataSource === 'csv' ? t.blue : t.green, flexShrink: 0 }}>
@@ -1219,8 +1289,8 @@ export default function App() {
           </div>
           <div style={{ display: 'flex', gap: isMobile ? 6 : 8, alignItems: 'center', flexShrink: 0 }}>
             {/* Promo alerts bell */}
-            <div style={{ position: 'relative' }}>
-              <button onClick={() => setAlertsOpen(o => !o)} className="sb-btn neon-ico" aria-label="Upcoming promo alerts" style={{
+            <div ref={alertsRef} style={{ position: 'relative' }}>
+              <button onClick={() => { setAlertsOpen(o => !o); if (!alertsSeen) { sessionStorage.setItem('alertsSeen', bangkokToday()); setAlertsSeen(true) } }} className="sb-btn neon-ico" aria-label="Upcoming promo alerts" style={{
                 background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, color: t.muted,
                 padding: isMobile ? '5px 8px' : '5px 10px', cursor: 'pointer',
                 display: 'inline-flex', alignItems: 'center', justifyContent: 'center', position: 'relative',
@@ -1228,7 +1298,7 @@ export default function App() {
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" />
                 </svg>
-                {alerts.length > 0 && (
+                {alerts.length > 0 && !alertsSeen && (
                   <span style={{ position: 'absolute', top: -4, right: -4, minWidth: 16, height: 16, padding: '0 4px', borderRadius: 8, background: t.accent, color: '#000', fontSize: 10, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{alerts.length}</span>
                 )}
               </button>
@@ -1712,6 +1782,74 @@ export default function App() {
                 )}
               </div>
 
+              {/* ── Promo Activity Heatmap ── */}
+              {(() => {
+                const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+                const ACT_CLR = { field: '#f97316', media: '#22d3ee', looks: '#f061ff', clearance: '#f43f5e' }
+                // heat[retailer][monthIdx] = Set of activity types
+                const heat = {}
+                Object.entries(PROMO_META).forEach(([retailer, meta]) => {
+                  meta.periods.forEach(p => {
+                    const mm = p.dateRange?.match(/^\d{1,2}\/(\d{1,2})/)
+                    if (!mm) return
+                    const mo = parseInt(mm[1]) - 1
+                    if (mo < 0 || mo > 11) return
+                    promoData.filter(it => it.retailer === retailer).forEach(it => {
+                      const pd = it.periods?.[p.name]
+                      if (!pd?.activities?.length) return
+                      if (!heat[retailer]) heat[retailer] = {}
+                      if (!heat[retailer][mo]) heat[retailer][mo] = new Set()
+                      pd.activities.forEach(a => heat[retailer][mo].add(a))
+                    })
+                  })
+                })
+                const retailers = Object.keys(heat)
+                if (!retailers.length) return null
+                return (
+                  <div style={{ ...glassPanel, borderRadius: 12, padding: isMobile ? 16 : 24 }}>
+                    <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 4 }}>Promo Activity Calendar</div>
+                    <div style={{ color: t.muted, fontSize: 12, marginBottom: 16 }}>Which retailers have field / media / looks activity — by month.</div>
+                    <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                      <table style={{ borderCollapse: 'collapse', fontSize: 11, minWidth: 520 }}>
+                        <thead>
+                          <tr>
+                            <th style={{ width: 72, textAlign: 'left', padding: '2px 8px 6px 0', color: t.muted, fontWeight: 700 }}>Retailer</th>
+                            {MONTHS.map(m => <th key={m} style={{ width: 44, textAlign: 'center', padding: '2px 2px 6px', color: t.muted, fontWeight: 600 }}>{m}</th>)}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {retailers.sort().map(r => (
+                            <tr key={r}>
+                              <td style={{ padding: '4px 8px 4px 0', fontWeight: 700, color: t.text, whiteSpace: 'nowrap' }}>{r}</td>
+                              {MONTHS.map((_, mi) => {
+                                const acts = heat[r]?.[mi] ? [...heat[r][mi]] : []
+                                return (
+                                  <td key={mi} style={{ padding: 2, textAlign: 'center' }}>
+                                    {acts.length > 0
+                                      ? <div style={{ display: 'flex', gap: 2, justifyContent: 'center', flexWrap: 'wrap' }}>
+                                          {acts.map(a => <span key={a} title={a} style={{ display: 'block', width: 8, height: 8, borderRadius: 99, background: ACT_CLR[a] || t.muted, boxShadow: `0 0 4px ${ACT_CLR[a] || t.muted}` }} />)}
+                                        </div>
+                                      : <span style={{ display: 'block', width: 8, height: 8, borderRadius: 2, background: t.border, margin: 'auto' }} />
+                                    }
+                                  </td>
+                                )
+                              })}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <div style={{ display: 'flex', gap: 14, marginTop: 12, flexWrap: 'wrap' }}>
+                      {Object.entries(ACT_CLR).map(([a, c]) => (
+                        <div key={a} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: t.muted }}>
+                          <span style={{ display: 'block', width: 8, height: 8, borderRadius: 99, background: c, boxShadow: `0 0 4px ${c}` }} />{a}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })()}
+
               {/* ── Retailer Scorecard ── */}
               <div style={{ ...glassPanel, borderRadius: 12, padding: isMobile ? 16 : 24 }}>
                 <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 4 }}>Retailer Scorecard</div>
@@ -2009,13 +2147,26 @@ export default function App() {
               )}
             </div>
             {/* Footer: copy + clear */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, padding: '0 20px 18px' }}>
-              {res.comp != null && (
-                <button onClick={copyResult} style={{ background: calcCopied ? t.green : t.accent, border: 'none', borderRadius: 8, color: '#000', fontSize: 12, fontWeight: 700, cursor: 'pointer', padding: '8px 18px', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                  {calcCopied ? '✓ Copied' : '⧉ Copy ฿' + res.comp.toFixed(2)}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, padding: '0 20px 18px', flexWrap: 'wrap' }}>
+              {import.meta.env.VITE_ALERT_TEST_SECRET ? (
+                <button onClick={() => {
+                  setAlertTestState('sending')
+                  fetch(`/api/test-alert?secret=${import.meta.env.VITE_ALERT_TEST_SECRET}`, { method: 'POST' })
+                    .then(r => setAlertTestState(r.ok ? 'ok' : 'err'))
+                    .catch(() => setAlertTestState('err'))
+                    .finally(() => setTimeout(() => setAlertTestState(''), 3000))
+                }} disabled={alertTestState === 'sending'} style={{ background: 'none', border: `1.5px solid ${alertTestState === 'ok' ? t.green : alertTestState === 'err' ? '#f43f5e' : t.border}`, borderRadius: 8, color: alertTestState === 'ok' ? t.green : alertTestState === 'err' ? '#f43f5e' : t.muted, fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: '8px 18px' }}>
+                  {alertTestState === 'sending' ? '...' : alertTestState === 'ok' ? '✓ Sent' : alertTestState === 'err' ? '✕ Failed' : 'Send LINE test'}
                 </button>
-              )}
-              <button onClick={clearCalc} className="clr-btn" style={{ background: 'none', border: `1.5px solid ${t.border}`, borderRadius: 8, color: t.muted, fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: '8px 18px' }}>✕ Clear</button>
+              ) : <span />}
+              <div style={{ display: 'flex', gap: 8 }}>
+                {res.comp != null && (
+                  <button onClick={copyResult} style={{ background: calcCopied ? t.green : t.accent, border: 'none', borderRadius: 8, color: '#000', fontSize: 12, fontWeight: 700, cursor: 'pointer', padding: '8px 18px', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    {calcCopied ? '✓ Copied' : '⧉ Copy ฿' + res.comp.toFixed(2)}
+                  </button>
+                )}
+                <button onClick={clearCalc} className="clr-btn" style={{ background: 'none', border: `1.5px solid ${t.border}`, borderRadius: 8, color: t.muted, fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: '8px 18px' }}>✕ Clear</button>
+              </div>
             </div>
             </>
             )}
@@ -2101,6 +2252,8 @@ export default function App() {
           isMobile={isMobile}
           pricing={retailerData[selectedProduct.barcode] || {}}
           variant={tab === 'packshot' ? 'packshot' : 'products'}
+          promoItems={promoData}
+          promoMeta={PROMO_META}
         />
       )}
     </div>

@@ -463,7 +463,7 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
                   <div className="ps-cal-ph-code" style={{ color: isNow ? t.accent : tx }}>{periodLabel(p.name)}</div>
                   {p.dateRange && <div className="ps-cal-ph-rng" style={{ color: mu }}>{p.dateRange}</div>}
                   {isNow ? <div className="ps-now-tag" style={{ background: GOLD_GRAD, color: '#fff' }}>NOW</div>
-                    : <div className="ps-cal-ph-caps">{acts.map(a => ACT[a] && <i key={a} style={{ width: 6, height: 6, borderRadius: 99, background: neon(ACT[a].color), boxShadow: `0 0 4px -1px ${neon(ACT[a].color)}` }} />)}</div>}
+                    : (() => { const r = parseDR(p.dateRange) || inferPeriodDate(p); const d = r && Math.ceil((r.s - TODAY) / 86400000); return d > 0 ? <div style={{ fontSize: 9, color: GOLD_A, fontWeight: 700, marginTop: 2 }}>in {d}d</div> : <div className="ps-cal-ph-caps">{acts.map(a => ACT[a] && <i key={a} style={{ width: 6, height: 6, borderRadius: 99, background: neon(ACT[a].color), boxShadow: `0 0 4px -1px ${neon(ACT[a].color)}` }} />)}</div> })()}
                 </div>
               )
             })}
@@ -828,7 +828,7 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
               </div>
               {spotTab === 'live' && spotNext.length > 0 && (
                 <div style={{ marginTop: 12, padding: '8px 14px', border: `1px dashed ${dim}`, borderRadius: 9, display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11, color: mu }}>
-                  <span>↓ NEXT — {(nextIdx >= 0 && periods[nextIdx]?.dateRange) || 'coming soon'}</span>
+                  <span>↓ NEXT — {(nextIdx >= 0 && periods[nextIdx]?.dateRange) || 'coming soon'}{(() => { const np = nextIdx >= 0 ? periods[nextIdx] : null; const r = np && (parseDR(np.dateRange) || inferPeriodDate(np)); const d = r && Math.ceil((r.s - TODAY) / 86400000); return d > 0 ? <span style={{ color: GOLD_A, fontWeight: 700, marginLeft: 4 }}>· in {d}d</span> : null })()}</span>
                   <span style={{ color: dim }}>{[...new Set(spotNext.map(i => i.brand))].slice(0, 3).join(' · ')}</span>
                 </div>
               )}
