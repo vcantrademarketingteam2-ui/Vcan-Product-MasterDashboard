@@ -32,8 +32,10 @@ export default {
     const url = new URL(request.url);
     // POST /api/test-alert?secret=X  — sends a test LINE message (behind LINE_TOKEN + shared secret)
     if (request.method === 'POST' && url.pathname === '/api/test-alert') {
-      const secret = url.searchParams.get('secret');
-      if (!secret || secret !== env.ALERT_TEST_SECRET) return new Response('Forbidden', { status: 403 });
+      const secret = (url.searchParams.get('secret') || '').trim();
+      const stored = (env.ALERT_TEST_SECRET || '').trim();
+      console.log(`test-alert: received len=${secret.length}, stored len=${stored.length}`);
+      if (!secret || secret !== stored) return new Response(`Forbidden (got ${secret.length} chars, stored ${stored.length} chars)`, { status: 403 });
       if (!env.LINE_TOKEN) return new Response('LINE_TOKEN not set', { status: 500 });
       try {
         await broadcast(env.LINE_TOKEN, `🔔 Test alert from VCAN Dashboard — ${new Date().toISOString()}`);
