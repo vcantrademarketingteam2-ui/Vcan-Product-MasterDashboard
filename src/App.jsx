@@ -4,6 +4,7 @@ import retailerData from './retailer_data.js'
 import promoData, { PROMO_META, PROMO_ACTIVITY, PROMO_RETAILERS } from './promo_data.js'
 import vcanLogo from './VCAN.png'
 import PromoSection from './PromoSection.jsx'
+import { upcomingWithin, bangkokToday } from './promoAlerts.js'
 
 // Count-up animation for KPI / bento numbers — respects prefers-reduced-motion.
 function useCountUp(target, dur = 1100) {
@@ -580,6 +581,14 @@ export default function App() {
   const [dataSource, setDataSource] = useState('xlsx')
   const [dark, setDark] = useState(true)
   const [tab, setTab] = useState('products')
+  const [alerts, setAlerts] = useState([])
+  const [alertsOpen, setAlertsOpen] = useState(false)
+  useEffect(() => {
+    fetch('/notification_schedule.json')
+      .then(r => (r.ok ? r.json() : []))
+      .then(sched => setAlerts(upcomingWithin(sched, bangkokToday(), 5)))
+      .catch(() => {})
+  }, [])
   const [vendorFilter, setVendorFilter] = useState('ALL')
   const [search, setSearch] = useState('')
   const [selectedBrands, setSelectedBrands] = useState([])
@@ -1195,7 +1204,7 @@ export default function App() {
             <div style={{ fontWeight: 800, fontSize: isMobile ? 14 : 17, color: t.text, letterSpacing: 0.2, whiteSpace: 'nowrap', flexShrink: 0 }}>
               Product Master
             </div>
-            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v2.25.1</span>
+            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v3.0.0</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: isMobile ? 11 : 13, background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, padding: isMobile ? '3px 8px' : '5px 12px', overflow: 'hidden', minWidth: 0, flexShrink: 1 }}>
               <span style={{ width: isMobile ? 6 : 7, height: isMobile ? 6 : 7, borderRadius: '50%', flexShrink: 0, background: dataSource === 'csv' ? t.blue : t.green }} />
               <span style={{ fontWeight: 800, color: dataSource === 'csv' ? t.blue : t.green, flexShrink: 0 }}>
@@ -1209,6 +1218,33 @@ export default function App() {
             </div>
           </div>
           <div style={{ display: 'flex', gap: isMobile ? 6 : 8, alignItems: 'center', flexShrink: 0 }}>
+            {/* Promo alerts bell */}
+            <div style={{ position: 'relative' }}>
+              <button onClick={() => setAlertsOpen(o => !o)} className="sb-btn neon-ico" aria-label="Upcoming promo alerts" style={{
+                background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, color: t.muted,
+                padding: isMobile ? '5px 8px' : '5px 10px', cursor: 'pointer',
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', position: 'relative',
+              }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                </svg>
+                {alerts.length > 0 && (
+                  <span style={{ position: 'absolute', top: -4, right: -4, minWidth: 16, height: 16, padding: '0 4px', borderRadius: 8, background: t.accent, color: '#000', fontSize: 10, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{alerts.length}</span>
+                )}
+              </button>
+              {alertsOpen && (
+                <div style={{ position: 'absolute', right: 0, top: 'calc(100% + 8px)', width: 280, maxHeight: 360, overflowY: 'auto', background: t.surface, border: `1px solid ${t.border}`, borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,.3)', zIndex: 60, padding: 8 }}>
+                  <div style={{ fontSize: 12, fontWeight: 800, color: t.muted, padding: '4px 8px 8px' }}>Upcoming promos (≤5 days)</div>
+                  {alerts.length === 0 && <div style={{ fontSize: 12, color: t.muted, padding: '4px 8px 8px' }}>Nothing in the next 5 days.</div>}
+                  {alerts.map((e, i) => (
+                    <div key={i} style={{ padding: '8px', borderTop: i ? `1px solid ${t.border}` : 'none' }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: t.text }}>{e.retailer}{e.brands.length ? ` · ${e.brands.join(', ')}` : ''}</div>
+                      <div style={{ fontSize: 11, color: t.muted, marginTop: 2 }}>{e.activities.join(', ')} — starts {e.startDate}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
             {/* Dark mode */}
             <button onClick={() => setDark(d => !d)} className="sb-btn neon-ico" aria-label={dark ? 'Switch to light mode' : 'Switch to dark mode'} style={{
               background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, color: t.muted,
