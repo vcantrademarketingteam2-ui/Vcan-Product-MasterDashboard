@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="VCAN PWA icon">
+  <defs>
+    <linearGradient id="bz" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#a5784a"/>
+      <stop offset="50%" stop-color="#f0c040"/>
+      <stop offset="100%" stop-color="#ffe680"/>
+    </linearGradient>
+    <radialGradient id="aurora" cx="22%" cy="14%" r="90%">
+      <stop offset="0%" stop-color="#f0c040" stop-opacity=".22"/>
+      <stop offset="55%" stop-color="#a5784a" stop-opacity=".12"/>
+      <stop offset="100%" stop-color="#0a0a0f" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="9" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect width="512" height="512" rx="116" fill="#0a0a0f"/>
+  <rect width="512" height="512" rx="116" fill="url(#aurora)"/>
+  <rect x="1" y="1" width="510" height="510" rx="115" fill="none" stroke="#d4a86a" stroke-opacity=".34" stroke-width="2"/>
+  <path d="M118 116 L256 432 L394 116" fill="none" stroke="url(#bz)" stroke-width="26"
+        stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)"/>
+  <!-- 4-point star on the upper-right arm of the V -->
+  <path d="M398 40 Q398 116 462 116 Q398 116 398 192 Q398 116 334 116 Q398 116 398 40 Z"
+        fill="url(#bz)" filter="url(#glow)"/>
+</svg>
