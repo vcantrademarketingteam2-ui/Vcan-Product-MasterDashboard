@@ -1,0 +1,203 @@
+[
+  {
+    "retailer": "Tops",
+    "period": "2603/04",
+    "startDate": "2026-01-07",
+    "activities": [
+      "media"
+    ],
+    "brands": [
+      "Dove Men"
+    ],
+    "title": "Tops 2603/04"
+  },
+  {
+    "retailer": "Tops",
+    "period": "2609/10",
+    "startDate": "2026-02-18",
+    "activities": [
+      "looks"
+    ],
+    "brands": [
+      "Dove Bar Soap"
+    ],
+    "title": "Tops 2609/10"
+  },
+  {
+    "retailer": "Tops",
+    "period": "2611/12",
+    "startDate": "2026-03-04",
+    "activities": [
+      "looks"
+    ],
+    "brands": [
+      "Dove Bar Soap",
+      "Malizia Bath Foam 1L"
+    ],
+    "title": "Tops 2611/12"
+  },
+  {
+    "retailer": "Tops",
+    "period": "2619/20",
+    "startDate": "2026-04-29",
+    "activities": [
+      "media"
+    ],
+    "brands": [
+      "Tempo"
+    ],
+    "title": "Tops 2619/20"
+  },
+  {
+    "retailer": "Tops",
+    "period": "2627/28",
+    "startDate": "2026-06-24",
+    "activities": [
+      "looks",
+      "media"
+    ],
+    "brands": [
+      "PEARS SOAP",
+      "Sundae Bath Foam"
+    ],
+    "title": "Tops 2627/28"
+  },
+  {
+    "retailer": "Tops",
+    "period": "2629/30",
+    "startDate": "2026-07-08",
+    "activities": [
+      "looks",
+      "media"
+    ],
+    "brands": [
+      "Sundae Bath Foam"
+    ],
+    "title": "Tops 2629/30"
+  },
+  {
+    "retailer": "Tops",
+    "period": "2633/34",
+    "startDate": "2026-08-05",
+    "activities": [
+      "media"
+    ],
+    "brands": [
+      "General Fresh"
+    ],
+    "title": "Tops 2633/34"
+  },
+  {
+    "retailer": "Tops",
+    "period": "2635/36",
+    "startDate": "2026-08-19",
+    "activities": [
+      "field"
+    ],
+    "brands": [
+      "L'Arbre Vert Body Wash"
+    ],
+    "title": "Tops 2635/36"
+  },
+  {
+    "retailer": "Tops",
+    "period": "2641/42",
+    "startDate": "2026-09-30",
+    "activities": [
+      "media"
+    ],
+    "brands": [
+      "PEARS BODY WASH"
+    ],
+    "title": "Tops 2641/42"
+  },
+  {
+    "retailer": "Tops",
+    "period": "2649/50",
+    "startDate": "2026-11-25",
+    "activities": [
+      "field"
+    ],
+    "brands": [
+      "Tempo"
+    ],
+    "title": "Tops 2649/50"
+  },
+  {
+    "retailer": "Big C",
+    "period": "Bro5",
+    "startDate": "2023-03-30",
+    "activities": [
+      "media"
+    ],
+    "brands": [
+      "combat"
+    ],
+    "title": "Big C Bro5"
+  },
+  {
+    "retailer": "Lotus",
+    "period": "WK 25-29",
+    "startDate": "2025-06-19",
+    "activities": [
+      "media"
+    ],
+    "brands": [],
+    "title": "Lotus WK 25-29"
+  },
+  {
+    "retailer": "TWD",
+    "period": "Bro.2",
+    "startDate": "2026-01-30",
+    "activities": [
+      "media"
+    ],
+    "brands": [
+      "Purex",
+      "Sofix",
+      "combat"
+    ],
+    "title": "TWD Bro.2"
+  },
+  {
+    "retailer": "TWD",
+    "period": "Bro.3",
+    "startDate": "2026-02-27",
+    "activities": [
+      "media"
+    ],
+    "brands": [
+      "Somat",
+      "combat"
+    ],
+    "title": "TWD Bro.3"
+  },
+  {
+    "retailer": "TWD",
+    "period": "Bro.4",
+    "startDate": "2026-03-27",
+    "activities": [
+      "media"
+    ],
+    "brands": [
+      "Purex",
+      "Sofix",
+      "Somat"
+    ],
+    "title": "TWD Bro.4"
+  },
+  {
+    "retailer": "TWD",
+    "period": "Bro7",
+    "startDate": "2026-06-26",
+    "activities": [
+      "media"
+    ],
+    "brands": [
+      "General Fresh",
+      "Purex",
+      "combat"
+    ],
+    "title": "TWD Bro7"
+  }
+]

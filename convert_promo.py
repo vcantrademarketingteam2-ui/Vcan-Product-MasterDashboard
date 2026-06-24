@@ -6,6 +6,7 @@ Reads from Y:\\MARKETING\\Promotion Plan ทุกห้าง\\2026\\
 Writes to src/promo_data.js
 """
 import json
+import re
 from datetime import datetime
 from pathlib import Path
 import openpyxl
@@ -64,6 +65,71 @@ def load_non_vat_barcodes():
     s = {str(it.get('barcode', '')) for it in items
          if str(it.get('brand', '')).upper().startswith(NON_VAT_BRAND_PREFIXES)}
     return s
+
+
+def parse_start_date(date_range):
+    """First date of a range like '7/01-20/01/26' -> ISO '2026-01-07'.
+    Returns None for month labels / un-parseable cells ('Jan', 'SP6', '')."""
+    if not date_range:
+        return None
+    s = str(date_range).strip()
+    m = re.match(r'(\d{1,2})\s*/\s*(\d{1,2})', s)
+    yr = re.search(r'/(\d{2,4})\s*$', s)
+    if not m or not yr:
+        return None
+    day, month = int(m.group(1)), int(m.group(2))
+    if not (1 <= month <= 12 and 1 <= day <= 31):
+        return None
+    y = int(yr.group(1))
+    year = 2000 + y if y < 100 else y
+    return f'{year:04d}-{month:02d}-{day:02d}'
+
+
+def load_barcode_brands():
+    """barcode -> master brand, from src/data.js (same source as load_non_vat_barcodes)."""
+    try:
+        txt = Path('src/data.js').read_text(encoding='utf-8')
+        start = txt.index('[', txt.index('PRODUCT_DATA'))
+        end = txt.rindex(']') + 1
+        items = json.loads(txt[start:end])
+    except Exception as e:
+        print(f'  (!)  Could not load data.js for brands: {e}')
+        return {}
+    return {str(it.get('barcode', '')): str(it.get('brand', '')) for it in items}
+
+
+def build_notification_schedule(promo_meta, all_products, barcode_brand):
+    """One entry per (retailer, period) that has >=1 item with a non-empty activities list
+    and a parseable start date."""
+    sched = []
+    for retailer, meta in promo_meta.items():
+        for p in meta['periods']:
+            start = parse_start_date(p.get('dateRange', ''))
+            if not start:
+                continue
+            acts, brands = set(), set()
+            for prod in all_products:
+                if prod['retailer'] != retailer:
+                    continue
+                pd = prod['periods'].get(p['name'])
+                if not pd or not pd.get('activities'):
+                    continue
+                acts.update(pd['activities'])
+                b = barcode_brand.get(prod['barcode']) or prod.get('brand') or ''
+                if b:
+                    brands.add(b)
+            if not acts:
+                continue
+            sched.append({
+                'retailer': retailer,
+                'period': p['name'],
+                'startDate': start,
+                'activities': sorted(acts),
+                'brands': sorted(brands),
+                'title': f"{retailer} {p['name']}",
+            })
+    return sched
+
 
 # Per-retailer config: file name, sheets, and which row the header is on (1-indexed)
 # Adjust header_row and column indices if the script misreads a file.
@@ -526,6 +592,14 @@ def main():
 
     OUT.write_text('\n'.join(js_lines), encoding='utf-8')
     print(f'\nDone -- {len(all_products)} records across {len(promo_retailers)} retailers -> {OUT}')
+
+    # Notification schedule for the promo-alerts Cron Worker + in-app bell
+    barcode_brand = load_barcode_brands()
+    schedule = build_notification_schedule(promo_meta, all_products, barcode_brand)
+    sched_path = Path('public/notification_schedule.json')
+    sched_path.write_text(json.dumps(schedule, ensure_ascii=False, indent=2), encoding='utf-8')
+    print(f'   Notification schedule -> {sched_path} ({len(schedule)} entries)')
+
     if not all_products:
         print('   Tip: If all retailers were skipped, check BASE_DIR path and CONFIG header_row values.')
 
