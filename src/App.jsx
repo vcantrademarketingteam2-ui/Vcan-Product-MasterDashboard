@@ -4,7 +4,55 @@ import retailerData from './retailer_data.js'
 import promoData, { PROMO_META, PROMO_ACTIVITY, PROMO_RETAILERS } from './promo_data.js'
 import vcanLogo from './VCAN.png'
 import PromoSection from './PromoSection.jsx'
-import { upcomingWithin, bangkokToday } from './promoAlerts.js'
+import { upcomingWithin, bangkokToday, daysUntil } from './promoAlerts.js'
+
+// Bell-alert urgency → tone + plain-language countdown. Tones map to theme colors
+// in render (today=red, soon ≤2d=orange, upcoming ≤5d=yellow) — the 2-day / 5-day
+// warning scheme. Pure + module-scope so it stays trivially testable.
+function alertUrgency(days) {
+  if (days <= 0) return { tone: 'today', text: 'Starts today' }
+  if (days === 1) return { tone: 'soon', text: 'Starts tomorrow' }
+  if (days <= 2) return { tone: 'soon', text: `${days} days left until it starts` }
+  return { tone: 'upcoming', text: `${days} days left until it starts` }
+}
+
+// Products brand-filter grouping. Patterns match by brand keyword so SKU variants
+// ("Malizia Bath Foam 1L", "VITAKRAFT CAT", "PEARS SOAP") inherit the base brand's
+// category. Anything unmatched lands in "Other" — VENDOR_BRANDS.ALL is data-derived,
+// so the grouping must never silently drop a brand.
+const BRAND_CATEGORIES = ['Laundry', 'Homecare', 'Personal Care', 'Intimate', 'Pet', 'Kitchen Ware', 'Other']
+// Order matters: brandCategory returns the FIRST matching category, so the more
+// specific rules (Intimate, exact-match Laundry L'Arbre Vert) come before the
+// broad Personal Care fallbacks (/malizia/, /l'arbre/).
+const BRAND_CAT_RULES = [
+  ['Pet',           [/vitakraft/i]],
+  ['Kitchen Ware',  [/\bwmf\b/i]],
+  ['Intimate',      [/malizia\s*intimate/i, /tena/i]],
+  ['Laundry',       [/perwoll/i, /purex/i, /vernel/i, /vnew/i, /^l['’]?arbre vert\s*$/i]],
+  ['Homecare',      [/sofix/i, /somat/i, /pril/i, /combat/i, /general\s*fresh/i, /brilly/i, /tempo/i]],
+  ['Personal Care', [/dove/i, /dial/i, /pears/i, /pepsodent/i, /jack/i, /malizia/i, /l['’]?arbre/i, /sundae/i]],
+]
+function brandCategory(b) {
+  for (const [cat, pats] of BRAND_CAT_RULES) if (pats.some(p => p.test(b))) return cat
+  return 'Other'
+}
+
+// Status the summary cards (and card-click filter) bucket by:
+// no retailer scope → the product's global master status; with retailer(s)
+// scoped → its status AT those retailers, matching the column dots
+// (A=active, รอขาย/On Process=pending, ยกเลิกขาย=discon). Across multiple
+// retailers, most-active wins.
+// ponytail: most-active priority for multi-retailer; revisit only if a per-column split is asked for.
+function effStatusFor(p, selectedRetailers) {
+  if (selectedRetailers.length === 0) return p.status
+  let rank = -1 // 2 active, 1 pending, 0 discon, -1 not listed
+  for (const r of selectedRetailers) {
+    const v = p.retailers[r]
+    const k = v === 'A' ? 2 : (v === 'รอขาย' || v === 'On Process') ? 1 : v === 'ยกเลิกขาย' ? 0 : -1
+    if (k > rank) rank = k
+  }
+  return rank === 2 ? 'ขาย' : rank === 1 ? 'รอขาย' : rank === 0 ? 'ยกเลิกขาย' : null
+}
 
 // Count-up animation for KPI / bento numbers — respects prefers-reduced-motion.
 function useCountUp(target, dur = 1100) {
@@ -652,6 +700,8 @@ export default function App() {
       .catch(() => {})
   }, [])
   const alertsRef = useRef(null)
+  const todayISO = bangkokToday()
+  const alertMinDays = alerts.length ? Math.min(...alerts.map(a => daysUntil(a.startDate, todayISO))) : null
   useEffect(() => {
     if (!alertsOpen) return
     const handler = (e) => { if (alertsRef.current && !alertsRef.current.contains(e.target)) setAlertsOpen(false) }
@@ -773,10 +823,29 @@ export default function App() {
   }
 
   const visibleBrands = VENDOR_BRANDS[vendorFilter] || VENDOR_BRANDS.ALL
+  const brandGroups = useMemo(() => {
+    const g = {}
+    visibleBrands.forEach(b => { (g[brandCategory(b)] = g[brandCategory(b)] || []).push(b) })
+    return g
+  }, [visibleBrands])
   const handleVendorChange = (v) => { setVendorFilter(v); setSelectedBrands([]) }
   const toggleBrand = (b) => setSelectedBrands(prev => prev.includes(b) ? prev.filter(x => x !== b) : [...prev, b])
+  const renderBrandPill = (b) => {
+    const sel = selectedBrands.includes(b)
+    return (
+      <button key={b} className="bpill" onClick={() => toggleBrand(b)} style={{
+        background: sel ? t.accent : t.surface2,
+        color: sel ? '#000' : t.text,
+        border: `1.5px solid ${sel ? t.accent : t.border}`,
+        borderRadius: 22, padding: '4px 9px', fontSize: 11, height: 26, boxSizing: 'border-box',
+        fontWeight: sel ? 700 : 500, cursor: 'pointer', textAlign: 'center', whiteSpace: 'nowrap', width: '100%', maxWidth: 'max-content',
+        boxShadow: sel ? `0 0 0 2px ${t.accent}33` : 'none',
+      }} title={b}>{b}</button>
+    )
+  }
   const clearAll = () => { setSearch(''); setSelectedBrands([]); setSelectedRetailers([]); setStatusTab('ALL'); setVendorFilter('ALL'); setSortCol(null); setSortDir('asc') }
   const toggleRetailer = (r) => setSelectedRetailers(prev => prev.includes(r) ? prev.filter(x => x !== r) : [...prev, r])
+  const toggleStatus = (k) => setStatusTab(s => (s === k ? 'ALL' : k))
   const handleSort = (col) => {
     if (sortCol === col) {
       if (sortDir === 'asc') setSortDir('desc')
@@ -786,27 +855,42 @@ export default function App() {
   const hasActiveFilters = search || selectedBrands.length > 0 || selectedRetailers.length > 0 || statusTab !== 'ALL' || vendorFilter !== 'ALL'
   const visibleRetailers = selectedRetailers.length > 0 ? selectedRetailers : RETAILERS
 
-  const stats = useMemo(() => ({
-    total: rawData.length,
-    active: rawData.filter(p => p.status === 'ขาย').length,
-    pending: rawData.filter(p => p.status === 'รอขาย').length,
-    discon: rawData.filter(p => p.status === 'ยกเลิกขาย').length,
-  }), [rawData])
-
-  const filtered = useMemo(() => rawData.filter(p => {
+  // Scope = active filters EXCEPT status. The four summary cards ARE the status
+  // breakdown, so they reflect this scope (retailer / vendor / brand / search) and
+  // stay meaningful even when a status is also picked. Retailer is the headline
+  // driver (task 3): pick "Tops" and the cards show only products listed at Tops.
+  const statsBase = useMemo(() => rawData.filter(p => {
     if (vendorFilter !== 'ALL' && p.company !== vendorFilter) return false
     if (selectedBrands.length > 0 && !selectedBrands.includes(p.brand.trim())) return false
-    if (statusTab !== 'ALL' && p.status !== statusTab) return false
-    if (selectedRetailers.length > 0) {
-      // keep product only if it has any relationship with at least one selected retailer
-      if (!selectedRetailers.some(r => p.retailers[r])) return false
-    }
+    if (selectedRetailers.length > 0 && !selectedRetailers.some(r => p.retailers[r])) return false
     if (search) {
       const q = search.toLowerCase()
       if (!p.product.toLowerCase().includes(q) && !p.brand.toLowerCase().includes(q) && !p.barcode.includes(q)) return false
     }
     return true
-  }), [rawData, vendorFilter, selectedBrands, selectedRetailers, statusTab, search])
+  }), [rawData, vendorFilter, selectedBrands, selectedRetailers, search])
+
+  const stats = useMemo(() => {
+    let active = 0, pending = 0, discon = 0
+    statsBase.forEach(p => {
+      const s = effStatusFor(p, selectedRetailers)
+      if (s === 'ขาย') active++
+      else if (s === 'รอขาย') pending++
+      else if (s === 'ยกเลิกขาย') discon++
+    })
+    return { total: statsBase.length, active, pending, discon }
+  }, [statsBase, selectedRetailers])
+
+  // Human label for what the cards are scoped to (reverts to "all products" when clear).
+  const scopeLabel = selectedRetailers.length > 0
+    ? `at ${selectedRetailers.join(' · ')}`
+    : (vendorFilter !== 'ALL' || selectedBrands.length > 0 || search) ? 'filtered subset' : 'all products'
+
+  // Table list = the same scope, then narrowed by the status filter.
+  const filtered = useMemo(
+    () => (statusTab === 'ALL' ? statsBase : statsBase.filter(p => effStatusFor(p, selectedRetailers) === statusTab)),
+    [statsBase, statusTab, selectedRetailers]
+  )
 
   const sortedFiltered = useMemo(() => {
     if (!sortCol) return filtered
@@ -1019,9 +1103,15 @@ export default function App() {
     </div>
   )
 
-  function StatCard({ label, value, sub, color }) {
+  function StatCard({ label, value, sub, color, active, onClick }) {
+    const ring = color || t.accent
     return (
-      <div className="vc-rise vc-lift" style={{ ...glassPanel, borderRadius: 12, padding: isMobile ? '14px 16px' : '20px 24px' }}>
+      <div className="vc-rise vc-lift" onClick={onClick} role={onClick ? 'button' : undefined} title={onClick ? `Filter: ${label}` : undefined} style={{
+        ...glassPanel, borderRadius: 12, padding: isMobile ? '14px 16px' : '20px 24px',
+        cursor: onClick ? 'pointer' : 'default',
+        outline: active ? `2px solid ${ring}` : '2px solid transparent', outlineOffset: -2,
+        boxShadow: active ? `${glassPanel.boxShadow}, 0 0 0 4px ${ring}22` : glassPanel.boxShadow,
+      }}>
         <div style={{ fontSize: 11, color: t.muted, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>{label}</div>
         <div style={{ fontSize: isMobile ? 28 : 36, fontWeight: 800, color: color || t.text, lineHeight: 1, marginBottom: 4 }}>{value}</div>
         {sub && <div style={{ fontSize: 11, color: t.muted }}>{sub}</div>}
@@ -1099,7 +1189,7 @@ export default function App() {
         ::-webkit-scrollbar-thumb{background:${t.border};border-radius:3px;}
         .rhover:hover{background:${t.rowHover}!important;}
         .bpill{transition:all 0.15s;cursor:pointer;}
-        .bpill:hover{background:${t.accent}!important;color:#000!important;border-color:${t.accent}!important;}
+        .bpill:hover{background:${t.accent}!important;color:#000!important;border-color:${t.accent}!important;transform:translateY(-2px);box-shadow:0 4px 12px ${t.accent}55;}
         .nav-item{transition:all 0.15s;cursor:pointer;}
         .nav-item:hover{background:${t.surface2}!important;}
         .sb-btn{transition:background 0.15s;cursor:pointer;}
@@ -1274,7 +1364,7 @@ export default function App() {
             <div style={{ fontWeight: 800, fontSize: isMobile ? 14 : 17, color: t.text, letterSpacing: 0.2, whiteSpace: 'nowrap', flexShrink: 0 }}>
               Product Master
             </div>
-            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v3.1.4</span>
+            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v3.2.3</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: isMobile ? 11 : 13, background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, padding: isMobile ? '3px 8px' : '5px 12px', overflow: 'hidden', minWidth: 0, flexShrink: 1 }}>
               <span style={{ width: isMobile ? 6 : 7, height: isMobile ? 6 : 7, borderRadius: '50%', flexShrink: 0, background: dataSource === 'csv' ? t.blue : t.green }} />
               <span style={{ fontWeight: 800, color: dataSource === 'csv' ? t.blue : t.green, flexShrink: 0 }}>
@@ -1299,19 +1389,38 @@ export default function App() {
                   <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" />
                 </svg>
                 {alerts.length > 0 && !alertsSeen && (
-                  <span style={{ position: 'absolute', top: -4, right: -4, minWidth: 16, height: 16, padding: '0 4px', borderRadius: 8, background: t.accent, color: '#000', fontSize: 10, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{alerts.length}</span>
+                  <span style={{ position: 'absolute', top: -4, right: -4, minWidth: 16, height: 16, padding: '0 4px', borderRadius: 8, background: alertMinDays <= 0 ? t.red : alertMinDays <= 2 ? (dark ? '#fb923c' : '#b45309') : t.yellow, color: '#fff', fontSize: 10, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{alerts.length}</span>
                 )}
               </button>
               {alertsOpen && (
                 <div style={{ position: 'absolute', right: 0, top: 'calc(100% + 8px)', width: 280, maxHeight: 360, overflowY: 'auto', background: t.surface, border: `1px solid ${t.border}`, borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,.3)', zIndex: 60, padding: 8 }}>
                   <div style={{ fontSize: 12, fontWeight: 800, color: t.muted, padding: '4px 8px 8px' }}>Upcoming promos (≤5 days)</div>
                   {alerts.length === 0 && <div style={{ fontSize: 12, color: t.muted, padding: '4px 8px 8px' }}>Nothing in the next 5 days.</div>}
-                  {alerts.map((e, i) => (
-                    <div key={i} style={{ padding: '8px', borderTop: i ? `1px solid ${t.border}` : 'none' }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: t.text }}>{e.retailer}{e.brands.length ? ` · ${e.brands.join(', ')}` : ''}</div>
-                      <div style={{ fontSize: 11, color: t.muted, marginTop: 2 }}>{e.activities.join(', ')} — starts {e.startDate}</div>
-                    </div>
-                  ))}
+                  {alerts.map((e, i) => {
+                    const d = daysUntil(e.startDate, todayISO)
+                    const u = alertUrgency(d)
+                    const clr = u.tone === 'today' ? t.red : u.tone === 'soon' ? (dark ? '#fb923c' : '#b45309') : t.yellow
+                    return (
+                      <div key={i} style={{
+                        padding: '9px 10px 9px 12px', marginTop: i ? 6 : 2, borderRadius: 10,
+                        background: `${clr}14`, borderLeft: `4px solid ${clr}`,
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                          <span style={{ fontSize: 13, fontWeight: 800, color: t.text }}>{e.retailer}</span>
+                          {e.activities?.length > 0 && (
+                            <span style={{ fontSize: 9.5, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.04em', color: clr, background: `${clr}24`, borderRadius: 5, padding: '1px 6px' }}>{e.activities.join(' · ')}</span>
+                          )}
+                        </div>
+                        {e.brands?.length > 0 && (
+                          <div style={{ fontSize: 12, color: t.text, opacity: .82, marginTop: 3, lineHeight: 1.35 }}>{e.brands.join(', ')}</div>
+                        )}
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 5 }}>
+                          <span style={{ fontSize: 11.5, fontWeight: 800, color: clr }}>{u.text}</span>
+                          <span style={{ fontSize: 10.5, color: t.muted, fontFamily: 'ui-monospace,monospace' }}>· {e.startDate}</span>
+                        </div>
+                      </div>
+                    )
+                  })}
                   <div style={{ borderTop: `1px solid ${t.border}`, marginTop: 4, padding: '8px 8px 4px', display: 'flex', justifyContent: 'flex-end' }}>
                     <button onClick={() => {
                       const secret = window.prompt('Enter alert secret:');
@@ -1370,10 +1479,10 @@ export default function App() {
             <>
               {/* Stat cards */}
               <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', gap: 12, marginBottom: 20 }}>
-                <StatCard label="Total SKUs" value={stats.total} sub="all products" />
-                <StatCard label="Active" value={stats.active} sub={`${stats.total ? Math.round(stats.active / stats.total * 100) : 0}% of total`} color={t.green} />
-                <StatCard label="Pending" value={stats.pending} sub="รอขาย" color={t.yellow} />
-                <StatCard label="Discontinued" value={stats.discon} sub="ยกเลิกขาย" color={t.red} />
+                <StatCard label="Total SKUs" value={stats.total} sub={scopeLabel} color={scopeLabel === 'all products' ? undefined : t.accent} />
+                <StatCard label="Active" value={stats.active} sub={`${stats.total ? Math.round(stats.active / stats.total * 100) : 0}% of total`} color={t.green} active={statusTab === 'ขาย'} onClick={() => toggleStatus('ขาย')} />
+                <StatCard label="Pending" value={stats.pending} sub="รอขาย" color={t.yellow} active={statusTab === 'รอขาย'} onClick={() => toggleStatus('รอขาย')} />
+                <StatCard label="Discontinued" value={stats.discon} sub="ยกเลิกขาย" color={t.red} active={statusTab === 'ยกเลิกขาย'} onClick={() => toggleStatus('ยกเลิกขาย')} />
               </div>
 
               {/* Sticky filter section */}
@@ -1400,11 +1509,13 @@ export default function App() {
                       )}
                     </div>
                     {hasActiveFilters && (
-                      <button onClick={clearAll} className="clr-btn" style={{
-                        background: 'none', border: `1.5px solid ${t.border}`, borderRadius: 8,
-                        color: t.muted, fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                        padding: '8px 14px', whiteSpace: 'nowrap', flexShrink: 0,
-                      }}>✕ Clear all</button>
+                      <button onClick={clearAll} className="vc-lift" style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 6,
+                        background: t.accent, border: `1.5px solid ${t.accent}`, borderRadius: 8,
+                        color: '#000', fontSize: 12.5, fontWeight: 800, cursor: 'pointer',
+                        padding: '8px 16px', whiteSpace: 'nowrap', flexShrink: 0,
+                        boxShadow: `0 2px 10px ${t.accent}66`,
+                      }}>✕ Clear filters</button>
                     )}
                   </div>
                 </div>
@@ -1437,21 +1548,42 @@ export default function App() {
 
                 {/* Brand pills — card background for contrast */}
                 <div style={{
-                  ...glassPanel, borderRadius: 12, padding: '10px 14px',
+                  ...glassPanel, borderRadius: 12, padding: '12px 16px',
+                  // Height guard: in extreme cases scroll rather than burying the
+                  // table/menus below; the proportional layout keeps it short normally.
+                  ...(isMobile ? {} : { maxHeight: '44vh', overflowY: 'auto' }),
                 }}>
-                  <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', alignItems: 'center' }}>
-                    {visibleBrands.map(b => {
-                      const sel = selectedBrands.includes(b)
+                  {/* Categorized brand pills — side-by-side columns (one per category,
+                      label on top, pills wrap WITHIN the column) divided by vertical
+                      rules. Each column's width is proportional to its TOTAL TEXT
+                      LENGTH (flex-grow = sum of brand-name chars, basis 0): since a
+                      column's height ≈ totalText / width, weighting width by total
+                      text makes every column end up ≈ the same height — so a busy
+                      category like Personal Care wraps into multiple sub-columns
+                      instead of one tall stack, balancing the grid and filling the
+                      right-side whitespace. Mobile: stack full-width. */}
+                  <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', flexWrap: isMobile ? 'nowrap' : 'wrap', alignItems: 'flex-start', justifyContent: 'space-between', gap: 0 }}>
+                    {BRAND_CATEGORIES.filter(c => brandGroups[c]?.length).map((cat, i) => {
+                      const count = brandGroups[cat].length
+                      const numCols = Math.ceil(count / 4)
+                      // ponytail: optimal row count so each column is balanced (e.g. Pet 5→3×2 not 4+1)
+                      const numRows = Math.ceil(count / numCols)
                       return (
-                        <button key={b} className="bpill" onClick={() => toggleBrand(b)} style={{
-                          background: sel ? t.accent : t.surface2,
-                          color: sel ? '#000' : t.text,
-                          border: `1.5px solid ${sel ? t.accent : t.border}`,
-                          borderRadius: 22, padding: '6px 16px', fontSize: 12.5,
-                          fontWeight: sel ? 700 : 500, cursor: 'pointer',
-                          boxShadow: sel ? `0 0 0 2px ${t.accent}33` : 'none',
-                        }}>{b}</button>
-                      )
+                      <div key={cat} style={{
+                        flex: `${numCols} 1 0`, minWidth: 'min-content',
+                        display: 'flex', flexDirection: 'column', gap: 10,
+                        ...(isMobile
+                          ? { paddingTop: i ? 9 : 0, marginTop: i ? 9 : 0, borderTop: i ? `1px solid ${t.border}` : 'none' }
+                          : { paddingLeft: i ? 10 : 0, paddingRight: 10, borderLeft: i ? `1px solid ${t.border}` : 'none' }),
+                      }}>
+                        <span style={{
+                          fontSize: 10.5, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.08em', color: t.muted, whiteSpace: 'nowrap',
+                        }}>{cat}</span>
+                        <div style={{ display: 'grid', gridAutoFlow: 'column', gridTemplateColumns: `repeat(${numCols}, minmax(min-content, 1fr))`, gridTemplateRows: `repeat(${numRows}, 26px)`, gap: 6, width: '100%' }}>
+                          {brandGroups[cat].map(renderBrandPill)}
+                        </div>
+                      </div>
+                      );
                     })}
                   </div>
                 </div>
