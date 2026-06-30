@@ -557,13 +557,13 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
           onMouseLeave={() => setBarTip(null)}>
           <div className="ps-sched-inner" ref={tlInnerRef} style={{ position: 'relative' }}>
 
-            {/* TODAY marker — solid neon glowline. zIndex 0 keeps it BELOW the
-                price pills (.ps-sched-bar is zIndex 1), so pills sit cleanly on top */}
+            {/* TODAY marker — zIndex 10 so it renders ABOVE price pills,
+                making the exact position clearly visible inside the current bar */}
             {tlNowX !== null && (
               <div style={{
-                position: 'absolute', top: 0, bottom: 0, pointerEvents: 'none', zIndex: 0,
+                position: 'absolute', top: 0, bottom: 0, pointerEvents: 'none', zIndex: 10,
                 left: tlNowX, width: 2, background: GOLD_A,
-                boxShadow: `0 0 8px 1px ${GOLD_A}cc, 0 0 22px 4px ${GOLD_A}55`,
+                boxShadow: `0 0 6px 1px ${GOLD_A}bb`,
               }} />
             )}
 
