@@ -1364,7 +1364,7 @@ export default function App() {
             <div style={{ fontWeight: 800, fontSize: isMobile ? 14 : 17, color: t.text, letterSpacing: 0.2, whiteSpace: 'nowrap', flexShrink: 0 }}>
               Product Master
             </div>
-            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v3.2.3</span>
+            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v3.2.4</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: isMobile ? 11 : 13, background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, padding: isMobile ? '3px 8px' : '5px 12px', overflow: 'hidden', minWidth: 0, flexShrink: 1 }}>
               <span style={{ width: isMobile ? 6 : 7, height: isMobile ? 6 : 7, borderRadius: '50%', flexShrink: 0, background: dataSource === 'csv' ? t.blue : t.green }} />
               <span style={{ fontWeight: 800, color: dataSource === 'csv' ? t.blue : t.green, flexShrink: 0 }}>
@@ -1566,7 +1566,7 @@ export default function App() {
                     {BRAND_CATEGORIES.filter(c => brandGroups[c]?.length).map((cat, i) => {
                       const count = brandGroups[cat].length
                       const numCols = Math.ceil(count / 4)
-                      // ponytail: optimal row count so each column is balanced (e.g. Pet 5→3×2 not 4+1)
+                      // ponytail: balanced distribution (Pet 5→3×2 not 4+1); minHeight forces equal column height
                       const numRows = Math.ceil(count / numCols)
                       return (
                       <div key={cat} style={{
@@ -1579,7 +1579,7 @@ export default function App() {
                         <span style={{
                           fontSize: 10.5, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.08em', color: t.muted, whiteSpace: 'nowrap',
                         }}>{cat}</span>
-                        <div style={{ display: 'grid', gridAutoFlow: 'column', gridTemplateColumns: `repeat(${numCols}, minmax(min-content, 1fr))`, gridTemplateRows: `repeat(${numRows}, 26px)`, gap: 6, width: '100%' }}>
+                        <div style={{ display: 'grid', gridAutoFlow: 'column', gridTemplateColumns: `repeat(${numCols}, minmax(min-content, 1fr))`, gridTemplateRows: `repeat(${numRows}, 26px)`, minHeight: 122, gap: 6, width: '100%' }}>
                           {brandGroups[cat].map(renderBrandPill)}
                         </div>
                       </div>
