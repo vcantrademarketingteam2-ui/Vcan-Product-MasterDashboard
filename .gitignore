@@ -25,7 +25,16 @@ dist-ssr
 
 # Secret credentials — never commit
 credentials.json
+Credentials.json/
 *.json.key
+
+# Generated caches
+__pycache__/
+.wrangler/
+
+# Claude Code / superpowers plugin — not part of the project
+.superpowers/
+.claude/
 
 # Packshot originals — large, stay local only (not deployed)
 # The .webp compressed versions ARE committed and deployed to Netlify
