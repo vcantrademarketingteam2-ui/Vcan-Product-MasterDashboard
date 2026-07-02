@@ -9,13 +9,8 @@
 
 import { useState, useMemo, useRef, useLayoutEffect } from 'react'
 import promoData, { PROMO_META, PROMO_ACTIVITY, PROMO_RETAILERS } from './promo_data.js'
+import { DEPT_PINS, canSeeRetailer, logPricingAccess } from './deptPins.js'
 import './PromoSection.css'
-
-// ── constants ─────────────────────────────────────────────────────────────────
-const DEPT_PINS = {
-  [import.meta.env.VITE_PIN_SALES ?? '2745']: 'Sales/Trade Marketing',
-  [import.meta.env.VITE_PIN_DATA   ?? '4343']: 'Data',
-}
 
 // v2.19.0 neon palette: media = neon cyan, looks = neon fuchsia, field = orange.
 // Clearance moved off cyan (→ neon coral) so media can own it.
@@ -169,6 +164,7 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
   const [pinErr, setPinErr] = useState(false)
   const [openKey, setOpenKey] = useState(null)
   const [calcOpen, setCalcOpen] = useState(false)
+  const canSeeGP = unlocked && canSeeRetailer(unlocked, retailer)
 
   const tlInnerRef  = useRef(null)
   const [tlNowX,  setTlNowX]  = useState(null)
@@ -425,7 +421,7 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
   const submitPin = e => {
     e.preventDefault()
     const dept = DEPT_PINS[pin]
-    if (dept) { setUnlocked(dept); setPin(''); setPinErr(false) }
+    if (dept) { setUnlocked(dept); setPin(''); setPinErr(false); logPricingAccess(dept, `Promotion Plan · ${retailer}`) }
     else { setPinErr(true); setPin('') }
   }
 
@@ -483,7 +479,7 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
                     <div className="ps-cal-rail-name" style={{ color: tx }}>{it.product}</div>
                     <div className="ps-cal-rail-sub">
                       <span className="ps-cal-rail-rsp" style={{ color: mu }}>RSP ฿{it.rspIncVat}</span>
-                      {unlocked && <span className="ps-cal-rail-gp" style={{ color: gpColor(it.gp) }}>GP {Math.round(it.gp * 100)}%</span>}
+                      {canSeeGP && <span className="ps-cal-rail-gp" style={{ color: gpColor(it.gp) }}>GP {Math.round(it.gp * 100)}%</span>}
                       {it.clearance && <span className="ps-cal-rail-tag" style={{ color: neon(CLEAR_COLOR), background: `${neon(CLEAR_COLOR)}22` }}>CLEAR</span>}
                     </div>
                   </div>
@@ -511,7 +507,7 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
                           {pctOff != null && pctOff > 0 && <span className="ps-tip">−{pctOff}%</span>}
                           <span className="ps-chip-pr" style={{ color: tx }}>{priceTxt(pd)}</span>
                           {openKey === ckey && pctOff != null && pctOff > 0 && <span className="ps-chip-off">−{pctOff}%</span>}
-                          {openKey === ckey && unlocked && pd.compensate != null && (
+                          {openKey === ckey && canSeeGP && pd.compensate != null && (
                             <span style={{ fontSize: 9, fontFamily: 'monospace', color: t.blue || '#58a6ff', fontWeight: 700 }}>฿{pd.compensate.toFixed(2)}</span>
                           )}
                           {(pd.activities || []).length > 0 && <span className="ps-chip-dots"><ActDots acts={pd.activities} size={5} /></span>}
@@ -620,7 +616,7 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
                       <div style={{ fontSize: 12.5, fontWeight: 600, color: tx, lineHeight: 1.35, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.product}</div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
                         <span style={{ fontSize: 11, fontFamily: 'ui-monospace,monospace', fontWeight: 700, color: mu }}>RSP ฿{it.rspIncVat}</span>
-                        {unlocked && <span style={{ fontSize: 10, fontFamily: 'ui-monospace,monospace', fontWeight: 700, color: gpColor(it.gp) }}>GP {Math.round(it.gp * 100)}%</span>}
+                        {canSeeGP && <span style={{ fontSize: 10, fontFamily: 'ui-monospace,monospace', fontWeight: 700, color: gpColor(it.gp) }}>GP {Math.round(it.gp * 100)}%</span>}
                         {it.clearance && <span style={{ fontSize: 8.5, fontWeight: 800, color: neon(CLEAR_COLOR), background: `${neon(CLEAR_COLOR)}22`, borderRadius: 4, padding: '1px 5px', letterSpacing: '.04em' }}>CLEAR</span>}
                       </div>
                     </div>

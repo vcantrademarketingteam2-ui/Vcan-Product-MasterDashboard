@@ -2,7 +2,7 @@
 # Called by update_dashboard.bat (NonInteractive) or run directly
 
 $src = "Y:\MARKETING\Meth\ห้องทำงาน Claude\Product Packshot for dashboard"
-$dst = "c:\Users\V-Can Nantawan\vcan-dashboard\public\packshots"
+$dst = Join-Path $PSScriptRoot "public\packshots"
 $isInteractive = [Environment]::UserInteractive -and (-not $args -contains "-NonInteractive")
 
 if (-not (Test-Path $src)) {

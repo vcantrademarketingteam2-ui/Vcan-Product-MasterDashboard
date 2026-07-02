@@ -5,6 +5,7 @@ import promoData, { PROMO_META, PROMO_ACTIVITY, PROMO_RETAILERS } from './promo_
 import vcanLogo from './VCAN.png'
 import PromoSection from './PromoSection.jsx'
 import { upcomingWithin, bangkokToday, daysUntil } from './promoAlerts.js'
+import { DEPT_PINS, canSeeRetailer, canViewAccessLog, logPricingAccess, getAccessLog, clearAccessLog } from './deptPins.js'
 
 // Bell-alert urgency → tone + plain-language countdown. Tones map to theme colors
 // in render (today=red, soon ≤2d=orange, upcoming ≤5d=yellow) — the 2-day / 5-day
@@ -77,20 +78,6 @@ function CountUp({ v, dec = 0 }) {
 }
 
 const RETAILERS = ['Tops', 'Villa', 'The Mall', 'Lotus', 'Homepro', 'Big C', 'TWD', 'Boots', 'Foodland', 'Central Department', "Pet'n me", 'Fuji']
-
-// Department PINs — values come from .env (VITE_ prefix = compiled into bundle)
-const DEPT_PINS = {
-  [import.meta.env.VITE_PIN_SALES ?? '2745']: 'Sales/Trade Marketing',
-  [import.meta.env.VITE_PIN_DATA   ?? '4343']: 'Data',
-}
-
-function logPricingAccess(dept, productName) {
-  try {
-    const logs = JSON.parse(localStorage.getItem('pricingLog') || '[]')
-    logs.unshift({ dept, product: productName, time: new Date().toISOString() })
-    localStorage.setItem('pricingLog', JSON.stringify(logs.slice(0, 200)))
-  } catch {}
-}
 
 const fmtTs = (d) => {
   const dt = new Date(d)
@@ -467,7 +454,7 @@ function ProductPopup({ product, onClose, t, dark, isMobile = false, pricing = {
               </tr>
             </thead>
             <tbody>
-              {RETAILERS.filter(r => pricing[r]).map(r => {
+              {RETAILERS.filter(r => pricing[r] && canSeeRetailer(unlockedDept, r)).map(r => {
                 const d = pricing[r]
                 const gpColor = d.gp >= 0.30 ? t.green : d.gp >= 0.20 ? t.yellow : t.red
                 return (
@@ -708,6 +695,22 @@ export default function App() {
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [alertsOpen])
+  // Admin access log — who unlocked cost/GP, on what, when (this device only; see deptPins.js)
+  const [logOpen, setLogOpen] = useState(false)
+  const [logDept, setLogDept] = useState(() => {
+    const d = sessionStorage.getItem('puDept') || ''
+    return canViewAccessLog(d) ? d : ''
+  })
+  const [logPin, setLogPin] = useState('')
+  const [logPinErr, setLogPinErr] = useState(false)
+  const [logTick, setLogTick] = useState(0)
+  const logRef = useRef(null)
+  useEffect(() => {
+    if (!logOpen) return
+    const handler = (e) => { if (logRef.current && !logRef.current.contains(e.target)) setLogOpen(false) }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [logOpen])
   const [vendorFilter, setVendorFilter] = useState('ALL')
   const [search, setSearch] = useState('')
   const [selectedBrands, setSelectedBrands] = useState([])
@@ -1364,7 +1367,7 @@ export default function App() {
             <div style={{ fontWeight: 800, fontSize: isMobile ? 14 : 17, color: t.text, letterSpacing: 0.2, whiteSpace: 'nowrap', flexShrink: 0 }}>
               Product Master
             </div>
-            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v3.2.5</span>
+            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v3.3.0</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: isMobile ? 11 : 13, background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, padding: isMobile ? '3px 8px' : '5px 12px', overflow: 'hidden', minWidth: 0, flexShrink: 1 }}>
               <span style={{ width: isMobile ? 6 : 7, height: isMobile ? 6 : 7, borderRadius: '50%', flexShrink: 0, background: dataSource === 'csv' ? t.blue : t.green }} />
               <span style={{ fontWeight: 800, color: dataSource === 'csv' ? t.blue : t.green, flexShrink: 0 }}>
@@ -1438,6 +1441,65 @@ export default function App() {
                       {alertTestState === 'sending' ? '...' : alertTestState === 'ok' ? '✓ Sent' : alertTestState === 'err' ? '✕ Failed' : 'Send LINE test'}
                     </button>
                   </div>
+                </div>
+              )}
+            </div>
+            {/* Access log (admin only — who unlocked cost/GP) */}
+            <div ref={logRef} style={{ position: 'relative' }}>
+              <button onClick={() => setLogOpen(o => !o)} className="sb-btn neon-ico" aria-label="Pricing access log" style={{
+                background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, color: t.muted,
+                padding: isMobile ? '5px 8px' : '5px 10px', cursor: 'pointer',
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+                </svg>
+              </button>
+              {logOpen && (
+                <div style={{ position: 'absolute', right: 0, top: 'calc(100% + 8px)', width: 300, maxHeight: 380, overflowY: 'auto', background: t.surface, border: `1px solid ${t.border}`, borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,.3)', zIndex: 60, padding: 12 }}>
+                  {!canViewAccessLog(logDept) ? (
+                    <>
+                      <div style={{ fontSize: 12, fontWeight: 800, color: t.muted, marginBottom: 8 }}>Pricing access log</div>
+                      <div style={{ fontSize: 11.5, color: t.muted, marginBottom: 10 }}>Enter your department PIN to view who unlocked cost/GP.</div>
+                      <form onSubmit={e => {
+                        e.preventDefault()
+                        const dept = DEPT_PINS[logPin]
+                        if (dept && canViewAccessLog(dept)) {
+                          setLogDept(dept)
+                          sessionStorage.setItem('pu', '1'); sessionStorage.setItem('puDept', dept)
+                          setLogPin(''); setLogPinErr(false)
+                        } else { setLogPinErr(true); setLogPin('') }
+                      }} style={{ display: 'flex', gap: 8 }}>
+                        <input type="password" inputMode="numeric" maxLength={10} value={logPin}
+                          onChange={e => { setLogPin(e.target.value); setLogPinErr(false) }}
+                          placeholder="PIN"
+                          style={{ flex: 1, background: t.surface2, border: `1.5px solid ${logPinErr ? '#f85149' : t.border}`, borderRadius: 8, color: t.text, padding: '8px 10px', fontSize: 14, textAlign: 'center', outline: 'none', letterSpacing: 3 }} />
+                        <button type="submit" style={{ background: t.accent, border: 'none', borderRadius: 8, color: '#000', fontWeight: 700, fontSize: 12, padding: '8px 14px', cursor: 'pointer' }}>View</button>
+                      </form>
+                      {logPinErr && <div style={{ fontSize: 11, color: '#f85149', fontWeight: 600, marginTop: 6 }}>Wrong PIN, or not authorized to view the log</div>}
+                    </>
+                  ) : (() => {
+                    const entries = getAccessLog()
+                    return (
+                      <>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                          <div style={{ fontSize: 12, fontWeight: 800, color: t.muted }}>Pricing access log</div>
+                          <button onClick={() => { clearAccessLog(); setLogTick(v => v + 1) }} style={{ background: 'none', border: 'none', fontSize: 10.5, color: t.muted, cursor: 'pointer', opacity: 0.7 }}>Clear</button>
+                        </div>
+                        <div style={{ fontSize: 10, color: t.muted, opacity: 0.75, marginBottom: 8 }}>This device only — not a company-wide log.</div>
+                        {entries.length === 0 && <div style={{ fontSize: 12, color: t.muted, padding: '4px 0' }}>No pricing access recorded on this device yet.</div>}
+                        {entries.map((e, i) => (
+                          <div key={i} style={{ padding: '7px 8px', marginTop: i ? 4 : 0, borderRadius: 8, background: t.surface2 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+                              <span style={{ fontSize: 12, fontWeight: 700, color: t.text }}>{e.dept}</span>
+                              <span style={{ fontSize: 10, color: t.muted, fontFamily: 'ui-monospace,monospace' }}>{new Date(e.time).toLocaleString()}</span>
+                            </div>
+                            <div style={{ fontSize: 11.5, color: t.muted, marginTop: 2 }}>{e.product}</div>
+                          </div>
+                        ))}
+                      </>
+                    )
+                  })()}
                 </div>
               )}
             </div>

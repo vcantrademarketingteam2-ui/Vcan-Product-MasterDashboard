@@ -35,7 +35,7 @@ npm run preview   # preview production build locally
 npm run lint      # ESLint
 ```
 
-Deploy: push to `main` **auto-builds on Cloudflare Pages/Workers only** (primary, `wrangler.jsonc` serves `dist/` as a single-page app). **Netlify is a manual-only backup** — auto builds are turned off in the Netlify dashboard (Build & deploy → "Stop builds"); deploy it by hand from the Netlify Deploys tab → "Trigger deploy" only when the backup needs refreshing. `update_dashboard.bat` runs the full pipeline (xlsx → data → packshots → webp → commit/push). Netlify URL: https://vcanproductmasterdashboard.netlify.app
+Deploy: push to `main` **auto-builds on Cloudflare Pages/Workers** (`wrangler.jsonc` serves `dist/` as a single-page app) — this is the only deploy target now, Netlify is no longer used. `update_dashboard.bat` runs the full pipeline (xlsx → data → packshots → webp → commit/push).
 
 There are no tests configured.
 
