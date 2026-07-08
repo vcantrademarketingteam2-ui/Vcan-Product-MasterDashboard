@@ -61,8 +61,19 @@ const TODAY_ISO = `${TODAY.getFullYear()}-${String(TODAY.getMonth() + 1).padStar
 
 // ── date helpers ──────────────────────────────────────────────────────────────
 function parseDR(dr = '') {
+  const s0 = (dr || '').trim()
+  // Villa format: "25.06.26 - 22.07.26" (dots, both sides carry year, spaces around dash).
+  // Without this branch every Villa period fails to parse and falls back to inferPeriodDate,
+  // which maps "Monthly7"→July and wrongly marks it NOW when today sits in Monthly6's range.
+  const md = s0.match(/^(\d+)\.(\d+)\.(\d+)\s*[–\-]\s*(\d+)\.(\d+)\.(\d+)$/)
+  if (md) {
+    const yr = n => (parseInt(n) < 50 ? 2000 : 1900) + parseInt(n)
+    const s = new Date(yr(md[3]), parseInt(md[2]) - 1, parseInt(md[1]))
+    const e = new Date(yr(md[6]), parseInt(md[5]) - 1, parseInt(md[4]), 23, 59, 59, 999)
+    return { s, e }
+  }
   // "27/05-9/06/26"  or  "7/01-20/01/26"
-  const m = dr.match(/^(\d+)\/(\d+)[–\-](\d+)\/(\d+)(?:\/(\d+))?$/)
+  const m = s0.match(/^(\d+)\/(\d+)[–\-](\d+)\/(\d+)(?:\/(\d+))?$/)
   if (!m) return null
   const yr = m[5] ? (parseInt(m[5]) < 50 ? 2000 + parseInt(m[5]) : 1900 + parseInt(m[5])) : TODAY.getFullYear()
   const s = new Date(yr, parseInt(m[2]) - 1, parseInt(m[1]))
@@ -383,11 +394,12 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
   // Bar backgrounds are OPAQUE (alpha gradient layered over a solid base) so the
   // NOW glowline can never bleed through the pill text.
   const barBase = dark ? '#0d1117' : '#f4efe9'
-  const getBarStyle = (activities, clearance) => {
+  const getBarStyle = (activities, clearance, branch) => {
     if (clearance) { const c = neon(CLEAR_COLOR); return { bg: `linear-gradient(135deg,${c}e8,${c}99), ${barBase}`, clr: c, txt: '#fff' } }
     for (const a of (activities || [])) {
       if (ACT[a]) { const c = neon(ACT[a].color); return { bg: `linear-gradient(135deg,${c}e8,${c}99), ${barBase}`, clr: c, txt: '#fff' } }
     }
+    if (branch) { const c = branchClr; return { bg: `linear-gradient(135deg,${c}e0,${c}90), ${barBase}`, clr: c, txt: '#fff', branch: true } }
     return {
       bg: dark ? '#1c2630' : '#fbf9f5',
       clr: dark ? '#a8c5da' : '#8fa9bd',
@@ -429,6 +441,11 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
   const s = t.surface, s2 = t.surface2, bdr = t.border, dim = t.dim, tx = t.text, mu = t.muted
   const nowBg = dark ? 'rgba(212,168,106,.10)' : 'rgba(156,107,53,.08)'
   const nowLine = t.accent
+  // discontinued ("ยกเลิกขาย") band tint + branch-exclusive (K.Village) green
+  const disconBg = dark ? 'rgba(248,81,73,.09)' : 'rgba(220,38,38,.06)'
+  const disconClr = t.red
+  const branchClr = dark ? '#4ade80' : '#16a34a'
+  const disconIdxOf = it => it.disconFrom ? periods.findIndex(pp => pp.name === it.disconFrom) : -1
 
   // ── sub-components ───────────────────────────────────────────────────────────
   function ActDots({ acts, size = 5 }) {
@@ -491,21 +508,31 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
                     const ckey = it.barcode + '|' + p.name
                     const pctOff = off(it, pd)
                     const nowEdge = isNow ? `inset 2px 0 0 ${nowLine}, inset -2px 0 0 ${nowLine}` : 'none'
+                    const di = disconIdxOf(it)
+                    const isDiscon = di >= 0 && i >= di
                     if (!pd) return (
                       <div key={p.name} className="ps-cal-cell ps-cal-cell-empty"
-                        style={{ borderLeft: `1px solid ${dim}`, background: isNow ? nowBg : 'transparent', boxShadow: nowEdge, color: mu }} />
+                        style={{ borderLeft: `1px solid ${dim}`, background: isDiscon ? disconBg : (isNow ? nowBg : 'transparent'), boxShadow: nowEdge, color: mu }}>
+                        {isDiscon && i === di && (
+                          <span style={{ fontSize: 9, fontWeight: 800, color: disconClr, background: `${disconClr}1e`, border: `1px solid ${disconClr}44`, borderRadius: 5, padding: '2px 6px', whiteSpace: 'nowrap' }}>ยกเลิกขาย</span>
+                        )}
+                      </div>
                     )
                     return (
                       <div key={p.name} className={`ps-cal-cell${isNow ? ' ps-now-cell' : ''}`}
-                        style={{ borderLeft: `1px solid ${dim}`, background: isNow ? nowBg : 'transparent',
+                        style={{ borderLeft: `1px solid ${dim}`, background: isDiscon ? disconBg : (isNow ? nowBg : 'transparent'),
                           boxShadow: nowEdge }}>
                         <span className="ps-chip" onClick={e => toggleChip(ckey, e)}
                           style={{ background: (prim || it.clearance) ? `color-mix(in srgb, ${mc} ${dark ? 16 : 24}%, ${s2})`
+                              : pd.branchExclusive ? `color-mix(in srgb, ${branchClr} ${dark ? 14 : 20}%, ${s2})`
                               : dark ? 'rgba(203,225,243,.10)' : 'rgba(255,255,255,.72)',
-                            border: `1px solid ${(prim || it.clearance) ? mc + '88' : (dark ? 'rgba(168,197,218,.4)' : 'rgba(143,169,189,.45)')}`,
+                            border: `1px solid ${(prim || it.clearance) ? mc + '88' : pd.branchExclusive ? branchClr + '88' : (dark ? 'rgba(168,197,218,.4)' : 'rgba(143,169,189,.45)')}`,
                             boxShadow: (prim || it.clearance) ? `0 0 8px -4px ${mc}` : 'none' }}>
                           {pctOff != null && pctOff > 0 && <span className="ps-tip">−{pctOff}%</span>}
                           <span className="ps-chip-pr" style={{ color: tx }}>{priceTxt(pd)}</span>
+                          {pd.branchExclusive && (
+                            <span title="เฉพาะสาขาเควิลเลจ (K.Village only)" style={{ fontSize: 8, fontWeight: 800, color: branchClr, background: `${branchClr}22`, border: `1px solid ${branchClr}55`, borderRadius: 4, padding: '1px 4px', letterSpacing: '.02em', lineHeight: 1.3 }}>K.Village</span>
+                          )}
                           {openKey === ckey && pctOff != null && pctOff > 0 && <span className="ps-chip-off">−{pctOff}%</span>}
                           {openKey === ckey && canSeeGP && pd.compensate != null && (
                             <span style={{ fontSize: 9, fontFamily: 'monospace', color: t.blue || '#58a6ff', fontWeight: 700 }}>฿{pd.compensate.toFixed(2)}</span>
@@ -626,12 +653,31 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
                       <div className="ps-sched-track"
                         style={{ background: `linear-gradient(to bottom, transparent calc(50% - 1px), ${dim} calc(50% - 1px), ${dim} calc(50% + 1px), transparent calc(50% + 1px))` }}
                         onMouseLeave={() => setBarTip(null)}>
+                        {/* Discontinued band — spans from the discontinue period to year-end */}
+                        {(() => {
+                          const di = disconIdxOf(it)
+                          if (di < 0 || !filteredSchedRange) return null
+                          const dr = parseDR(periods[di].dateRange) || inferPeriodDate(periods[di])
+                          if (!dr) return null
+                          const { start, end, totalMs } = filteredSchedRange
+                          const bs2 = Math.max(dr.s.getTime(), start.getTime())
+                          if (end.getTime() <= bs2) return null
+                          const left = (bs2 - start.getTime()) / totalMs * 100
+                          const width = (end.getTime() - bs2) / totalMs * 100
+                          return (
+                            <div style={{ position: 'absolute', left: `${left}%`, width: `${width}%`, top: 6, bottom: 6, pointerEvents: 'none',
+                              background: `repeating-linear-gradient(45deg, ${disconClr}20, ${disconClr}20 6px, transparent 6px, transparent 13px)`,
+                              border: `1px dashed ${disconClr}66`, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <span style={{ fontSize: 10, fontWeight: 800, color: disconClr, background: dark ? 'rgba(13,17,23,.72)' : 'rgba(244,239,233,.82)', padding: '2px 7px', borderRadius: 5, whiteSpace: 'nowrap' }}>ยกเลิกขาย</span>
+                            </div>
+                          )
+                        })()}
                         {periods.map(p => {
                           const pd = it.periods?.[p.name]
                           if (!pd) return null
                           const pos = barPos(p)
                           if (!pos) return null
-                          const bs = getBarStyle(pd.activities, it.clearance)
+                          const bs = getBarStyle(pd.activities, it.clearance, pd.branchExclusive)
                           const offPct = offPctOf(it, pd)
                           const dr = parseDR(p.dateRange) || inferPeriodDate(p)
                           const dateDisplay = p.dateRange || (dr ? `${MONTH_NAMES[dr.s.getMonth()]} ${dr.s.getFullYear()}` : '')
@@ -648,6 +694,7 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
                                 offPct, color: bs.clr,
                                 activities: pd.activities || [],
                                 clearance: it.clearance,
+                                branch: pd.branchExclusive,
                               })}
                               onMouseLeave={e => { e.stopPropagation(); setBarTip(null) }}
                               onMouseMove={e => setBarTip(prev => prev ? { ...prev, x: e.clientX, y: e.clientY } : prev)}
@@ -658,6 +705,9 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
                                 style={bs.ice ? { color: bs.txt, textShadow: 'none' } : undefined}>{priceTxt(pd)}</span>
                               {pos.width >= 6 && offPct != null && offPct > 0 && (
                                 <span className="ps-sched-bar-off" style={bs.ice ? { color: mu } : undefined}>−{offPct}%</span>
+                              )}
+                              {pd.branchExclusive && pos.width >= 5 && (
+                                <span style={{ fontSize: 8.5, fontWeight: 800, color: '#fff', background: 'rgba(0,0,0,.28)', borderRadius: 4, padding: '0 4px', marginLeft: 2, whiteSpace: 'nowrap' }}>K.Village</span>
                               )}
                             </div>
                           )
@@ -679,7 +729,7 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
   // `ended` = past promo: use a more opaque card + full-contrast text so the
   // history stays clearly legible instead of fading into the background.
   function FeedCard({ it, ended }) {
-    const bs = getBarStyle(it.pd?.activities, it.clearance)
+    const bs = getBarStyle(it.pd?.activities, it.clearance, it.pd?.branchExclusive)
     const prClr = ended ? tx : (bs.ice ? tx : bs.clr)
     return (
       <div onClick={() => openProduct(it)}
@@ -700,6 +750,7 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3 }}>
             <span style={{ fontSize: 10.5, color: ended ? tx : mu, fontWeight: 600 }}>RSP ฿{it.rspIncVat}</span>
             {it.clearance && <span style={{ fontSize: 9, fontWeight: 800, color: neon(CLEAR_COLOR) }}>CLEAR</span>}
+            {it.pd?.branchExclusive && <span title="เฉพาะสาขาเควิลเลจ" style={{ fontSize: 8.5, fontWeight: 800, color: branchClr, background: `${branchClr}22`, border: `1px solid ${branchClr}55`, borderRadius: 4, padding: '0 4px' }}>K.Village</span>}
             {(it.pd?.activities || []).map(a => ACT[a] ? (
               <i key={a} style={{ width: 6, height: 6, borderRadius: 99, background: neon(ACT[a].color), display: 'inline-block', flexShrink: 0 }} />
             ) : null)}
@@ -948,7 +999,7 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
           )}
         </div>
         <div style={{ display: 'flex', gap: 13, alignItems: 'center', flexWrap: 'wrap' }}>
-          {Object.entries(ACT).map(([k, a]) => (
+          {Object.entries(ACT).filter(([k]) => k !== 'looks' || retailer === 'Tops').map(([k, a]) => (
             <span key={k} className="ps-actleg" style={{ color: mu }}>
               <span className="ps-actleg-dot" style={{ background: neon(a.color), boxShadow: `0 0 5px -1px ${neon(a.color)}` }} />
               {a.label}
@@ -1040,10 +1091,16 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
               )}
             </div>
           </div>
-          {barTip.activities.length > 0 && (
+          {(barTip.activities.length > 0 || barTip.clearance || barTip.branch) && (
             <>
               <div style={{ height: 1, background: bdr, margin: '9px 0 7px' }} />
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                {barTip.branch && (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 5, background: `${branchClr}18`, color: branchClr, border: `1px solid ${branchClr}33` }}>
+                    <i style={{ width: 5, height: 5, borderRadius: 99, background: branchClr, display: 'inline-block' }} />
+                    เฉพาะสาขาเควิลเลจ
+                  </span>
+                )}
                 {barTip.activities.map(a => ACT[a] ? (
                   <span key={a} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 5, background: `${neon(ACT[a].color)}18`, color: neon(ACT[a].color), border: `1px solid ${neon(ACT[a].color)}33` }}>
                     <i style={{ width: 5, height: 5, borderRadius: 99, background: neon(ACT[a].color), display: 'inline-block' }} />

@@ -38,7 +38,17 @@ ACTIVITY_BY_FAMILY = {'yellow': 'media', 'orange': 'field', 'purple': 'media', '
 # Per-retailer overrides for stores that use colours differently.
 # Only supply keys that differ from the global default above.
 RETAILER_ACTIVITY_OVERRIDE = {
-    'TWD': {'orange': 'media'},  # TWD: FFC65911 = ลงสื่อ, not field. No field activity in TWD.
+    'TWD': {'orange': 'media'},   # TWD: FFC65911 = ลงสื่อ, not field. No field activity in TWD.
+    'Villa': {'yellow': 'field'}, # Villa: yellow FFFFFF00 = ลงพื้นที่ (field), e.g. Vnew — the store
+                                  # swaps yellow/media the way Tops uses it (Tops yellow = media).
+}
+
+# Branch-exclusive promos: a fill colour that means "this promo runs at selected branches
+# only" rather than any media/field activity. Villa paints these green (FF92D050) and notes
+# "เฉพาะสาขาเควิลเลจ" (K.Village only). Surfaced as a per-cell flag, NOT an activity, so it
+# doesn't get mis-drawn as a field/media dot.
+BRANCH_EXCLUSIVE_COLORS = {
+    'Villa': {'FF92D050'},
 }
 
 LOOKS_KEYWORDS = ['looks', 'magazine']
@@ -239,16 +249,20 @@ def get_fill_color(cell):
 
 
 def detect_marks(cell, retailer):
-    """Inspect one promo cell and return (activities, is_blue, has_comment).
+    """Inspect one promo cell and return (activities, is_blue, has_comment, is_branch, is_discon).
       - activities: list of 'media'/'field'/'looks' (LOOKS from a comment, others via the
         global colour map).
       - is_blue: True if FF00B0F0-filled (whole-row clearance flag, accumulated per product).
       - has_comment: True if the cell carries any comment (so we don't drop a LOOKS note that
         sits on an empty price cell).
+      - is_branch: True if the fill marks a branch-exclusive promo (e.g. Villa green = K.Village).
+      - is_discon: True if the cell is painted the discontinue red (FFFF0000).
     """
     acts = []
     is_blue = False
     has_comment = False
+    is_branch = False
+    is_discon = False
     try:
         if cell.comment:
             has_comment = True
@@ -259,7 +273,9 @@ def detect_marks(cell, retailer):
     color = get_fill_color(cell)
     if color and color not in IGNORE_COLORS:
         if color in DISCON_COLORS:
-            pass  # discontinued is surfaced at product level via master status, not here
+            is_discon = True  # surfaced per-period so the app can span "ยกเลิกขาย" to year-end
+        elif color in BRANCH_EXCLUSIVE_COLORS.get(retailer, set()):
+            is_branch = True  # branch-only promo, not a media/field activity
         elif color in CLEARANCE_COLORS:
             is_blue = True
         else:
@@ -269,7 +285,7 @@ def detect_marks(cell, retailer):
                 act = override.get(fam, ACTIVITY_BY_FAMILY.get(fam))
                 if act and act not in acts:
                     acts.append(act)
-    return acts, is_blue, has_comment
+    return acts, is_blue, has_comment, is_branch, is_discon
 
 
 def num(val):
@@ -433,6 +449,7 @@ def parse_sheet(ws, cfg, retailer, non_vat=frozenset()):
         # Parse period cells
         period_data = {}
         any_blue = False  # blue paints the whole row -> product is a clearance item
+        discon_from = None  # first period painted the discontinue red -> spans to year-end
         bro_is_media = cfg.get('bro_is_media')
         for p in periods:
             ci = p['colIdx']
@@ -442,9 +459,11 @@ def parse_sheet(ws, cfg, retailer, non_vat=frozenset()):
             val = cell.value
             blank = val is None or (isinstance(val, str) and not val.strip())
 
-            activities, is_blue, has_comment = detect_marks(cell, retailer)
+            activities, is_blue, has_comment, is_branch, is_discon = detect_marks(cell, retailer)
             if is_blue:
                 any_blue = True
+            if is_discon and discon_from is None:
+                discon_from = p['name']  # earliest red cell = discontinued from this period on
             # TWD encodes media as the brochure ('Bro.N') columns themselves — a value in one
             # means the SKU is placed in that brochure, regardless of fill colour.
             is_bro = bro_is_media and 'bro' in str(p['name']).lower()
@@ -461,8 +480,9 @@ def parse_sheet(ws, cfg, retailer, non_vat=frozenset()):
                     activities = ['looks' if a == 'media' else a for a in activities]
 
             # Keep the cell only if it carries something to show: a price, an activity
-            # (incl. a LOOKS note that sits on an empty cell), or it's a brochure placement.
-            if blank and not activities and not (is_bro and has_comment):
+            # (incl. a LOOKS note that sits on an empty cell), a branch-exclusive mark, or a
+            # brochure placement.
+            if blank and not activities and not is_branch and not (is_bro and has_comment):
                 continue
 
             sale_price = None
@@ -481,15 +501,18 @@ def parse_sheet(ws, cfg, retailer, non_vat=frozenset()):
             if sale_price is not None and rsp_ex is not None:
                 compensate = round(rsp_ex - (sale_price / vat_div), 4)
 
-            period_data[p['name']] = {
+            cell_out = {
                 'salePrice': sale_price,
                 'saleLabel': sale_label,
                 'activities': activities,
                 'compensate': compensate,
             }
+            if is_branch:
+                cell_out['branchExclusive'] = True  # K.Village-only promo (Villa green)
+            period_data[p['name']] = cell_out
 
-        if period_data:  # only include rows that have at least one promotional period
-            products.append({
+        if period_data or discon_from:  # include rows with a promo period OR a discontinue mark
+            prod_out = {
                 'retailer': retailer,
                 'barcode': barcode,
                 'product': product,
@@ -502,7 +525,10 @@ def parse_sheet(ws, cfg, retailer, non_vat=frozenset()):
                 'gp': gp,
                 'clearance': any_blue,  # product-level clearance flag
                 'periods': period_data,
-            })
+            }
+            if discon_from:
+                prod_out['disconFrom'] = discon_from  # "ยกเลิกขาย" from this period through year-end
+            products.append(prod_out)
 
     return products, periods
 
@@ -547,6 +573,8 @@ def main():
                     # merge: keep existing fields, fold in any periods it doesn't have yet
                     for pname, pdata in prod['periods'].items():
                         by_barcode[bc]['periods'].setdefault(pname, pdata)
+                    if prod.get('disconFrom') and not by_barcode[bc].get('disconFrom'):
+                        by_barcode[bc]['disconFrom'] = prod['disconFrom']
                 else:
                     by_barcode[bc] = prod
                     retailer_products.append(prod)
