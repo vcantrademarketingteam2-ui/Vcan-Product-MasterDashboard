@@ -947,7 +947,7 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
             borderRadius: 10, transition: 'border-color .15s, background .15s',
           }}>
             {RetailerLogo
-              ? <RetailerLogo name={r} h={isMobile ? 32 : 30} maxW={isMobile ? 52 : 72}
+              ? <RetailerLogo name={r} h={isMobile ? 32 : 30} maxW={isMobile ? 52 : 72} dark={dark}
                   fallbackStyle={{ fontSize: 10, fontWeight: 700, color: retailer === r ? GOLD_A : tx, textAlign: 'center', lineHeight: 1.2 }} />
               : <span style={{ fontSize: 11, fontWeight: 700, color: retailer === r ? GOLD_A : tx }}>{r}</span>
             }

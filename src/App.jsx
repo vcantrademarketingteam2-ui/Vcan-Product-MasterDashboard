@@ -147,7 +147,7 @@ const RETAILER_SHORT = {
 }
 // Drop logo files into public/retailers/ with these exact names to replace the text labels.
 const RETAILER_LOGOS = {
-  'Tops': '/retailers/tops.jpg',
+  'Tops': '/retailers/tops.png',
   'Villa': '/retailers/villa.png',
   'The Mall': '/retailers/the-mall.png',
   'Lotus': '/retailers/lotus.png',
@@ -156,10 +156,21 @@ const RETAILER_LOGOS = {
   'TWD': '/retailers/twd.png',
   'Boots': '/retailers/boots.png',
   'Foodland': '/retailers/foodland.png',
-  'Central Department': '/retailers/central.jpg',
-  "Pet'n me": '/retailers/petnme.jpg',
+  'Central Department': '/retailers/central.png',
+  "Pet'n me": '/retailers/petnme.png',
   'Fuji': '/retailers/fuji.png',
 }
+// Tops/Villa/Lotus/Homepro/BigC/TWD/Boots/Central/Pet'n me ship as solid brand-color
+// tiles (no alpha) — render bare, no wrapper background, or a second white box doubles
+// up behind their own fill. Villa/The Mall/Foodland/Fuji are the only 4 with real
+// transparency (raw wordmarks); whether each needs a frosted plate depends on ink color
+// vs the theme background, measured (WCAG contrast) rather than assumed:
+// Villa navy 1.54:1 / The Mall black 1.16:1 against dark bg #0d1117 → both need a plate
+// in dark mode only (both pass >5:1 on light unaided). Foodland/Fuji white ink is
+// 1.14:1 against light bg #f4efe9 → need a plate in light mode only (18.9:1 on dark
+// unaided). No retailer needs a plate in both themes.
+const RETAILER_DARK_PLATE = new Set(['Villa', 'The Mall'])
+const RETAILER_LIGHT_PLATE = new Set(['Foodland', 'Fuji'])
 
 // Activity badge colors for Promotion Plan — defined here (not imported) so colors are
 // independent of the generated promo_data.js
@@ -169,23 +180,34 @@ const PROMO_ACTIVITY_DISPLAY = {
   looks: { label: 'LOOKS Magazine', color: '#e879f9' },  // fuchsia/pink — clearly distinct from orange field
 }
 
-// Renders a retailer's logo on a white chip (so dark/transparent logos never blend
-// into the row), falling back to the short text label if the image is missing.
-function RetailerLogo({ name, h = 28, maxW = 76, fallbackStyle = {} }) {
+// Renders a retailer's logo, falling back to the short text label if the image is
+// missing. Most logos ship as solid brand-color tiles and render bare (no wrapper
+// background — a flat white chip behind an already-colored tile was the "white
+// border" bug). The 4 transparent-wordmark logos get a frosted glass plate, but only
+// in the theme where their ink color actually fails contrast (see RETAILER_DARK_PLATE
+// / RETAILER_LIGHT_PLATE above) — full contrast math there, not a blanket plate.
+function RetailerLogo({ name, h = 28, maxW = 76, dark, fallbackStyle = {} }) {
   const [err, setErr] = useState(false)
   const src = RETAILER_LOGOS[name]
   if (err || !src) return <span style={{ whiteSpace: 'nowrap', ...fallbackStyle }}>{RETAILER_SHORT[name] || name}</span>
+  const needsPlate = (dark && RETAILER_DARK_PLATE.has(name)) || (!dark && RETAILER_LIGHT_PLATE.has(name))
   // Fixed-size frame: every logo sits in the same maxW×h box and is scaled to fit
   // (contain) — wide wordmarks shrink to fit width, square logos get side whitespace,
   // so all chips stay uniform and nothing overflows. No per-logo scale needed.
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: maxW, height: h, background: '#fff', borderRadius: 4, padding: '1px 2px', boxSizing: 'border-box', lineHeight: 0, boxShadow: '0 0 0 1px rgba(0,0,0,0.06)' }}>
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+      width: maxW, height: h, borderRadius: 6, boxSizing: 'border-box', lineHeight: 0,
+      ...(needsPlate
+        ? { background: 'rgba(220,220,225,0.92)', backdropFilter: 'blur(6px)', padding: '2px 5px', boxShadow: '0 0 0 1px rgba(0,0,0,0.08)' }
+        : { background: 'transparent', padding: 0 }),
+    }}>
       <img
         src={src}
         alt={RETAILER_SHORT[name] || name}
         title={name}
         onError={() => setErr(true)}
-        style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', display: 'block' }}
+        style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', display: 'block', borderRadius: needsPlate ? 0 : 5 }}
       />
     </span>
   )
@@ -1435,7 +1457,7 @@ export default function App() {
             <div style={{ fontWeight: 800, fontSize: isMobile ? 14 : 17, color: t.text, letterSpacing: 0.2, whiteSpace: 'nowrap', flexShrink: 0 }}>
               Product Master
             </div>
-            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v3.6.1</span>
+            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v3.6.2</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: isMobile ? 11 : 13, background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, padding: isMobile ? '3px 8px' : '5px 12px', overflow: 'hidden', minWidth: 0, flexShrink: 1 }}>
               <span style={{ width: isMobile ? 6 : 7, height: isMobile ? 6 : 7, borderRadius: '50%', flexShrink: 0, background: dataSource === 'csv' ? t.blue : t.green }} />
               <span style={{ fontWeight: 800, color: dataSource === 'csv' ? t.blue : t.green, flexShrink: 0 }}>
