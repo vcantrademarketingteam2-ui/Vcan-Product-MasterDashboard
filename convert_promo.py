@@ -77,22 +77,83 @@ def load_non_vat_barcodes():
     return s
 
 
-def parse_start_date(date_range):
+def _year_of(y):
+    """2-digit -> 2000s, Buddhist 4-digit (>2400) -> Gregorian, else pass through."""
+    if y > 2400:
+        return y - 543
+    if y < 100:
+        return 2000 + y
+    return y
+
+
+# Short month name -> 0-indexed month, for Homepro's bare "Jan".."Dec" period names.
+MONTH_NAMES = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec']
+
+
+def parse_start_date(date_range, year_hint=None):
     """First date of a range like '7/01-20/01/26' -> ISO '2026-01-07'.
-    Returns None for month labels / un-parseable cells ('Jan', 'SP6', '')."""
+    Also handles Villa's dot format ('25.06.26 - 22.07.26'), the day-range/slash format
+    used by Big C and Foodland's Thai-Buddhist name field ('5-25/1/23', '1-31/1/2569'),
+    and Villa's bare 'MonthlyN' / Homepro's bare 'Jan'..'Dec' names (needs year_hint since
+    those carry no year of their own). Returns None for un-parseable cells ('SP6', '')."""
     if not date_range:
         return None
     s = str(date_range).strip()
+    # Villa: "25.06.26 - 22.07.26" (dots)
+    dot = re.match(r'(\d{1,2})\.(\d{1,2})\.(\d{2,4})', s)
+    if dot:
+        day, month, y = int(dot.group(1)), int(dot.group(2)), int(dot.group(3))
+        if 1 <= month <= 12 and 1 <= day <= 31:
+            return f'{_year_of(y):04d}-{month:02d}-{day:02d}'
+        return None
+    # Big C "5-25/1/23" / Foodland name "1-31/1/2569": leading day, dash, day2/month/year
+    dash = re.match(r'(\d{1,2})\s*-\s*\d{1,2}\s*/\s*(\d{1,2})\s*/\s*(\d{2,4})\s*$', s)
+    if dash:
+        day, month, y = int(dash.group(1)), int(dash.group(2)), int(dash.group(3))
+        if 1 <= month <= 12 and 1 <= day <= 31:
+            return f'{_year_of(y):04d}-{month:02d}-{day:02d}'
+        return None
+    # Standard slash format: "D/M-D/M/YY" or "D/M/YY"
     m = re.match(r'(\d{1,2})\s*/\s*(\d{1,2})', s)
     yr = re.search(r'/(\d{2,4})\s*$', s)
-    if not m or not yr:
+    if m and yr:
+        day, month = int(m.group(1)), int(m.group(2))
+        y = int(yr.group(1))
+        if 1 <= month <= 12 and 1 <= day <= 31:
+            return f'{_year_of(y):04d}-{month:02d}-{day:02d}'
         return None
-    day, month = int(m.group(1)), int(m.group(2))
-    if not (1 <= month <= 12 and 1 <= day <= 31):
+    if year_hint is None:
         return None
-    y = int(yr.group(1))
-    year = 2000 + y if y < 100 else y
-    return f'{year:04d}-{month:02d}-{day:02d}'
+    # Villa bare "Monthly7" -> 1st of that month
+    mn = re.match(r'^Monthly(\d{1,2})$', s, re.IGNORECASE)
+    if mn:
+        month = int(mn.group(1))
+        if 1 <= month <= 12:
+            return f'{year_hint:04d}-{month:02d}-01'
+        return None
+    # Homepro bare "Jan".."Dec" -> 1st of that month
+    if s[:3].lower() in MONTH_NAMES:
+        month = MONTH_NAMES.index(s[:3].lower()) + 1
+        return f'{year_hint:04d}-{month:02d}-01'
+    return None
+
+
+def _selftest_parse_start_date():
+    """Run with: python -c "import convert_promo; convert_promo._selftest_parse_start_date()" """
+    cases = [
+        ('7/01-20/01/26', None, '2026-01-07'),           # Tops/standard slash
+        ('25.06.26 - 22.07.26', None, '2026-06-25'),      # Villa dot format
+        ('5-25/1/23', None, '2023-01-05'),                # Big C day-range/slash
+        ('1-31/1/2569', None, '2026-01-01'),              # Foodland Thai-Buddhist name
+        ('Monthly7', 2026, '2026-07-01'),                 # Villa bare name fallback
+        ('Jan', 2026, '2026-01-01'),                      # Homepro bare name fallback
+        ('SP6', None, None),                              # unparseable -> None
+        ('', None, None),                                 # empty -> None
+    ]
+    for date_range, year_hint, expected in cases:
+        got = parse_start_date(date_range, year_hint=year_hint)
+        assert got == expected, f'parse_start_date({date_range!r}, year_hint={year_hint}) = {got!r}, expected {expected!r}'
+    print(f'_selftest_parse_start_date: {len(cases)} cases OK')
 
 
 def load_barcode_brands():
@@ -111,10 +172,15 @@ def load_barcode_brands():
 def build_notification_schedule(promo_meta, all_products, barcode_brand):
     """One entry per (retailer, period) that has >=1 item with a non-empty activities list
     and a parseable start date."""
+    year_hint = int(BASE_DIR.name) if BASE_DIR.name.isdigit() else datetime.now().year
     sched = []
     for retailer, meta in promo_meta.items():
         for p in meta['periods']:
-            start = parse_start_date(p.get('dateRange', ''))
+            # dateRange first; fall back to the period name itself (Foodland's date text
+            # ends up in the name column, see CONFIG comment) then to month-only inference
+            # (Villa 'MonthlyN' / Homepro 'Jan'..'Dec') using the source folder's year.
+            start = (parse_start_date(p.get('dateRange', ''))
+                     or parse_start_date(p['name'], year_hint=year_hint))
             if not start:
                 continue
             acts, brands = set(), set()

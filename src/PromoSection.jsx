@@ -7,7 +7,7 @@
  *   - v2.15.0: Timeline redesign — Schedule (proportional Gantt) + Spotlight (live feed) views.
  */
 
-import { useState, useMemo, useRef, useLayoutEffect } from 'react'
+import { useState, useMemo } from 'react'
 import promoData, { PROMO_META, PROMO_ACTIVITY, PROMO_RETAILERS } from './promo_data.js'
 import { DEPT_PINS, canSeeRetailer, logPricingAccess } from './deptPins.js'
 import './PromoSection.css'
@@ -177,9 +177,6 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
   const [calcOpen, setCalcOpen] = useState(false)
   const canSeeGP = unlocked && canSeeRetailer(unlocked, retailer)
 
-  const tlInnerRef  = useRef(null)
-  const [tlNowX,  setTlNowX]  = useState(null)
-
   // ── derived data ────────────────────────────────────────────────────────────
   const periods = useMemo(() => {
     return (PROMO_META[retailer]?.periods || []).map((p, i) => ({ ...p, idx: i, isCurrent: periodIsCurrent(p) }))
@@ -252,6 +249,15 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
     }
     return out
   }, [filteredSchedRange])
+
+  // Cumulative left/width % for each month cell — the SAME numbers drive the axis
+  // labels, the gridline/tint background, and (with nowPct) the NOW line, all
+  // inside the identical width:100% track that positions the bars (barPos below).
+  // One coordinate system, pure %, no JS pixel measurement anywhere.
+  const schedMonthPos = useMemo(() => {
+    let acc = 0
+    return schedMonths.map(m => { const left = acc; acc += m.flex; return { ...m, left, width: m.flex } })
+  }, [schedMonths])
 
   // NOW position as 0–100% across the filtered range
   const nowPct = useMemo(() => {
@@ -353,23 +359,6 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
     return { name: p.name, dateRange: dateLabel, pct: Math.max(0, Math.min(100, pct)) }
   }, [periods, currentIdx])
 
-  // measure NOW x-position from DOM after render (Schedule view only)
-  useLayoutEffect(() => {
-    if (layout === 'timeline' && tlView === 'schedule') {
-      function measureSched(innerEl, setter) {
-        if (!innerEl || nowPct === null) { setter(null); return }
-        const track = innerEl.querySelector('.ps-sched-track')
-        if (!track) { setter(null); return }
-        const ir = innerEl.getBoundingClientRect()
-        const tr = track.getBoundingClientRect()
-        setter(Math.round(tr.left - ir.left + (nowPct / 100) * tr.width) - 1)
-      }
-      measureSched(tlInnerRef.current, setTlNowX)
-    } else {
-      setTlNowX(null)
-    }
-  }, [layout, tlView, retailer, currentIdx, brandFilter, nowPct, schedWindow])
-
   // per-period activity dots (union across all items in that period)
   const actsByPeriod = useMemo(() => {
     const m = {}
@@ -453,6 +442,28 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
       <i key={a} className="ps-chip-dot" title={ACT[a].label}
         style={{ background: neon(ACT[a].color), boxShadow: `0 0 4px -1px ${neon(ACT[a].color)}`, width: size, height: size }} />
     ) : null)
+  }
+
+  // Shared background layer for every Schedule Gantt track (the month axis strip
+  // AND each product lane) — month gridlines + alternating tint + the NOW line.
+  // Every position here is `left: X%` sourced from schedMonthPos / nowPct, the
+  // exact same numbers barPos() below uses for the bars — one coordinate system,
+  // so the axis, the gridlines and the NOW line can never drift apart again.
+  function SchedTrackBg() {
+    return (
+      <>
+        {schedMonthPos.map((m, i) => (
+          <div key={i} className="ps-sched-gridcol" style={{
+            left: `${m.left}%`, width: `${m.width}%`,
+            borderLeft: i === 0 ? 'none' : `1px solid ${dim}`,
+            background: m.isNow ? nowBg : (i % 2 === 1 ? (dark ? 'rgba(255,255,255,.03)' : 'rgba(0,0,0,.02)') : 'transparent'),
+          }} />
+        ))}
+        {nowPct !== null && (
+          <div className="ps-sched-nowline" style={{ left: `${nowPct}%`, background: GOLD_A, boxShadow: `0 0 7px 1px ${GOLD_A}cc, 0 0 15px 2px ${GOLD_A}55` }} />
+        )}
+      </>
+    )
   }
 
   // Grid view — unchanged period-column matrix
@@ -551,7 +562,13 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
     )
   }
 
-  // Schedule view — proportional Gantt with date-accurate bar widths
+  // Schedule view — proportional Gantt with date-accurate bar widths.
+  // v3.5.0 structural NOW-line fix: the axis strip AND every product lane render
+  // their gridlines/tint/NOW-line via the shared SchedTrackBg() using
+  // schedMonthPos / nowPct — the identical % numbers barPos() below uses to
+  // place the bars. Everything lives inside the same width:100% `.ps-sched-track`
+  // box (an axis variant included), so there is no cross-container DOM
+  // measurement anywhere in this view and nothing can drift out of alignment.
   function Schedule() {
     return (
       <>
@@ -578,19 +595,11 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
         </div>
         <div className="ps-sched-scroll" style={{ scrollbarColor: `${bdr} transparent`, overflow: 'auto', maxHeight: '70vh' }}
           onMouseLeave={() => setBarTip(null)}>
-          <div className="ps-sched-inner" ref={tlInnerRef} style={{ position: 'relative' }}>
+          <div className="ps-sched-inner">
 
-            {/* TODAY marker — zIndex 10 so it renders ABOVE price pills,
-                making the exact position clearly visible inside the current bar */}
-            {tlNowX !== null && (
-              <div style={{
-                position: 'absolute', top: 0, bottom: 0, pointerEvents: 'none', zIndex: 10,
-                left: tlNowX, width: 2, background: GOLD_A,
-                boxShadow: `0 0 6px 1px ${GOLD_A}bb`,
-              }} />
-            )}
-
-            {/* Month axis — frosted glass over scrolling rows */}
+            {/* Month axis — frosted glass over scrolling rows. Gridlines, month tint
+                and the NOW line/tag are all painted by SchedTrackBg — same math as
+                every row's track below it, so the axis can never drift from the rows. */}
             <div className="ps-sched-axis" style={{
               background: dark ? 'rgba(33,38,45,.72)' : 'rgba(251,248,243,.7)',
               backdropFilter: 'blur(12px) saturate(1.4)', WebkitBackdropFilter: 'blur(12px) saturate(1.4)',
@@ -599,20 +608,20 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
                 <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.1em', color: mu }}>Product</span>
               </div>
               <div className="ps-sched-months">
-                {schedMonths.length > 0 ? schedMonths.map((m, i) => (
-                  <div key={i} style={{
-                    flex: m.flex, minWidth: 0,
-                    padding: '8px 10px 6px',
-                    borderLeft: `1px solid ${m.isNow ? nowLine + '55' : dim}`,
-                    background: m.isNow ? `linear-gradient(180deg,${nowBg},transparent)` : 'transparent',
-                    display: 'flex', flexDirection: 'column', gap: 1,
-                  }}>
-                    <b style={{ fontSize: 12, fontWeight: 800, color: m.isNow ? t.accent : tx, letterSpacing: '.04em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {m.name.toUpperCase()}
-                    </b>
-                    <small style={{ fontSize: 10, color: m.isNow ? t.accent + 'bb' : mu, fontFamily: 'ui-monospace,monospace' }}>{m.isNow ? 'NOW' : m.year}</small>
+                {schedMonthPos.length > 0 ? (
+                  <div className="ps-sched-track ps-sched-track--axis">
+                    <SchedTrackBg />
+                    {schedMonthPos.map((m, i) => (
+                      <div key={i} className="ps-sched-month-lbl" style={{ left: `${m.left}%`, width: `${m.width}%` }}>
+                        <b style={{ color: m.isNow ? t.accent : tx }}>{m.name.toUpperCase()}</b>
+                        <small style={{ color: m.isNow ? t.accent + 'bb' : mu }}>{m.isNow ? 'NOW' : m.year}</small>
+                      </div>
+                    ))}
+                    {nowPct !== null && (
+                      <div className="ps-sched-now-tag" style={{ left: `${nowPct}%`, background: GOLD_GRAD }}>TODAY</div>
+                    )}
                   </div>
-                )) : (
+                ) : (
                   <div style={{ padding: '10px 14px', fontSize: 12, color: mu }}>กรุณาตรวจสอบข้อมูลวันที่</div>
                 )}
               </div>
@@ -622,9 +631,7 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
             {grouped.map(([brand, list]) => (
               <div key={brand}>
                 {/* Brand header */}
-                <div style={{
-                  display: 'flex', alignItems: 'center', gap: 8,
-                  padding: '6px 16px 5px 14px',
+                <div className="ps-sched-brand-hdr" style={{
                   borderLeft: `3px solid ${coColor(list[0].company) || t.accent}`,
                   background: dark ? 'rgba(255,255,255,.03)' : 'rgba(0,0,0,.02)',
                   borderBottom: `1px solid ${dim}`, borderTop: `1px solid ${bdr}`,
@@ -650,10 +657,11 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
 
                     {/* Proportional Gantt lane */}
                     <div className="ps-sched-lane">
-                      <div className="ps-sched-track"
-                        style={{ background: `linear-gradient(to bottom, transparent calc(50% - 1px), ${dim} calc(50% - 1px), ${dim} calc(50% + 1px), transparent calc(50% + 1px))` }}
-                        onMouseLeave={() => setBarTip(null)}>
-                        {/* Discontinued band — spans from the discontinue period to year-end */}
+                      <div className="ps-sched-track" onMouseLeave={() => setBarTip(null)}>
+                        <SchedTrackBg />
+                        {/* Discontinued band — spans from the discontinue period to year-end.
+                            No explicit z-index: it stays in the auto-z paint layer with the
+                            gridlines, below the bars (which carry z-index via .ps-sched-bar). */}
                         {(() => {
                           const di = disconIdxOf(it)
                           if (di < 0 || !filteredSchedRange) return null
@@ -665,7 +673,7 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
                           const left = (bs2 - start.getTime()) / totalMs * 100
                           const width = (end.getTime() - bs2) / totalMs * 100
                           return (
-                            <div style={{ position: 'absolute', left: `${left}%`, width: `${width}%`, top: 6, bottom: 6, pointerEvents: 'none',
+                            <div style={{ position: 'absolute', left: `${left}%`, width: `${width}%`, top: 4, bottom: 4, pointerEvents: 'none',
                               background: `repeating-linear-gradient(45deg, ${disconClr}20, ${disconClr}20 6px, transparent 6px, transparent 13px)`,
                               border: `1px dashed ${disconClr}66`, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                               <span style={{ fontSize: 10, fontWeight: 800, color: disconClr, background: dark ? 'rgba(13,17,23,.72)' : 'rgba(244,239,233,.82)', padding: '2px 7px', borderRadius: 5, whiteSpace: 'nowrap' }}>ยกเลิกขาย</span>
@@ -681,6 +689,7 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
                           const offPct = offPctOf(it, pd)
                           const dr = parseDR(p.dateRange) || inferPeriodDate(p)
                           const dateDisplay = p.dateRange || (dr ? `${MONTH_NAMES[dr.s.getMonth()]} ${dr.s.getFullYear()}` : '')
+                          const multiAct = (pd.activities || []).length > 1
                           return (
                             <div key={p.name} className="ps-sched-bar"
                               style={{ left: `${pos.left}%`, width: `${pos.width}%`, background: bs.bg,
@@ -705,6 +714,9 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
                                 style={bs.ice ? { color: bs.txt, textShadow: 'none' } : undefined}>{priceTxt(pd)}</span>
                               {pos.width >= 6 && offPct != null && offPct > 0 && (
                                 <span className="ps-sched-bar-off" style={bs.ice ? { color: mu } : undefined}>−{offPct}%</span>
+                              )}
+                              {multiAct && pos.width >= 8 && (
+                                <span className="ps-sched-bar-dots"><ActDots acts={pd.activities} size={4.5} /></span>
                               )}
                               {pd.branchExclusive && pos.width >= 5 && (
                                 <span style={{ fontSize: 8.5, fontWeight: 800, color: '#fff', background: 'rgba(0,0,0,.28)', borderRadius: 4, padding: '0 4px', marginLeft: 2, whiteSpace: 'nowrap' }}>K.Village</span>

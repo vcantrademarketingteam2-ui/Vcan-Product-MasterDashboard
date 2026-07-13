@@ -124,6 +124,42 @@
     "title": "Tops 2649/50"
   },
   {
+    "retailer": "Villa",
+    "period": "Monthly4",
+    "startDate": "2026-04-23",
+    "activities": [
+      "field"
+    ],
+    "brands": [
+      "L'Arbre Vert"
+    ],
+    "title": "Villa Monthly4"
+  },
+  {
+    "retailer": "Villa",
+    "period": "Monthly5",
+    "startDate": "2026-05-28",
+    "activities": [
+      "field"
+    ],
+    "brands": [
+      "Malizia Bath Foam 1L"
+    ],
+    "title": "Villa Monthly5"
+  },
+  {
+    "retailer": "Villa",
+    "period": "Monthly7",
+    "startDate": "2026-07-23",
+    "activities": [
+      "field"
+    ],
+    "brands": [
+      "Vnew"
+    ],
+    "title": "Villa Monthly7"
+  },
+  {
     "retailer": "Big C",
     "period": "Bro5",
     "startDate": "2023-03-30",
@@ -134,6 +170,57 @@
       "combat"
     ],
     "title": "Big C Bro5"
+  },
+  {
+    "retailer": "Homepro",
+    "period": "Apr",
+    "startDate": "2026-04-01",
+    "activities": [
+      "field"
+    ],
+    "brands": [
+      "Purex"
+    ],
+    "title": "Homepro Apr"
+  },
+  {
+    "retailer": "Homepro",
+    "period": "May",
+    "startDate": "2026-05-01",
+    "activities": [
+      "media"
+    ],
+    "brands": [
+      "Brilly",
+      "General Fresh",
+      "L'Arbre Vert",
+      "Vnew"
+    ],
+    "title": "Homepro May"
+  },
+  {
+    "retailer": "Homepro",
+    "period": "Jun",
+    "startDate": "2026-06-01",
+    "activities": [
+      "field"
+    ],
+    "brands": [
+      "Tempo"
+    ],
+    "title": "Homepro Jun"
+  },
+  {
+    "retailer": "Homepro",
+    "period": "Nov",
+    "startDate": "2026-11-01",
+    "activities": [
+      "field"
+    ],
+    "brands": [
+      "Tempo"
+    ],
+    "title": "Homepro Nov"
   },
   {
     "retailer": "Lotus",

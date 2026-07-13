@@ -142,7 +142,14 @@
 }
 .ps-bar-dots { display: flex; gap: 4px; align-items: center; }
 
-/* ---------- schedule (proportional gantt) ---------- */
+/* ---------- schedule (proportional gantt) — v3.5.0 redesign ---------- */
+/* Structural NOW-line fix: the axis strip and every row's lane share the exact
+   same horizontal box (.ps-sched-months / .ps-sched-lane both pad 0 12px 0 6px)
+   and each wraps a `.ps-sched-track` (position:relative; width:100%). Month
+   gridlines, the alternate-month tint and the NOW line are all drawn as plain
+   `left: X%` children of that track by SchedTrackBg() in PromoSection.jsx —
+   the same numbers barPos() uses for the bars. There is no DOM measurement
+   anywhere in this view; nothing can drift, ever. */
 .ps-sched-scroll { overflow: auto; max-height: 70vh; }
 .ps-sched-scroll::-webkit-scrollbar { height: 10px; width: 10px; }
 .ps-sched-scroll::-webkit-scrollbar-thumb { border-radius: 99px; border: 3px solid transparent; background-clip: padding-box; }
@@ -152,10 +159,10 @@
 .ps-sched-axis-lead { position: sticky; left: 0; z-index: 2; width: 252px; min-width: 252px; flex: none;
   display: flex; align-items: center; padding: 0 14px 0 18px; }
 /* Horizontal padding MUST match .ps-sched-lane (0 12px 0 6px) so the month
-   columns share the exact same box as .ps-sched-track. The NOW line is measured
-   off the track; without this the line drifts from the month labels (up to ~18px,
-   obvious in the full-year window). */
+   columns share the exact same box as every row's .ps-sched-track. */
 .ps-sched-months { flex: 1; display: flex; min-width: 0; overflow: hidden; padding: 0 12px 0 6px; }
+
+.ps-sched-brand-hdr { display: flex; align-items: center; gap: 8px; padding: 6px 16px 5px 14px; }
 
 .ps-sched-row { display: flex; border-bottom-width: 1px; border-bottom-style: solid; min-height: 60px; }
 .ps-sched-row:hover .ps-sched-lead { filter: brightness(1.05); }
@@ -164,15 +171,41 @@
 .ps-sched-lead { position: sticky; left: 0; z-index: 3; width: 252px; min-width: 252px; flex: none;
   padding: 8px 14px 8px 18px; display: flex; flex-direction: column; justify-content: center; cursor: pointer;
   box-shadow: 6px 0 10px -8px rgba(0,0,0,.5); }
-.ps-sched-lane { flex: 1; min-width: 0; display: flex; align-items: center; padding: 8px 12px 8px 6px; }
-.ps-sched-track { position: relative; width: 100%; height: 38px; }
-.ps-sched-bar { position: absolute; top: 4px; height: 30px; min-width: 40px; border-radius: 99px; display: flex; flex-direction: column;
+.ps-sched-lane { flex: 1; min-width: 0; display: flex; align-items: stretch; padding: 8px 12px 8px 6px; }
+
+/* The track is the single coordinate system: 0–100% left→right maps to the
+   filtered date window for the axis, every lane, the gridlines and the NOW
+   line alike. height:100% (rather than a fixed px value) makes it stretch to
+   fill whatever vertical space its row/axis gives it. */
+.ps-sched-track { position: relative; width: 100%; height: 100%; min-height: 38px; border-radius: 8px; overflow: visible; }
+.ps-sched-track--axis { min-height: 40px; }
+
+/* Month gridline/tint columns — plain absolutely-positioned `left/width: X%`
+   children, no JS involved. */
+.ps-sched-gridcol { position: absolute; top: 0; bottom: 0; pointer-events: none; }
+
+/* NOW line — 2px neon/bronze, positioned purely by `left: nowPct%` (the same
+   number used by the axis' TODAY tag and by every row's identical line).
+   z-index above bars, pointer-events:none so hover still reaches the bar. */
+.ps-sched-nowline { position: absolute; top: 0; bottom: 0; width: 2px; z-index: 5; pointer-events: none; }
+
+.ps-sched-month-lbl { position: absolute; top: 0; bottom: 0; min-width: 0; padding: 8px 10px 6px;
+  display: flex; flex-direction: column; gap: 1px; pointer-events: none; overflow: hidden; }
+.ps-sched-month-lbl b { font-size: 12px; font-weight: 800; letter-spacing: .04em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ps-sched-month-lbl small { font-size: 10px; font-family: ui-monospace, monospace; }
+
+.ps-sched-now-tag { position: absolute; top: -1px; transform: translateX(-50%); z-index: 6; pointer-events: none;
+  font-size: 8.5px; font-weight: 800; color: #fff; padding: 1px 6px; border-radius: 0 0 5px 5px;
+  letter-spacing: .08em; white-space: nowrap; box-shadow: 0 2px 8px -1px rgba(0,0,0,.35); }
+
+.ps-sched-bar { position: absolute; top: 6px; bottom: 6px; min-width: 40px; border-radius: 9px; display: flex; flex-direction: column;
   justify-content: center; align-items: center; text-align: center; padding: 0 10px; overflow: hidden;
   cursor: pointer; transition: filter .14s, transform .12s; z-index: 1; }
-.ps-sched-bar:hover { filter: brightness(1.18); z-index: 2; }
+.ps-sched-bar:hover { filter: brightness(1.18); transform: translateY(-1px); z-index: 2; }
 .ps-sched-bar-txt { font-size: 12.5px; font-weight: 800; font-family: ui-monospace, monospace; color: #fff;
   text-shadow: 0 1px 3px rgba(0,0,0,.55); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; line-height: 1.1; }
 .ps-sched-bar-off { font-size: 9px; font-weight: 700; color: rgba(255,255,255,.8); white-space: nowrap; line-height: 1; margin-top: 1px; }
+.ps-sched-bar-dots { display: flex; gap: 3px; align-items: center; margin-top: 1px; }
 
 /* ---------- mobile ---------- */
 @media (max-width: 767px) {
