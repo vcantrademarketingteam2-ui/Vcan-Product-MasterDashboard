@@ -38,6 +38,62 @@ function brandCategory(b) {
   return 'Other'
 }
 
+// BrandPill (v3.6.0) — shared brand identity chip: vendor-tinted monogram + name,
+// reused on Products filter / popup header / Packshot cards / Analytics labels /
+// Promo brand strips. Monogram = initials of the first two words, or the first two
+// letters of a single-word brand. Launch is monograms only — the tile is also the
+// future logo slot (falls back to monogram on missing/broken image, same as
+// RetailerLogo), inactive until a logo folder path is provided.
+function brandMonogram(b) {
+  const words = b.trim().split(/\s+/).filter(Boolean)
+  if (words.length >= 2) return (words[0][0] + words[1][0]).toUpperCase()
+  return (b.replace(/[^a-zA-Z]/g, '').slice(0, 2) || b.slice(0, 2)).toUpperCase()
+}
+const BP_DIMS = {
+  s: { h: 24, tile: 18, radius: 5.5, font: 11, tileFont: 8, pad: '0 9px 0 3px', gap: 5 },
+  m: { h: 30, tile: 22, radius: 7, font: 12.5, tileFont: 9.5, pad: '0 12px 0 5px', gap: 7 },
+  l: { h: 38, tile: 28, radius: 9, font: 14, tileFont: 11.5, pad: '0 15px 0 6px', gap: 9 },
+}
+function MonogramTile({ brand, company, t, size = 'm' }) {
+  const clr = company === 'Vcan' ? t.vcanClr : t.moolaClr
+  const d = BP_DIMS[size]
+  return (
+    <span style={{
+      width: d.tile, height: d.tile, borderRadius: d.radius, flexShrink: 0,
+      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+      fontSize: d.tileFont, fontWeight: 800, color: 'rgba(0,0,0,.78)',
+      background: `linear-gradient(135deg, ${clr}, ${clr}99)`,
+    }}>{brandMonogram(brand)}</span>
+  )
+}
+// selected = vendor-colored glow ring only (decided, no fill swap); count = SKUs in
+// current scope, shown on filter pills only (decided) — pass null elsewhere.
+function BrandPill({ brand, company, t, size = 'm', selected = false, count = null, onClick }) {
+  const clr = company === 'Vcan' ? t.vcanClr : t.moolaClr
+  const interactive = !!onClick
+  const d = BP_DIMS[size]
+  const Tag = interactive ? 'button' : 'span'
+  return (
+    <Tag type={interactive ? 'button' : undefined} onClick={onClick}
+      className={interactive ? `ps-glow${selected ? ' ps-glow-on' : ''}` : undefined}
+      style={{
+        '--g': clr, display: 'inline-flex', alignItems: 'center', gap: d.gap, height: d.h,
+        padding: d.pad, borderRadius: 99, boxSizing: 'border-box', fontFamily: 'inherit',
+        background: t.surface2, border: `1.5px solid ${selected ? clr : t.border}`,
+        color: selected ? clr : t.text, fontSize: d.font, fontWeight: selected ? 700 : 600,
+        cursor: interactive ? 'pointer' : 'default', maxWidth: '100%',
+        transition: 'border-color .13s ease',
+      }} title={brand}
+    >
+      <MonogramTile brand={brand} company={company} t={t} size={size} />
+      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, flex: '0 1 auto' }}>{brand}</span>
+      {count != null && (
+        <span style={{ fontSize: 10, fontWeight: 700, color: t.muted, background: `${t.accent}22`, borderRadius: 99, padding: '1px 6px', marginLeft: 1, flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{count}</span>
+      )}
+    </Tag>
+  )
+}
+
 // Status the summary cards (and card-click filter) bucket by:
 // no retailer scope → the product's global master status; with retailer(s)
 // scoped → its status AT those retailers, matching the column dots
@@ -623,13 +679,11 @@ function ProductPopup({ product, onClose, t, dark, isMobile = false, pricing = {
           )}
           {/* Header */}
           <div style={{ padding: isMobile ? '10px 14px 14px' : '16px 20px', borderBottom: `1px solid ${t.border}`, display: 'flex', alignItems: 'flex-start', gap: 12, background: t.surface2 }}>
-            <div style={{ flex: 1 }}>
+            {!isMobile && <BrandPill brand={product.brand} company={product.company} t={t} size="l" />}
+            <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 15, fontWeight: 800, color: t.text, lineHeight: 1.4, marginBottom: 4 }}>{product.product}</div>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 12, fontWeight: 700, color: product.company === 'Vcan' ? t.vcanClr : t.moolaClr }}>{product.company}</span>
-                <span style={{ color: t.border }}>·</span>
-                <span style={{ fontSize: 12, color: t.muted }}>{product.brand}</span>
-                <span style={{ color: t.border }}>·</span>
+                {isMobile && <BrandPill brand={product.brand} company={product.company} t={t} size="s" />}
                 <span style={{ fontSize: 11, fontFamily: 'monospace', color: t.muted }}>{product.barcode}</span>
               </div>
             </div>
@@ -833,19 +887,33 @@ export default function App() {
   }, [visibleBrands])
   const handleVendorChange = (v) => { setVendorFilter(v); setSelectedBrands([]) }
   const toggleBrand = (b) => setSelectedBrands(prev => prev.includes(b) ? prev.filter(x => x !== b) : [...prev, b])
-  const renderBrandPill = (b) => {
-    const sel = selectedBrands.includes(b)
-    return (
-      <button key={b} className="bpill" onClick={() => toggleBrand(b)} style={{
-        background: sel ? t.accent : t.surface2,
-        color: sel ? '#000' : t.text,
-        border: `1.5px solid ${sel ? t.accent : t.border}`,
-        borderRadius: 22, padding: '4px 9px', fontSize: 11, height: 26, boxSizing: 'border-box',
-        fontWeight: sel ? 700 : 500, cursor: 'pointer', textAlign: 'center', whiteSpace: 'nowrap', width: '100%', maxWidth: 'max-content',
-        boxShadow: sel ? `0 0 0 2px ${t.accent}33` : 'none',
-      }} title={b}>{b}</button>
-    )
-  }
+  // brand → company (stable, for the monogram tile's vendor color) and brand → SKU count
+  // scoped by vendor/retailer/search (mirrors statsBase, minus the brand filter itself so
+  // picking a brand doesn't zero out its own count badge).
+  const brandCompany = useMemo(() => {
+    const m = {}
+    rawData.forEach(p => { const b = p.brand.trim(); if (!(b in m)) m[b] = p.company })
+    return m
+  }, [rawData])
+  const brandCounts = useMemo(() => {
+    const scoped = rawData.filter(p => {
+      if (vendorFilter !== 'ALL' && p.company !== vendorFilter) return false
+      if (selectedRetailers.length > 0 && !selectedRetailers.some(r => p.retailers[r])) return false
+      if (search) {
+        const q = search.toLowerCase()
+        if (!p.product.toLowerCase().includes(q) && !p.brand.toLowerCase().includes(q) && !p.barcode.includes(q)) return false
+      }
+      return true
+    })
+    const m = {}
+    scoped.forEach(p => { const b = p.brand.trim(); m[b] = (m[b] || 0) + 1 })
+    return m
+  }, [rawData, vendorFilter, selectedRetailers, search])
+  const renderBrandPill = (b) => (
+    <BrandPill key={b} brand={b} company={brandCompany[b]} t={t} size="m"
+      selected={selectedBrands.includes(b)} count={brandCounts[b] || 0}
+      onClick={() => toggleBrand(b)} />
+  )
   const clearAll = () => { setSearch(''); setSelectedBrands([]); setSelectedRetailers([]); setStatusTab('ALL'); setVendorFilter('ALL'); setSortCol(null); setSortDir('asc') }
   const toggleRetailer = (r) => setSelectedRetailers(prev => prev.includes(r) ? prev.filter(x => x !== r) : [...prev, r])
   const toggleStatus = (k) => setStatusTab(s => (s === k ? 'ALL' : k))
@@ -1367,7 +1435,7 @@ export default function App() {
             <div style={{ fontWeight: 800, fontSize: isMobile ? 14 : 17, color: t.text, letterSpacing: 0.2, whiteSpace: 'nowrap', flexShrink: 0 }}>
               Product Master
             </div>
-            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v3.5.0</span>
+            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v3.6.0</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: isMobile ? 11 : 13, background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, padding: isMobile ? '3px 8px' : '5px 12px', overflow: 'hidden', minWidth: 0, flexShrink: 1 }}>
               <span style={{ width: isMobile ? 6 : 7, height: isMobile ? 6 : 7, borderRadius: '50%', flexShrink: 0, background: dataSource === 'csv' ? t.blue : t.green }} />
               <span style={{ fontWeight: 800, color: dataSource === 'csv' ? t.blue : t.green, flexShrink: 0 }}>
@@ -1888,7 +1956,7 @@ export default function App() {
                       const clr = b.company === 'Vcan' ? t.vcanClr : t.moolaClr
                       return (
                         <div key={b.brand} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                          <span style={{ width: isMobile ? 88 : 130, flexShrink: 0, fontSize: 11.5, fontWeight: 700, color: t.text, textAlign: 'right', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.brand}</span>
+                          <div style={{ width: isMobile ? 88 : 130, flexShrink: 0, display: 'flex', justifyContent: 'flex-end', overflow: 'hidden' }}><BrandPill brand={b.brand} company={b.company} t={t} size="s" /></div>
                           <div style={{ flex: 1, height: 14, background: dark ? 'rgba(0,0,0,.45)' : 'rgba(38,32,25,.07)', borderRadius: 99, overflow: 'visible' }}>
                             <div style={{ height: '100%', width: `${Math.max(4, Math.round(b.active / maxA * 100))}%`, borderRadius: 99, background: `linear-gradient(90deg, ${clr}, ${clr}88)`,
                               boxShadow: dark ? `0 0 6px ${clr}aa, 0 0 16px -2px ${clr}77` : `0 0 10px -2px ${clr}` }} />
@@ -2139,10 +2207,11 @@ export default function App() {
               <div style={{ display: 'flex', gap: 7, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
                 <span style={{ fontSize: 12, color: t.muted, fontWeight: 600, flexShrink: 0 }}>Brand:</span>
                 <button key="ALL" className="bpill" onClick={() => setSelectedBrands([])} style={{ background: selectedBrands.length === 0 ? t.accent : t.surface2, color: selectedBrands.length === 0 ? '#000' : t.text, border: `1px solid ${selectedBrands.length === 0 ? t.accent : t.border}`, borderRadius: 20, padding: '5px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>All</button>
-                {VENDOR_BRANDS.ALL.map(b => {
-                  const sel = selectedBrands.includes(b)
-                  return <button key={b} className="bpill" onClick={() => toggleBrand(b)} style={{ background: sel ? t.accent : t.surface2, color: sel ? '#000' : t.text, border: `1px solid ${sel ? t.accent : t.border}`, borderRadius: 20, padding: '5px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{b}</button>
-                })}
+                {VENDOR_BRANDS.ALL.map(b => (
+                  <BrandPill key={b} brand={b} company={brandCompany[b]} t={t} size="m"
+                    selected={selectedBrands.includes(b)} count={brandCounts[b] || 0}
+                    onClick={() => toggleBrand(b)} />
+                ))}
               </div>
               {/* ── Legend + count bar ── */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 14, padding: '8px 14px', background: t.surface, border: `1px solid ${t.border}`, borderRadius: 10, flexWrap: 'wrap' }}>
@@ -2169,7 +2238,7 @@ export default function App() {
                   >
                     <PackshotImg barcode={p.barcode} side="front" style={{ width: '100%', height: 150, background: dark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)' }} placeholderSize={40} />
                     <div style={{ padding: '10px 12px' }}>
-                      <div style={{ fontSize: 10.5, fontWeight: 700, color: p.company === 'Vcan' ? t.vcanClr : t.moolaClr, marginBottom: 3 }}>{p.brand}</div>
+                      <div style={{ marginBottom: 4, overflow: 'hidden' }}><BrandPill brand={p.brand} company={p.company} t={t} size="s" /></div>
                       <div style={{ fontSize: 11.5, fontWeight: 600, color: t.text, lineHeight: 1.35, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }} title={p.product}>{p.product}</div>
                       <div style={{ marginTop: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span style={{ fontSize: 12, fontWeight: 700, color: t.text }}>฿{p.rsp || '—'}</span>
@@ -2198,6 +2267,7 @@ export default function App() {
               isMobile={isMobile}
               onSelect={setSelectedProduct}
               RetailerLogo={RetailerLogo}
+              MonogramTile={MonogramTile}
             />
           )}
 

@@ -162,7 +162,7 @@ function enrich(items, rawData) {
 }
 
 // ── component ─────────────────────────────────────────────────────────────────
-export default function PromoSection({ rawData, retailerData, t, dark, isMobile, onSelect, RetailerLogo }) {
+export default function PromoSection({ rawData, retailerData, t, dark, isMobile, onSelect, RetailerLogo, MonogramTile }) {
   const [retailer, setRetailer] = useState(PROMO_RETAILERS[0] || '')
   const [brandFilter, setBrandFilter] = useState([])
   const [layout, setLayout] = useState('timeline')
@@ -497,7 +497,7 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
           {grouped.map(([brand, list]) => (
             <div key={brand}>
               <div className="ps-cal-band" style={{ background: `color-mix(in srgb, ${coColor(list[0].company) || t.accent} 7%, ${s2})`, borderBottom: `1px solid ${bdr}`, borderTop: `1px solid ${bdr}` }}>
-                <span className="ps-cal-band-dot" style={{ background: coColor(list[0].company) || t.accent }} />
+                <MonogramTile brand={brand} company={list[0].company} t={t} size="s" />
                 <span className="ps-cal-band-name" style={{ color: coColor(list[0].company) || t.accent }}>{brand}</span>
                 <span className="ps-cal-band-count" style={{ color: mu }}>{list.length} SKU{list.length > 1 ? 's' : ''}</span>
               </div>
@@ -636,6 +636,7 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
                   background: dark ? 'rgba(255,255,255,.03)' : 'rgba(0,0,0,.02)',
                   borderBottom: `1px solid ${dim}`, borderTop: `1px solid ${bdr}`,
                 }}>
+                  <MonogramTile brand={brand} company={list[0].company} t={t} size="s" />
                   <span style={{ fontSize: 11.5, fontWeight: 800, letterSpacing: '.07em', textTransform: 'uppercase', color: coColor(list[0].company) || t.accent }}>{brand}</span>
                   <span style={{ fontSize: 10.5, color: mu }}>{list.length} SKU{list.length > 1 ? 's' : ''}</span>
                   <span style={{ fontSize: 10, color: mu, marginLeft: 4 }}>{list[0].company}</span>
