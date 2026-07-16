@@ -38,12 +38,16 @@ function brandCategory(b) {
   return 'Other'
 }
 
-// BrandPill (v3.6.0, logos wired v3.7.0) — shared brand identity chip: vendor-tinted
-// monogram + name, reused on Products filter / popup header / Packshot cards /
-// Analytics labels / Promo brand strips. Monogram = initials of the first two words,
-// or the first two letters of a single-word brand. Tile renders a real logo from
-// BRAND_LOGOS when one exists for the brand (white backing plate, same
-// missing/broken-image fallback pattern as RetailerLogo), else falls back to monogram.
+// BrandPill (v3.6.0, logos wired v3.7.0, "Marquee Capsule" redesign v3.8.0) —
+// shared brand identity chip: vendor-tinted logo plaque + name, reused on Products
+// filter / popup header / Packshot cards / Analytics labels / Promo brand strips.
+// The plaque replaced a fixed-square monogram tile — wide wordmarks (Sundae,
+// Malizia, up to ~3.7:1) were getting crushed flat in a square; the plaque now
+// sizes to each logo's own aspect ratio (measured on load, see BrandPlaque),
+// clamped so square logos stay square and nothing runs away past 2.3x tall.
+// Brand name is demoted to a caption alongside the plaque — logo leads, name
+// follows. Monogram = initials of the first two words, or the first two letters
+// of a single-word brand, still used as the plaque's own fallback content.
 function brandMonogram(b) {
   const words = b.trim().split(/\s+/).filter(Boolean)
   if (words.length >= 2) return (words[0][0] + words[1][0]).toUpperCase()
@@ -86,30 +90,39 @@ const BRAND_LOGOS = {
   'WMF': '/brands/wmf.png',
 }
 const BP_DIMS = {
-  s: { h: 24, tile: 18, radius: 5.5, font: 11, tileFont: 8, pad: '0 9px 0 3px', gap: 5 },
-  m: { h: 30, tile: 22, radius: 7, font: 12.5, tileFont: 9.5, pad: '0 12px 0 5px', gap: 7 },
-  l: { h: 38, tile: 28, radius: 9, font: 14, tileFont: 11.5, pad: '0 15px 0 6px', gap: 9 },
+  s: { h: 30, plaqueH: 24, pillR: 9,  plaqueR: 7,  tileFont: 8,    capFont: 10,   pad: '0 10px 0 3px', gap: 6 },
+  m: { h: 40, plaqueH: 34, pillR: 12, plaqueR: 9,  tileFont: 9.5,  capFont: 11,   pad: '0 13px 0 3px', gap: 9 },
+  l: { h: 50, plaqueH: 44, pillR: 15, plaqueR: 11, tileFont: 11.5, capFont: 12.5, pad: '0 16px 0 4px', gap: 11 },
 }
-function MonogramTile({ brand, company, t, size = 'm' }) {
+// Plaque width = clamp(1.0x, naturalAR*1.0x, 2.3x) the plaque height — square logos
+// stay square, wide wordmarks get a wide stage, nothing runs away unbounded. AR is
+// unknown until the image loads, so it starts at 1 (square) and widens on onLoad —
+// a one-time reflow, imperceptible for these small same-origin assets.
+function plaqueWidth(ar, h) {
+  return Math.round(Math.min(Math.max(h, ar * h), h * 2.3))
+}
+function BrandPlaque({ brand, company, t, size = 'm' }) {
   const clr = company === 'Vcan' ? t.vcanClr : t.moolaClr
   const d = BP_DIMS[size]
   const [err, setErr] = useState(false)
+  const [ar, setAr] = useState(1)
   const src = BRAND_LOGOS[brand]
   if (src && !err) {
     return (
       <span style={{
-        width: d.tile, height: d.tile, borderRadius: d.radius, flexShrink: 0,
+        width: plaqueWidth(ar, d.plaqueH), height: d.plaqueH, borderRadius: d.plaqueR, flexShrink: 0,
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        background: '#fff', overflow: 'hidden', lineHeight: 0,
+        background: '#fff', overflow: 'hidden', padding: 3, boxSizing: 'border-box',
       }}>
         <img src={src} alt={brand} onError={() => setErr(true)}
-          style={{ width: '100%', height: '100%', objectFit: 'contain', padding: '10%', boxSizing: 'border-box' }} />
+          onLoad={(e) => setAr(e.currentTarget.naturalWidth / e.currentTarget.naturalHeight)}
+          style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />
       </span>
     )
   }
   return (
     <span style={{
-      width: d.tile, height: d.tile, borderRadius: d.radius, flexShrink: 0,
+      width: d.plaqueH, height: d.plaqueH, borderRadius: d.plaqueR, flexShrink: 0,
       display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
       fontSize: d.tileFont, fontWeight: 800, color: 'rgba(0,0,0,.78)',
       background: `linear-gradient(135deg, ${clr}, ${clr}99)`,
@@ -128,15 +141,18 @@ function BrandPill({ brand, company, t, size = 'm', selected = false, count = nu
       className={interactive ? `ps-glow${selected ? ' ps-glow-on' : ''}` : undefined}
       style={{
         '--g': clr, display: 'inline-flex', alignItems: 'center', gap: d.gap, height: d.h,
-        padding: d.pad, borderRadius: 99, boxSizing: 'border-box', fontFamily: 'inherit',
+        padding: d.pad, borderRadius: d.pillR, boxSizing: 'border-box', fontFamily: 'inherit',
         background: t.surface2, border: `1.5px solid ${selected ? clr : t.border}`,
-        color: selected ? clr : t.text, fontSize: d.font, fontWeight: selected ? 700 : 600,
         cursor: interactive ? 'pointer' : 'default', maxWidth: '100%',
         transition: 'border-color .13s ease',
       }} title={brand}
     >
-      <MonogramTile brand={brand} company={company} t={t} size={size} />
-      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, flex: '0 1 auto' }}>{brand}</span>
+      <BrandPlaque brand={brand} company={company} t={t} size={size} />
+      <span style={{
+        fontSize: d.capFont, fontWeight: selected ? 700 : 600, color: selected ? clr : t.muted,
+        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, flex: '0 1 auto',
+        transition: 'color .13s ease',
+      }}>{brand}</span>
       {count != null && (
         <span style={{ fontSize: 10, fontWeight: 700, color: t.muted, background: `${t.accent}22`, borderRadius: 99, padding: '1px 6px', marginLeft: 1, flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{count}</span>
       )}
@@ -206,7 +222,7 @@ const RETAILER_LOGOS = {
   'TWD': '/retailers/twd.png',
   'Boots': '/retailers/boots.jpg',
   'Foodland': '/retailers/foodland.png',
-  'Central Department': '/retailers/central.png',
+  'Central Department': '/retailers/central.jpg',
   "Pet'n me": '/retailers/petnme.png',
   'Fuji': '/retailers/fuji.png',
 }
@@ -236,6 +252,9 @@ const PROMO_ACTIVITY_DISPLAY = {
 // border" bug). The 4 transparent-wordmark logos get a frosted glass plate, but only
 // in the theme where their ink color actually fails contrast (see RETAILER_DARK_PLATE
 // / RETAILER_LIGHT_PLATE above) — full contrast math there, not a blanket plate.
+// v3.8.0 "Bare Tile": plate shrinks to a whisper (1px/3px, radius 7) so it reads as
+// part of the logo, not a chip — chrome now lives at the call site (see the R1
+// selection/dim styling on the interactive filter-pill wrappers), not in here.
 function RetailerLogo({ name, h = 28, maxW = 76, dark, fallbackStyle = {} }) {
   const [err, setErr] = useState(false)
   const src = RETAILER_LOGOS[name]
@@ -247,9 +266,9 @@ function RetailerLogo({ name, h = 28, maxW = 76, dark, fallbackStyle = {} }) {
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-      width: maxW, height: h, borderRadius: 6, boxSizing: 'border-box', lineHeight: 0,
+      width: maxW, height: h, borderRadius: 7, boxSizing: 'border-box', lineHeight: 0,
       ...(needsPlate
-        ? { background: 'rgba(220,220,225,0.92)', backdropFilter: 'blur(6px)', padding: '2px 5px', boxShadow: '0 0 0 1px rgba(0,0,0,0.08)' }
+        ? { background: 'rgba(220,220,225,0.92)', backdropFilter: 'blur(6px)', padding: '1px 3px', boxShadow: '0 0 0 1px rgba(0,0,0,0.08)' }
         : { background: 'transparent', padding: 0 }),
     }}>
       <img
@@ -1344,6 +1363,14 @@ export default function App() {
         .clr-btn{transition:all 0.15s;cursor:pointer;}
         .clr-btn:hover{box-shadow:0 0 8px 3px rgba(248,81,73,0.4)!important;border-color:#f85149!important;color:#f85149!important;}
 
+        /* Retailer pill "Bare Tile" (v3.8.0) — chrome-free filter pill; selection
+           reads by glow ring + dimming siblings, never by a background box. */
+        .rp-btn{transition:opacity .15s ease,box-shadow .15s ease,transform .12s ease;}
+        .rp-btn:hover{transform:translateY(-1px);}
+        .rp-btn:hover:not(.rp-sel){box-shadow:0 0 0 1px ${t.border};}
+        .rp-sel{box-shadow:0 0 0 2px var(--g,${t.accent}),0 0 14px -2px var(--g,${t.accent});}
+        .rp-row:has(.rp-sel) .rp-btn:not(.rp-sel){opacity:.42;}
+
         /* ── universal motion system (v2.21.0) ── */
         @keyframes vcRise{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:none;}}
         @keyframes vcFade{from{opacity:0;}to{opacity:1;}}
@@ -1507,7 +1534,7 @@ export default function App() {
             <div style={{ fontWeight: 800, fontSize: isMobile ? 14 : 17, color: t.text, letterSpacing: 0.2, whiteSpace: 'nowrap', flexShrink: 0 }}>
               Product Master
             </div>
-            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v3.7.0</span>
+            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v3.8.0</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: isMobile ? 11 : 13, background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, padding: isMobile ? '3px 8px' : '5px 12px', overflow: 'hidden', minWidth: 0, flexShrink: 1 }}>
               <span style={{ width: isMobile ? 6 : 7, height: isMobile ? 6 : 7, borderRadius: '50%', flexShrink: 0, background: dataSource === 'csv' ? t.blue : t.green }} />
               <span style={{ fontWeight: 800, color: dataSource === 'csv' ? t.blue : t.green, flexShrink: 0 }}>
@@ -1726,19 +1753,19 @@ export default function App() {
                 {!isMobile && <div style={{
                   ...glassPanel, borderRadius: 12, padding: '10px 14px', marginBottom: 10,
                 }}>
-                  <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <div className="rp-row" style={{ display: 'flex', gap: 9, flexWrap: 'wrap', alignItems: 'center' }}>
                     <span style={{ fontSize: 11, color: t.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, flexShrink: 0 }}>Customer</span>
                     {RETAILERS.map(r => {
                       const sel = selectedRetailers.includes(r)
                       return (
-                        <button key={r} onClick={() => toggleRetailer(r)} title={r} style={{
-                          display: 'inline-flex', alignItems: 'center',
-                          background: sel ? `${t.accent}18` : t.surface2,
-                          border: `2px solid ${sel ? t.accent : t.border}`,
-                          borderRadius: 10, padding: '3px 7px', cursor: 'pointer',
-                          boxShadow: sel ? `0 0 0 3px ${t.accent}22` : 'none',
-                        }}>
-                          <RetailerLogo name={r} h={26} maxW={66} dark={dark} fallbackStyle={{ fontSize: 11, fontWeight: 700, color: t.text }} />
+                        <button key={r} onClick={() => toggleRetailer(r)} title={r}
+                          className={`rp-btn${sel ? ' rp-sel' : ''}`}
+                          style={{
+                            '--g': t.accent, display: 'inline-flex', alignItems: 'center',
+                            background: 'transparent', border: 'none', borderRadius: 8,
+                            padding: 2, cursor: 'pointer',
+                          }}>
+                          <RetailerLogo name={r} h={32} maxW={80} dark={dark} fallbackStyle={{ fontSize: 11, fontWeight: 700, color: t.text }} />
                         </button>
                       )
                     })}
@@ -1848,7 +1875,7 @@ export default function App() {
                               fontWeight: 700, fontSize: 10.5, whiteSpace: 'nowrap',
                               borderBottom: `2px solid ${t.border}`,
                               position: 'sticky', top: 0, background: t.surface2, zIndex: 1,
-                            }}><RetailerLogo name={r} h={28} maxW={74} dark={dark} fallbackStyle={{ fontSize: 10.5 }} /></th>
+                            }}><RetailerLogo name={r} h={32} maxW={84} dark={dark} fallbackStyle={{ fontSize: 10.5 }} /></th>
                           ))}
                         </tr>
                       )}
@@ -1981,7 +2008,7 @@ export default function App() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 9, marginTop: 16 }}>
                     {intel.retailersByActive.slice(0, 8).map(r => (
                       <div key={r.name} style={{ display: 'grid', gridTemplateColumns: isMobile ? '52px 1fr 62px' : '60px 1fr 74px', alignItems: 'center', gap: 10 }}>
-                        <RetailerLogo name={r.name} h={20} maxW={56} dark={dark} fallbackStyle={{ fontSize: 10.5, fontWeight: 700, color: t.text }} />
+                        <RetailerLogo name={r.name} h={24} maxW={62} dark={dark} fallbackStyle={{ fontSize: 10.5, fontWeight: 700, color: t.text }} />
                         <div style={{ height: 9, borderRadius: 6, background: dark ? 'rgba(0,0,0,.45)' : 'rgba(38,32,25,.07)', overflow: 'hidden' }}>
                           <div style={{ height: '100%', width: `${Math.round(r.active / maxRetailerActive * 100)}%`, borderRadius: 6, background: `linear-gradient(90deg, ${t.accent}, ${t.blue})`, boxShadow: dark ? `0 0 9px -1px ${t.accent}` : 'none', transition: 'width .6s ease' }} />
                         </div>
@@ -2060,7 +2087,7 @@ export default function App() {
                     <thead>
                       <tr style={{ borderBottom: `2px solid ${t.border}` }}>
                         <th style={{ padding: '9px 12px', textAlign: 'left', color: t.muted, fontWeight: 700, fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5, position: 'sticky', left: 0, background: t.surface, zIndex: 1 }}>Brand</th>
-                        {RETAILERS.map(r => <th key={r} style={{ padding: '9px 4px', textAlign: 'center', color: t.muted, fontWeight: 700, fontSize: 9.5, whiteSpace: 'nowrap' }}><RetailerLogo name={r} h={24} maxW={60} dark={dark} fallbackStyle={{ fontSize: 9.5 }} /></th>)}
+                        {RETAILERS.map(r => <th key={r} style={{ padding: '9px 4px', textAlign: 'center', color: t.muted, fontWeight: 700, fontSize: 9.5, whiteSpace: 'nowrap' }}><RetailerLogo name={r} h={28} maxW={70} dark={dark} fallbackStyle={{ fontSize: 9.5 }} /></th>)}
                         <th style={{ padding: '9px 10px', textAlign: 'center', color: t.muted, fontWeight: 700, fontSize: 11, textTransform: 'uppercase' }}>Cov.</th>
                       </tr>
                     </thead>
@@ -2122,7 +2149,7 @@ export default function App() {
                             const inStore = g.present.includes(r)
                             return (
                               <span key={r} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 10.5, fontWeight: 700, padding: '3px 9px', borderRadius: 6, background: inStore ? `${t.green}1e` : `${t.red}0d`, color: inStore ? t.green : t.muted, border: `1px solid ${inStore ? t.green + '44' : t.red + '33'}`, opacity: inStore ? 1 : 0.9 }}>
-                                <span>{inStore ? '✓' : '+'}</span><RetailerLogo name={r} h={20} maxW={56} dark={dark} fallbackStyle={{ fontSize: 10.5 }} />
+                                <span>{inStore ? '✓' : '+'}</span><RetailerLogo name={r} h={24} maxW={62} dark={dark} fallbackStyle={{ fontSize: 10.5 }} />
                               </span>
                             )
                           })}
@@ -2221,7 +2248,7 @@ export default function App() {
                           <tr key={r.name} className="rhover" style={{ borderBottom: `1px solid ${t.dim}` }}>
                             <td style={{ padding: '9px 10px', fontWeight: 700, color: t.text, whiteSpace: 'nowrap' }}>
                               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
-                                <RetailerLogo name={r.name} h={30} maxW={88} dark={dark} fallbackStyle={{ fontWeight: 700, color: t.text }} />
+                                <RetailerLogo name={r.name} h={36} maxW={92} dark={dark} fallbackStyle={{ fontWeight: 700, color: t.text }} />
                                 {isCore && <span style={{ fontSize: 9, fontWeight: 700, color: t.accent, border: `1px solid ${t.accent}66`, borderRadius: 4, padding: '1px 5px' }}>CORE</span>}
                               </span>
                             </td>
@@ -2260,14 +2287,20 @@ export default function App() {
                 {psSearch && <button onClick={() => setPsSearch('')} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: t.muted, cursor: 'pointer', fontSize: 18, lineHeight: 1 }}>×</button>}
               </div>
               {/* ── Customer (retailer) pills — logos (above brand) ── */}
-              <div style={{ display: 'flex', gap: 7, marginBottom: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+              <div className="rp-row" style={{ display: 'flex', gap: 9, marginBottom: 10, flexWrap: 'wrap', alignItems: 'center' }}>
                 <span style={{ fontSize: 12, color: t.muted, fontWeight: 600, flexShrink: 0 }}>Customer:</span>
                 <button onClick={() => setPsRetailers([])} style={{ background: psRetailers.length === 0 ? t.accent : t.surface2, color: psRetailers.length === 0 ? '#000' : t.text, border: `1.5px solid ${psRetailers.length === 0 ? t.accent : t.border}`, borderRadius: 20, padding: '6px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>All</button>
                 {RETAILERS.map(r => {
                   const sel = psRetailers.includes(r)
                   return (
-                    <button key={r} onClick={() => togglePsRetailer(r)} title={r} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: sel ? `${t.accent}18` : t.surface2, border: `2px solid ${sel ? t.accent : t.border}`, borderRadius: 10, cursor: 'pointer', boxShadow: sel ? `0 0 0 3px ${t.accent}22` : 'none', width: isMobile ? 60 : 76, height: isMobile ? 42 : 38 }}>
-                      <RetailerLogo name={r} h={isMobile ? 26 : 22} maxW={isMobile ? 68 : 58} dark={dark} fallbackStyle={{ fontSize: 11, fontWeight: 700, color: t.text }} />
+                    <button key={r} onClick={() => togglePsRetailer(r)} title={r}
+                      className={`rp-btn${sel ? ' rp-sel' : ''}`}
+                      style={{
+                        '--g': t.accent, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                        background: 'transparent', border: 'none', borderRadius: 8, padding: 2, cursor: 'pointer',
+                        minHeight: isMobile ? 40 : 'unset',
+                      }}>
+                      <RetailerLogo name={r} h={isMobile ? 30 : 26} maxW={isMobile ? 76 : 66} dark={dark} fallbackStyle={{ fontSize: 11, fontWeight: 700, color: t.text }} />
                     </button>
                   )
                 })}
@@ -2338,7 +2371,7 @@ export default function App() {
               isMobile={isMobile}
               onSelect={setSelectedProduct}
               RetailerLogo={RetailerLogo}
-              MonogramTile={MonogramTile}
+              MonogramTile={BrandPlaque}
             />
           )}
 
@@ -2563,7 +2596,7 @@ export default function App() {
             <div style={{ padding: '12px 16px 10px', borderBottom: `1px solid ${t.border}`, position: 'sticky', top: 0, background: t.surface, zIndex: 1 }}>
               <div style={{ fontWeight: 800, fontSize: 13, color: t.text }}>{matrixPopover.brand}</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: t.muted, marginTop: 3 }}>
-                <RetailerLogo name={matrixPopover.retailer} h={18} maxW={56} dark={dark} fallbackStyle={{ fontSize: 11 }} />
+                <RetailerLogo name={matrixPopover.retailer} h={22} maxW={58} dark={dark} fallbackStyle={{ fontSize: 11 }} />
                 <span>· {matrixPopover.products.length} active SKU{matrixPopover.products.length !== 1 ? 's' : ''}</span>
               </div>
             </div>
