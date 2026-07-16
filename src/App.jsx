@@ -38,16 +38,52 @@ function brandCategory(b) {
   return 'Other'
 }
 
-// BrandPill (v3.6.0) — shared brand identity chip: vendor-tinted monogram + name,
-// reused on Products filter / popup header / Packshot cards / Analytics labels /
-// Promo brand strips. Monogram = initials of the first two words, or the first two
-// letters of a single-word brand. Launch is monograms only — the tile is also the
-// future logo slot (falls back to monogram on missing/broken image, same as
-// RetailerLogo), inactive until a logo folder path is provided.
+// BrandPill (v3.6.0, logos wired v3.7.0) — shared brand identity chip: vendor-tinted
+// monogram + name, reused on Products filter / popup header / Packshot cards /
+// Analytics labels / Promo brand strips. Monogram = initials of the first two words,
+// or the first two letters of a single-word brand. Tile renders a real logo from
+// BRAND_LOGOS when one exists for the brand (white backing plate, same
+// missing/broken-image fallback pattern as RetailerLogo), else falls back to monogram.
 function brandMonogram(b) {
   const words = b.trim().split(/\s+/).filter(Boolean)
   if (words.length >= 2) return (words[0][0] + words[1][0]).toUpperCase()
   return (b.replace(/[^a-zA-Z]/g, '').slice(0, 2) || b.slice(0, 2)).toUpperCase()
+}
+// Drop logo files into public/brands/ with these exact names to replace monogram
+// tiles. Several data.js brand keys are variants of one physical brand (Malizia
+// Bath Foam 1L/300ml/Intimate, VITAKRAFT Bird/CAT/DOG/Rabbit/Rodent, L'Arbre Vert
+// + Body Wash, Dove Bar Soap, PEARS BODY WASH/SOAP) — they intentionally share one file.
+const BRAND_LOGOS = {
+  'Brilly': '/brands/brilly.png',
+  'combat': '/brands/combat.png',
+  'Dial': '/brands/dial.png',
+  'Dove Bar Soap': '/brands/dove.png',
+  'Dove Men': '/brands/dove-men.png',
+  'General Fresh': '/brands/general-fresh.png',
+  "Jack N' Jill": '/brands/jack-n-jill.png',
+  "L'Arbre Vert": '/brands/larbre-vert.png',
+  "L'Arbre Vert Body Wash": '/brands/larbre-vert.png',
+  'Malizia Bath Foam 1L': '/brands/malizia.png',
+  'Malizia Bath Foam 300ml': '/brands/malizia.png',
+  'Malizia Intimate': '/brands/malizia.png',
+  'PEARS BODY WASH': '/brands/pears.png',
+  'PEARS SOAP': '/brands/pears.png',
+  'Pepsodent sensitive': '/brands/pepsodent.png',
+  'Perwoll': '/brands/perwoll.png',
+  'Pril': '/brands/pril.png',
+  'Purex': '/brands/purex.png',
+  'Sofix': '/brands/sofix.png',
+  'Somat': '/brands/somat.png',
+  'Sundae Bath Foam': '/brands/sundae.png',
+  'Tempo': '/brands/tempo.png',
+  'Tena': '/brands/tena.png',
+  'VITAKRAFT Bird': '/brands/vitakraft.png',
+  'VITAKRAFT CAT': '/brands/vitakraft.png',
+  'VITAKRAFT DOG': '/brands/vitakraft.png',
+  'VITAKRAFT Rabbit': '/brands/vitakraft.png',
+  'VITAKRAFT Rodent': '/brands/vitakraft.png',
+  'Vnew': '/brands/vnew.png',
+  'WMF': '/brands/wmf.png',
 }
 const BP_DIMS = {
   s: { h: 24, tile: 18, radius: 5.5, font: 11, tileFont: 8, pad: '0 9px 0 3px', gap: 5 },
@@ -57,6 +93,20 @@ const BP_DIMS = {
 function MonogramTile({ brand, company, t, size = 'm' }) {
   const clr = company === 'Vcan' ? t.vcanClr : t.moolaClr
   const d = BP_DIMS[size]
+  const [err, setErr] = useState(false)
+  const src = BRAND_LOGOS[brand]
+  if (src && !err) {
+    return (
+      <span style={{
+        width: d.tile, height: d.tile, borderRadius: d.radius, flexShrink: 0,
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        background: '#fff', overflow: 'hidden', lineHeight: 0,
+      }}>
+        <img src={src} alt={brand} onError={() => setErr(true)}
+          style={{ width: '100%', height: '100%', objectFit: 'contain', padding: '10%', boxSizing: 'border-box' }} />
+      </span>
+    )
+  }
   return (
     <span style={{
       width: d.tile, height: d.tile, borderRadius: d.radius, flexShrink: 0,
@@ -152,9 +202,9 @@ const RETAILER_LOGOS = {
   'The Mall': '/retailers/the-mall.png',
   'Lotus': '/retailers/lotus.png',
   'Homepro': '/retailers/homepro.png',
-  'Big C': '/retailers/bigc.png',
+  'Big C': '/retailers/bigc.jpg',
   'TWD': '/retailers/twd.png',
-  'Boots': '/retailers/boots.png',
+  'Boots': '/retailers/boots.jpg',
   'Foodland': '/retailers/foodland.png',
   'Central Department': '/retailers/central.png',
   "Pet'n me": '/retailers/petnme.png',
@@ -1457,7 +1507,7 @@ export default function App() {
             <div style={{ fontWeight: 800, fontSize: isMobile ? 14 : 17, color: t.text, letterSpacing: 0.2, whiteSpace: 'nowrap', flexShrink: 0 }}>
               Product Master
             </div>
-            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v3.6.3</span>
+            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v3.7.0</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: isMobile ? 11 : 13, background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, padding: isMobile ? '3px 8px' : '5px 12px', overflow: 'hidden', minWidth: 0, flexShrink: 1 }}>
               <span style={{ width: isMobile ? 6 : 7, height: isMobile ? 6 : 7, borderRadius: '50%', flexShrink: 0, background: dataSource === 'csv' ? t.blue : t.green }} />
               <span style={{ fontWeight: 800, color: dataSource === 'csv' ? t.blue : t.green, flexShrink: 0 }}>
