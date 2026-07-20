@@ -29,7 +29,7 @@ export function logPricingAccess(dept, label) {
     const logs = JSON.parse(localStorage.getItem('pricingLog') || '[]')
     logs.unshift({ dept, product: label, time: new Date().toISOString() })
     localStorage.setItem('pricingLog', JSON.stringify(logs.slice(0, 200)))
-  } catch {}
+  } catch { /* localStorage unavailable (private browsing / quota) — skip logging */ }
 }
 
 export function getAccessLog() {
@@ -38,5 +38,5 @@ export function getAccessLog() {
 }
 
 export function clearAccessLog() {
-  try { localStorage.removeItem('pricingLog') } catch {}
+  try { localStorage.removeItem('pricingLog') } catch { /* localStorage unavailable */ }
 }

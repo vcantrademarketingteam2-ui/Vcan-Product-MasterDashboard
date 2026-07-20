@@ -16,7 +16,7 @@ async function broadcast(token, text) {
 }
 
 export default {
-  async scheduled(event, env, ctx) {
+  async scheduled(event, env) {
     if (!env.LINE_TOKEN) { console.error('LINE_TOKEN not set'); return; }
     const today = bangkokToday();
     const res = await env.ASSETS.fetch('https://assets.local/notification_schedule.json');

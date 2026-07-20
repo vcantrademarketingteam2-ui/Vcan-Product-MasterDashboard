@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import fallbackData, { GENERATED_AT } from './data.js'
 import retailerData from './retailer_data.js'
-import promoData, { PROMO_META, PROMO_ACTIVITY, PROMO_RETAILERS } from './promo_data.js'
+import promoData, { PROMO_META } from './promo_data.js'
 import vcanLogo from './VCAN.png'
 import PromoSection from './PromoSection.jsx'
 import { upcomingWithin, bangkokToday, daysUntil } from './promoAlerts.js'
@@ -180,8 +180,9 @@ function effStatusFor(p, selectedRetailers) {
 // Count-up animation for KPI / bento numbers — respects prefers-reduced-motion.
 function useCountUp(target, dur = 1100) {
   const [v, setV] = useState(0)
+  const reduced = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
   useEffect(() => {
-    if (typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) { setV(target); return }
+    if (reduced) return
     let raf, t0
     const step = (ts) => {
       if (!t0) t0 = ts
@@ -191,8 +192,8 @@ function useCountUp(target, dur = 1100) {
     }
     raf = requestAnimationFrame(step)
     return () => cancelAnimationFrame(raf)
-  }, [target, dur])
-  return v
+  }, [target, dur, reduced])
+  return reduced ? target : v
 }
 function CountUp({ v, dec = 0 }) {
   const n = useCountUp(v)
@@ -237,6 +238,15 @@ const RETAILER_LOGOS = {
 // unaided). No retailer needs a plate in both themes.
 const RETAILER_DARK_PLATE = new Set(['Villa', 'The Mall'])
 const RETAILER_LIGHT_PLATE = new Set(['Foodland', 'Fuji'])
+// Ambient neon glow behind each retailer tile (docs/superpowers/specs/2026-07-13-retailer-glow-codex-brief.md).
+// Always-on decoration, not a selection state — kept separate from the .ps-glow ring
+// the interactive filter-pill wrappers apply on top. Villa uses brand blue #3aa0ff
+// instead of its navy #2d2b74, which reads muddy as a glow (brief's call).
+const RETAILER_GLOW = {
+  'Tops': '#ff3c1c', 'Villa': '#3aa0ff', 'The Mall': '#ed1c24', 'Lotus': '#00beb5',
+  'Homepro': '#1867b2', 'Big C': '#a0c515', 'TWD': '#9b1c20', 'Boots': '#05054b',
+  'Foodland': '#ec2029', 'Central Department': '#e23b3b', "Pet'n me": '#ffc502', 'Fuji': '#e4151b',
+}
 
 // Activity badge colors for Promotion Plan — defined here (not imported) so colors are
 // independent of the generated promo_data.js
@@ -260,6 +270,11 @@ function RetailerLogo({ name, h = 28, maxW = 76, dark, fallbackStyle = {} }) {
   const src = RETAILER_LOGOS[name]
   if (err || !src) return <span style={{ whiteSpace: 'nowrap', ...fallbackStyle }}>{RETAILER_SHORT[name] || name}</span>
   const needsPlate = (dark && RETAILER_DARK_PLATE.has(name)) || (!dark && RETAILER_LIGHT_PLATE.has(name))
+  const glow = RETAILER_GLOW[name]
+  // Ambient, not hover/selection feedback — kept softer than .ps-glow's hover/selected
+  // rings (which live one layer up, on the interactive filter-pill button) so the two
+  // never compete when both are present.
+  const glowShadow = glow ? `0 0 4px -1px ${glow}, 0 0 9px -3px ${glow}` : ''
   // Fixed-size frame: every logo sits in the same maxW×h box and is scaled to fit
   // (contain) — wide wordmarks shrink to fit width, square logos get side whitespace,
   // so all chips stay uniform and nothing overflows. No per-logo scale needed.
@@ -268,8 +283,8 @@ function RetailerLogo({ name, h = 28, maxW = 76, dark, fallbackStyle = {} }) {
       display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
       width: maxW, height: h, borderRadius: 7, boxSizing: 'border-box', lineHeight: 0,
       ...(needsPlate
-        ? { background: 'rgba(220,220,225,0.92)', backdropFilter: 'blur(6px)', padding: '1px 3px', boxShadow: '0 0 0 1px rgba(0,0,0,0.08)' }
-        : { background: 'transparent', padding: 0 }),
+        ? { background: 'rgba(220,220,225,0.92)', backdropFilter: 'blur(6px)', padding: '1px 3px', boxShadow: glowShadow ? `${glowShadow}, 0 0 0 1px rgba(0,0,0,0.08)` : '0 0 0 1px rgba(0,0,0,0.08)' }
+        : { background: 'transparent', padding: 0, boxShadow: glowShadow || 'none' }),
     }}>
       <img
         src={src}
@@ -322,7 +337,7 @@ function parseCSV(text) {
     if (!row.some(c => c)) continue
     const c0 = row[0], c1 = row[1], c2 = row[2]
     if (VENDORS.includes(c0)) currentCompany = c0
-    let barcode = '', product = '', packSize = '', rsp = '', status = '', retailerOffset = 8
+    let barcode, product, packSize, rsp, status, retailerOffset = 8
     if (isBarcode(c1) && c0 && !VENDORS.includes(c0) && !isBarcode(c0)) {
       // Layout B: c0=brand, c1=barcode — checked BEFORE Layout A
       currentBrand = normalizeBrand(c0)
@@ -351,7 +366,8 @@ function PackshotImg({ barcode, side = 'front', style = {}, placeholderSize = 40
   const EXTS = ['webp', 'jpg', 'png']
   const [idx, setIdx] = useState(0)
   const [failed, setFailed] = useState(false)
-  useEffect(() => { setIdx(0); setFailed(false) }, [barcode, side])
+  // idx/failed reset on barcode/side change via the `key` prop at each call site
+  // (forces a remount) instead of an effect — see PackshotImg call sites.
   // cache-bust per data build — a stale CDN/browser cache can otherwise keep
   // serving an old image (or old 404) for an updated packshot on one device
   const src = `/packshots/${barcode}_${side}.${EXTS[idx]}?v=${encodeURIComponent(GENERATED_AT)}`
@@ -429,24 +445,22 @@ function ProductPopup({ product, onClose, t, dark, isMobile = false, pricing = {
     }
     img.src = loadedSrc
   }
+  // Popup state (side/loadedSrc/zoomed/etc.) resets per-product via the `key` prop
+  // on ProductPopup at the call site (forces a remount) rather than an effect —
+  // the useState initializers above already match the old reset values.
+  // Reset zoom + pan whenever the lightbox closes — done inline at each close
+  // site (closeZoom) rather than via an effect keyed on `zoomed`.
+  const closeZoom = () => { setZoomed(false); setZoomScale(1); setPanPos({ x: 0, y: 0 }) }
   useEffect(() => {
-    setSide('front')
-    setLoadedSrc(null)
-    setZoomed(false)
-    setZoomScale(1)
-    setPanPos({ x: 0, y: 0 })
-    setPopTab('info')
     // Esc: close lightbox first, then popup
     const h = (e) => {
       if (e.key === 'Escape') {
-        setZoomed(prev => { if (prev) return false; onClose(); return prev })
+        if (zoomed) closeZoom(); else onClose()
       }
     }
     document.addEventListener('keydown', h)
     return () => document.removeEventListener('keydown', h)
-  }, [product, onClose])
-  // Reset zoom + pan whenever lightbox closes
-  useEffect(() => { if (!zoomed) { setZoomScale(1); setPanPos({ x: 0, y: 0 }) } }, [zoomed])
+  }, [onClose, zoomed])
   // Ctrl+Scroll zoom — must be non-passive to call preventDefault
   useEffect(() => {
     if (!zoomed) return
@@ -459,6 +473,21 @@ function ProductPopup({ product, onClose, t, dark, isMobile = false, pricing = {
     el.addEventListener('wheel', onWheel, { passive: false })
     return () => el.removeEventListener('wheel', onWheel)
   }, [zoomed])
+  // Promo history: all periods with a salePrice for this barcode across all retailers.
+  // Kept above the `if (!product) return null` below — hooks must run unconditionally.
+  const myPromos = useMemo(() => {
+    if (!product) return []
+    const entries = []
+    promoItems.filter(it => String(it.barcode) === String(product.barcode)).forEach(it => {
+      const meta = promoMeta[it.retailer]?.periods || []
+      Object.entries(it.periods || {}).forEach(([pName, pd]) => {
+        if (!pd?.salePrice) return
+        const pm = meta.find(m => m.name === pName)
+        entries.push({ retailer: it.retailer, period: pName, dateRange: pm?.dateRange || '', price: pd.salePrice, label: pd.saleLabel || '', activities: pd.activities || [] })
+      })
+    })
+    return entries.sort((a, b) => a.retailer.localeCompare(b.retailer) || a.period.localeCompare(b.period))
+  }, [product, promoItems, promoMeta])
   if (!product) return null
   const statusColor = product.status === 'ขาย' ? t.green : product.status === 'รอขาย' ? t.yellow : t.red
   const statusLabel = product.status === 'ขาย' ? 'Active' : product.status === 'รอขาย' ? 'Pending' : 'Discontinued'
@@ -483,7 +512,7 @@ function ProductPopup({ product, onClose, t, dark, isMobile = false, pricing = {
   // hero=true → big centered image (Packshot view); hero=false → narrow side panel (Products view)
   const imagePanel = (hero) => (
     <div style={{ width: hero ? '100%' : (isMobile ? '100%' : 260), minWidth: hero ? 'unset' : (isMobile ? 'unset' : 220), flexShrink: 0, padding: hero ? '24px 16px 18px' : (isMobile ? '16px' : '20px 16px'), display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, borderRight: hero || isMobile ? 'none' : `1px solid ${t.border}`, borderBottom: isMobile || hero ? `1px solid ${t.border}` : 'none', background: hero ? (dark ? 'rgba(255,255,255,0.015)' : 'rgba(0,0,0,0.015)') : 'transparent' }}>
-      <PackshotImg barcode={product.barcode} side={side} onSrcChange={setLoadedSrc} style={{ width: hero ? 'auto' : '100%', maxWidth: hero ? 420 : 'unset', height: hero ? 320 : (isMobile ? 180 : 220), borderRadius: 8, background: dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)' }} placeholderSize={56} />
+      <PackshotImg key={`${product.barcode}_${side}`} barcode={product.barcode} side={side} onSrcChange={setLoadedSrc} style={{ width: hero ? 'auto' : '100%', maxWidth: hero ? 420 : 'unset', height: hero ? 320 : (isMobile ? 180 : 220), borderRadius: 8, background: dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)' }} placeholderSize={56} />
       {/* Controls row: Front/Back · Zoom · Save */}
       <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
         {['front', 'back'].map(s => (
@@ -657,20 +686,6 @@ function ProductPopup({ product, onClose, t, dark, isMobile = false, pricing = {
 
   const isPackshotView = variant === 'packshot' && !isMobile
 
-  // Promo history: all periods with a salePrice for this barcode across all retailers
-  const myPromos = useMemo(() => {
-    const entries = []
-    promoItems.filter(it => String(it.barcode) === String(product.barcode)).forEach(it => {
-      const meta = promoMeta[it.retailer]?.periods || []
-      Object.entries(it.periods || {}).forEach(([pName, pd]) => {
-        if (!pd?.salePrice) return
-        const pm = meta.find(m => m.name === pName)
-        entries.push({ retailer: it.retailer, period: pName, dateRange: pm?.dateRange || '', price: pd.salePrice, label: pd.saleLabel || '', activities: pd.activities || [] })
-      })
-    })
-    return entries.sort((a, b) => a.retailer.localeCompare(b.retailer) || a.period.localeCompare(b.period))
-  }, [product.barcode, promoItems, promoMeta])
-
   const promoBlock = (
     <div>
       {myPromos.length === 0
@@ -712,7 +727,7 @@ function ProductPopup({ product, onClose, t, dark, isMobile = false, pricing = {
       {zoomed && loadedSrc && (
         <div
           ref={lbRef}
-          onClick={() => setZoomed(false)}
+          onClick={closeZoom}
           onMouseMove={(e) => {
             if (!dragRef.current) return
             setPanPos({ x: dragRef.current.ox + (e.clientX - dragRef.current.startX), y: dragRef.current.oy + (e.clientY - dragRef.current.startY) })
@@ -745,7 +760,7 @@ function ProductPopup({ product, onClose, t, dark, isMobile = false, pricing = {
             />
           </div>
           {/* Close */}
-          <button onClick={() => setZoomed(false)} style={{ position: 'absolute', top: 20, right: 20, background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.18)', borderRadius: '50%', color: '#fff', fontSize: 18, width: 40, height: 40, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}>✕</button>
+          <button onClick={closeZoom} style={{ position: 'absolute', top: 20, right: 20, background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.18)', borderRadius: '50%', color: '#fff', fontSize: 18, width: 40, height: 40, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}>✕</button>
           {/* Zoom badge */}
           {zoomScale !== 1 && (
             <div onClick={e => { e.stopPropagation(); setZoomScale(1); setPanPos({ x: 0, y: 0 }) }} style={{ position: 'absolute', top: 20, left: '50%', transform: 'translateX(-50%)', background: 'rgba(255,255,255,0.14)', border: '1px solid rgba(255,255,255,0.22)', backdropFilter: 'blur(6px)', borderRadius: 20, padding: '5px 16px', color: '#fff', fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap', cursor: 'pointer' }}>
@@ -816,6 +831,40 @@ function ProductPopup({ product, onClose, t, dark, isMobile = false, pricing = {
   )
 }
 
+// Nav-tab icons — pure/stateless, hoisted to module scope so they're stable
+// component references (defining them inside App() re-created them every render).
+function IconBarChart({ size = 15, color = 'currentColor' }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 14 14" fill={color} xmlns="http://www.w3.org/2000/svg">
+      <rect x="0.5" y="8" width="3" height="5.5" rx="0.6"/>
+      <rect x="5.5" y="4" width="3" height="9.5" rx="0.6"/>
+      <rect x="10.5" y="1" width="3" height="12.5" rx="0.6"/>
+    </svg>
+  )
+}
+function IconGrid({ size = 15 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/>
+      <rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>
+    </svg>
+  )
+}
+function IconImage({ size = 15 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="4" width="18" height="16" rx="2.5"/><circle cx="8.5" cy="9.5" r="1.6"/><path d="M21 16l-5-5L5 20"/>
+    </svg>
+  )
+}
+function IconCalendar({ size = 15 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9h18M8 2.5v4M16 2.5v4"/>
+    </svg>
+  )
+}
+
 export default function App() {
   const [rawData, setRawData] = useState(fallbackData)
   const [lastUpdated, setLastUpdated] = useState(() => fmtTs(__BUILD_TIME__))
@@ -848,7 +897,7 @@ export default function App() {
   })
   const [logPin, setLogPin] = useState('')
   const [logPinErr, setLogPinErr] = useState(false)
-  const [logTick, setLogTick] = useState(0)
+  const [, setLogTick] = useState(0)  // value unused — setter forces a re-read of getAccessLog()
   const logRef = useRef(null)
   useEffect(() => {
     if (!logOpen) return
@@ -872,20 +921,9 @@ export default function App() {
   const [sortDir, setSortDir] = useState('asc')
   const [matrixPopover, setMatrixPopover] = useState(null)
   const [periodPopover, setPeriodPopover] = useState(null)  // {period, brands, x, y}
-  const [promoRetailer, setPromoRetailer] = useState(null)  // single-select
-  const [promoBrands, setPromoBrands] = useState([])
-  const togglePromoBrand = (b) => setPromoBrands(prev => prev.includes(b) ? prev.filter(x => x !== b) : [...prev, b])
-  const selectPromoRetailer = (r, enriched) => {
-    setPromoRetailer(r)
-    if (r) {
-      const avail = new Set(enriched.filter(p => p.retailer === r).map(p => p.brand))
-      setPromoBrands(prev => prev.filter(b => avail.has(b)))
-    } else {
-      setPromoBrands([])
-    }
-  }
+  const [promoRetailer] = useState(null)  // single-select — setter unused, dead calc-modal filter below always sees null
   const [promoUnlocked, setPromoUnlocked] = useState(() => sessionStorage.getItem('pu') === '1')
-  const [promoUnlockedDept, setPromoUnlockedDept] = useState(() => sessionStorage.getItem('puDept') || '')
+  const [, setPromoUnlockedDept] = useState(() => sessionStorage.getItem('puDept') || '')  // value unused, only the setter is read
   const [promoPwInput, setPromoPwInput] = useState('')
   const [promoPwError, setPromoPwError] = useState(false)
   // Compensate calculator (popup) — RSP/GP come from a chosen product, user types promo price
@@ -1190,55 +1228,6 @@ export default function App() {
     })
   }, [rawData])
 
-  const promoFiltered = useMemo(() => {
-    let d = enrichedPromoData
-    if (promoRetailer) d = d.filter(p => p.retailer === promoRetailer)
-    if (vendorFilter !== 'ALL') d = d.filter(p => p.company === vendorFilter)
-    if (promoBrands.length > 0) d = d.filter(p => promoBrands.includes(p.brand))
-    return d
-  }, [enrichedPromoData, promoRetailer, vendorFilter, promoBrands])
-
-  const promoCurrentGroup = useMemo(() => {
-    if (!promoRetailer) return null
-    return {
-      retailer: promoRetailer,
-      periods: PROMO_META[promoRetailer]?.periods || [],
-      items: promoFiltered,
-    }
-  }, [promoFiltered, promoRetailer])
-
-  const promoBrandList = useMemo(() => {
-    const base = promoRetailer ? enrichedPromoData.filter(p => p.retailer === promoRetailer) : enrichedPromoData
-    return [...new Set(base.map(p => p.brand))].filter(Boolean).sort()
-  }, [enrichedPromoData, promoRetailer])
-
-  // Per-period "who has a special activity" overview for the selected retailer (respects the
-  // brand/vendor filter). Each period lists the brands running something, expandable to show
-  // whether it's field / media / LOOKS.
-  const promoActivityByPeriod = useMemo(() => {
-    if (!promoCurrentGroup) return []
-    return promoCurrentGroup.periods.map(period => {
-      const brandsMap = {}
-      promoCurrentGroup.items.forEach(item => {
-        const pd = item.periods[period.name]
-        if (pd && pd.activities && pd.activities.length) {
-          if (!brandsMap[item.brand]) brandsMap[item.brand] = new Set()
-          pd.activities.forEach(a => brandsMap[item.brand].add(a))
-        }
-      })
-      const brands = Object.entries(brandsMap).map(([brand, set]) => ({ brand, activities: [...set] }))
-      const allActs = new Set(brands.flatMap(b => b.activities))
-      return { period: period.name, dateRange: period.dateRange, brands, allActs: [...allActs] }
-    }).filter(p => p.brands.length > 0)
-  }, [promoCurrentGroup])
-
-  // quick lookup: period name -> its activity summary entry (for the header symbols)
-  const promoActivityMap = useMemo(() => {
-    const m = {}
-    promoActivityByPeriod.forEach(e => { m[e.period] = e })
-    return m
-  }, [promoActivityByPeriod])
-
   const maxRetailerActive = Math.max(...intel.retailers.map(r => r.active), 1)
   const gpTone = (g) => g == null ? t.muted : g >= 0.30 ? t.green : g >= 0.20 ? t.yellow : t.red
 
@@ -1281,29 +1270,6 @@ export default function App() {
     )
   }
 
-  const IconBarChart = ({ size = 15, color = 'currentColor' }) => (
-    <svg width={size} height={size} viewBox="0 0 14 14" fill={color} xmlns="http://www.w3.org/2000/svg">
-      <rect x="0.5" y="8" width="3" height="5.5" rx="0.6"/>
-      <rect x="5.5" y="4" width="3" height="9.5" rx="0.6"/>
-      <rect x="10.5" y="1" width="3" height="12.5" rx="0.6"/>
-    </svg>
-  )
-  const IconGrid = ({ size = 15 }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/>
-      <rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>
-    </svg>
-  )
-  const IconImage = ({ size = 15 }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="4" width="18" height="16" rx="2.5"/><circle cx="8.5" cy="9.5" r="1.6"/><path d="M21 16l-5-5L5 20"/>
-    </svg>
-  )
-  const IconCalendar = ({ size = 15 }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9h18M8 2.5v4M16 2.5v4"/>
-    </svg>
-  )
   const NAV_ITEMS = [
     { key: 'products', icon: <IconGrid />, label: 'Products' },
     { key: 'analytics', icon: <IconBarChart size={15} />, label: 'Analytics' },
@@ -1534,7 +1500,7 @@ export default function App() {
             <div style={{ fontWeight: 800, fontSize: isMobile ? 14 : 17, color: t.text, letterSpacing: 0.2, whiteSpace: 'nowrap', flexShrink: 0 }}>
               Product Master
             </div>
-            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v3.8.0</span>
+            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v3.9.0</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: isMobile ? 11 : 13, background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, padding: isMobile ? '3px 8px' : '5px 12px', overflow: 'hidden', minWidth: 0, flexShrink: 1 }}>
               <span style={{ width: isMobile ? 6 : 7, height: isMobile ? 6 : 7, borderRadius: '50%', flexShrink: 0, background: dataSource === 'csv' ? t.blue : t.green }} />
               <span style={{ fontWeight: 800, color: dataSource === 'csv' ? t.blue : t.green, flexShrink: 0 }}>
@@ -1708,10 +1674,10 @@ export default function App() {
             <>
               {/* Stat cards */}
               <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', gap: 12, marginBottom: 20 }}>
-                <StatCard label="Total SKUs" value={stats.total} sub={scopeLabel} color={scopeLabel === 'all products' ? undefined : t.accent} />
-                <StatCard label="Active" value={stats.active} sub={`${stats.total ? Math.round(stats.active / stats.total * 100) : 0}% of total`} color={t.green} active={statusTab === 'ขาย'} onClick={() => toggleStatus('ขาย')} />
-                <StatCard label="Pending" value={stats.pending} sub="รอขาย" color={t.yellow} active={statusTab === 'รอขาย'} onClick={() => toggleStatus('รอขาย')} />
-                <StatCard label="Discontinued" value={stats.discon} sub="ยกเลิกขาย" color={t.red} active={statusTab === 'ยกเลิกขาย'} onClick={() => toggleStatus('ยกเลิกขาย')} />
+                {StatCard({ label: 'Total SKUs', value: stats.total, sub: scopeLabel, color: scopeLabel === 'all products' ? undefined : t.accent })}
+                {StatCard({ label: 'Active', value: stats.active, sub: `${stats.total ? Math.round(stats.active / stats.total * 100) : 0}% of total`, color: t.green, active: statusTab === 'ขาย', onClick: () => toggleStatus('ขาย') })}
+                {StatCard({ label: 'Pending', value: stats.pending, sub: 'รอขาย', color: t.yellow, active: statusTab === 'รอขาย', onClick: () => toggleStatus('รอขาย') })}
+                {StatCard({ label: 'Discontinued', value: stats.discon, sub: 'ยกเลิกขาย', color: t.red, active: statusTab === 'ยกเลิกขาย', onClick: () => toggleStatus('ยกเลิกขาย') })}
               </div>
 
               {/* Sticky filter section */}
@@ -1808,7 +1774,7 @@ export default function App() {
                         <span style={{
                           fontSize: 10.5, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.08em', color: t.muted, whiteSpace: 'nowrap',
                         }}>{cat}</span>
-                        <div style={{ display: 'grid', gridAutoFlow: 'column', gridTemplateColumns: `repeat(${numCols}, minmax(min-content, 1fr))`, gridTemplateRows: `repeat(${numRows}, 32px)`, minHeight: 146, gap: 6, width: '100%' }}>
+                        <div style={{ display: 'grid', gridAutoFlow: 'column', gridTemplateColumns: `repeat(${numCols}, minmax(min-content, 1fr))`, gridTemplateRows: `repeat(${numRows}, 40px)`, minHeight: 190, gap: '10px 14px', width: '100%' }}>
                           {brandGroups[cat].map(renderBrandPill)}
                         </div>
                       </div>
@@ -1851,10 +1817,10 @@ export default function App() {
                         <tr style={{ background: t.surface2, boxShadow: `0 2px 0 ${t.accent}` }}>
                           <th style={{ padding: '10px 8px', textAlign: 'center', color: t.text, fontWeight: 700, fontSize: 11, textTransform: 'uppercase', borderBottom: `2px solid ${t.border}`, position: 'sticky', top: 0, background: t.surface2, zIndex: 1, width: 52 }}>#</th>
                           <th onClick={() => handleSort('product')} style={{ padding: '10px 12px', textAlign: 'left', color: sortCol === 'product' ? t.accent : t.text, fontWeight: 700, fontSize: 11, textTransform: 'uppercase', borderBottom: `2px solid ${t.border}`, position: 'sticky', top: 0, background: t.surface2, zIndex: 1, cursor: 'pointer', userSelect: 'none' }}>
-                            Brand / Product <SortIcon col="product" />
+                            Brand / Product {SortIcon({ col: 'product' })}
                           </th>
                           <th onClick={() => handleSort('status')} style={{ padding: '10px 8px', textAlign: 'center', color: sortCol === 'status' ? t.accent : t.text, fontWeight: 700, fontSize: 11, textTransform: 'uppercase', borderBottom: `2px solid ${t.border}`, position: 'sticky', top: 0, background: t.surface2, zIndex: 1, width: 82, cursor: 'pointer', userSelect: 'none' }}>
-                            Status <SortIcon col="status" />
+                            Status {SortIcon({ col: 'status' })}
                           </th>
                         </tr>
                       ) : (
@@ -1867,7 +1833,7 @@ export default function App() {
                               width: w, whiteSpace: 'nowrap',
                               position: 'sticky', top: 0, background: t.surface2, zIndex: 1,
                               cursor: key ? 'pointer' : 'default', userSelect: 'none',
-                            }}>{label}{key && <SortIcon col={key} />}</th>
+                            }}>{label}{key && SortIcon({ col: key })}</th>
                           ))}
                           {visibleRetailers.map(r => (
                             <th key={r} style={{
@@ -1980,7 +1946,7 @@ export default function App() {
               <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(12, minmax(0,1fr))', gap: 12 }}>
                 {/* Portfolio Status donut */}
                 <div className="vc-rise vc-lift" style={{ ...glassPanel, borderRadius: 14, padding: isMobile ? 16 : 20, gridColumn: isMobile ? 'auto' : 'span 4' }}>
-                  <BentoHead title="Portfolio Status" desc="All SKUs by lifecycle state" />
+                  {BentoHead({ title: 'Portfolio Status', desc: 'All SKUs by lifecycle state' })}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 18, marginTop: 16, flexWrap: 'wrap' }}>
                     <div style={{ width: 132, height: 132, borderRadius: '50%', flexShrink: 0, position: 'relative', display: 'grid', placeItems: 'center',
                       background: `conic-gradient(${t.green} 0deg ${intel.summary.aDeg}deg, ${t.yellow} ${intel.summary.aDeg}deg ${intel.summary.pDeg}deg, ${t.red} ${intel.summary.pDeg}deg 360deg)`,
@@ -2004,7 +1970,7 @@ export default function App() {
 
                 {/* Channel Share bars */}
                 <div className="vc-rise vc-lift" style={{ ...glassPanel, borderRadius: 14, padding: isMobile ? 16 : 20, gridColumn: isMobile ? 'auto' : 'span 8' }}>
-                  <BentoHead title="Channel Share" desc="Active SKUs per retailer — share of total shelf presence" />
+                  {BentoHead({ title: 'Channel Share', desc: 'Active SKUs per retailer — share of total shelf presence' })}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 9, marginTop: 16 }}>
                     {intel.retailersByActive.slice(0, 8).map(r => (
                       <div key={r.name} style={{ display: 'grid', gridTemplateColumns: isMobile ? '52px 1fr 62px' : '60px 1fr 74px', alignItems: 'center', gap: 10 }}>
@@ -2020,7 +1986,7 @@ export default function App() {
 
                 {/* Coverage rings */}
                 <div className="vc-rise vc-lift" style={{ ...glassPanel, borderRadius: 14, padding: isMobile ? 16 : 20, gridColumn: isMobile ? 'auto' : 'span 12' }}>
-                  <BentoHead title="Coverage Leaders" desc="Brands in the most doors — distribution reach across the retailer network" />
+                  {BentoHead({ title: 'Coverage Leaders', desc: 'Brands in the most doors — distribution reach across the retailer network' })}
                   <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(220px,1fr))', gap: 14, marginTop: 16 }}>
                     {intel.brands.filter(b => b.active > 0).slice(0, 5).map(b => {
                       const pct = Math.round(b.coverage / RETAILERS.length * 100)
@@ -2617,6 +2583,7 @@ export default function App() {
       {/* ── PRODUCT POPUP ── */}
       {selectedProduct && (
         <ProductPopup
+          key={selectedProduct.barcode}
           product={selectedProduct}
           onClose={() => setSelectedProduct(null)}
           t={t}

@@ -65,7 +65,7 @@ function parseDR(dr = '') {
   // Villa format: "25.06.26 - 22.07.26" (dots, both sides carry year, spaces around dash).
   // Without this branch every Villa period fails to parse and falls back to inferPeriodDate,
   // which maps "Monthly7"→July and wrongly marks it NOW when today sits in Monthly6's range.
-  const md = s0.match(/^(\d+)\.(\d+)\.(\d+)\s*[–\-]\s*(\d+)\.(\d+)\.(\d+)$/)
+  const md = s0.match(/^(\d+)\.(\d+)\.(\d+)\s*[–-]\s*(\d+)\.(\d+)\.(\d+)$/)
   if (md) {
     const yr = n => (parseInt(n) < 50 ? 2000 : 1900) + parseInt(n)
     const s = new Date(yr(md[3]), parseInt(md[2]) - 1, parseInt(md[1]))
@@ -73,7 +73,7 @@ function parseDR(dr = '') {
     return { s, e }
   }
   // "27/05-9/06/26"  or  "7/01-20/01/26"
-  const m = s0.match(/^(\d+)\/(\d+)[–\-](\d+)\/(\d+)(?:\/(\d+))?$/)
+  const m = s0.match(/^(\d+)\/(\d+)[–-](\d+)\/(\d+)(?:\/(\d+))?$/)
   if (!m) return null
   const yr = m[5] ? (parseInt(m[5]) < 50 ? 2000 + parseInt(m[5]) : 1900 + parseInt(m[5])) : TODAY.getFullYear()
   const s = new Date(yr, parseInt(m[2]) - 1, parseInt(m[1]))
@@ -89,7 +89,7 @@ const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct'
 function inferPeriodDate(p) {
   const name = (p?.name || '').trim()
   // Foodland Thai Buddhist: "1-31/1/2569" or "1-30 /4/2569"
-  const th = name.match(/^(\d+)[–\-]\s*(\d+)\s*\/(\d+)\/(\d{4})$/)
+  const th = name.match(/^(\d+)[–-]\s*(\d+)\s*\/(\d+)\/(\d{4})$/)
   if (th) {
     const rawYr = parseInt(th[4])
     const yr = rawYr > 2500 ? rawYr - 543 : rawYr
@@ -125,22 +125,6 @@ function periodLabel(name) {
   return name
 }
 
-// Derive month groupings for Grid axis from a periods array
-function groupPeriodsByMonth(periods) {
-  const groups = []
-  periods.forEach(p => {
-    const r = parseDR(p.dateRange) || inferPeriodDate(p)
-    const mName = r ? MONTH_NAMES[r.s.getMonth()] : 'Period'
-    const last = groups[groups.length - 1]
-    if (last && last.name === mName) last.count++
-    else groups.push({ name: mName, count: 1, nowInside: false })
-  })
-  let acc = 0
-  const nowIdx = periods.findIndex(p => periodIsCurrent(p))
-  groups.forEach(g => { if (nowIdx >= acc && nowIdx < acc + g.count) g.nowInside = true; acc += g.count })
-  return groups
-}
-
 // Discount % off RSP — null when sale price or RSP is missing/invalid
 function offPctOf(item, pd) {
   if (pd?.salePrice == null || !(item.rspIncVat > 0)) return null
@@ -162,7 +146,7 @@ function enrich(items, rawData) {
 }
 
 // ── component ─────────────────────────────────────────────────────────────────
-export default function PromoSection({ rawData, retailerData, t, dark, isMobile, onSelect, RetailerLogo, MonogramTile }) {
+export default function PromoSection({ rawData, t, dark, isMobile, onSelect, RetailerLogo, MonogramTile }) {
   const [retailer, setRetailer] = useState(PROMO_RETAILERS[0] || '')
   const [brandFilter, setBrandFilter] = useState([])
   const [layout, setLayout] = useState('timeline')
@@ -183,7 +167,6 @@ export default function PromoSection({ rawData, retailerData, t, dark, isMobile,
   }, [retailer])
 
   const currentIdx = useMemo(() => periods.findIndex(p => p.isCurrent), [periods])
-  const months = useMemo(() => groupPeriodsByMonth(periods), [periods])
 
   const allItems = useMemo(() => {
     const raw = promoData.filter(p => p.retailer === retailer)
@@ -1154,16 +1137,20 @@ function CalcModal({ t, dark, items, retailer, onClose }) {
   const costAt = price => (price / 1.07) * (1 - gp)
   const p = parseFloat(promo)
 
-  const result = useMemo(() => {
-    if (rsp == null) return { err: 'ค้นหาและเลือก product ก่อน' }
-    if (type !== 'b2g1' && isNaN(p)) return { err: 'ใส่ราคาโปรโมชัน' }
+  // ponytail: trivial arithmetic, recompute every render — no useMemo needed,
+  // and it sidesteps the stale-closure bug a [bc, type, mode, promo] dep array
+  // had (rsp/gp/costAt derive from `items`, which wasn't in that array).
+  let result
+  if (rsp == null) result = { err: 'ค้นหาและเลือก product ก่อน' }
+  else if (type !== 'b2g1' && isNaN(p)) result = { err: 'ใส่ราคาโปรโมชัน' }
+  else {
     const eff = type === '2for' ? p / 2 : p
     let comp
     if (type === 'b2g1') comp = mode === 'keepgp' ? costAt(rsp) : rsp
     else if (mode === 'keepgp') comp = costAt(rsp) - costAt(eff)
     else comp = rsp - eff
-    return { comp }
-  }, [bc, type, mode, promo])
+    result = { comp }
+  }
 
   const s = t.surface, s2 = t.surface2, bdr = t.border, tx = t.text, mu = t.muted
 
