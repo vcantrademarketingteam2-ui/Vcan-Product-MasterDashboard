@@ -1506,7 +1506,7 @@ export default function App() {
             <div style={{ fontWeight: 800, fontSize: isMobile ? 14 : 17, color: t.text, letterSpacing: 0.2, whiteSpace: 'nowrap', flexShrink: 0 }}>
               Product Master
             </div>
-            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v3.10.1</span>
+            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v3.10.2</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: isMobile ? 11 : 13, background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, padding: isMobile ? '3px 8px' : '5px 12px', overflow: 'hidden', minWidth: 0, flexShrink: 1 }}>
               <span style={{ width: isMobile ? 6 : 7, height: isMobile ? 6 : 7, borderRadius: '50%', flexShrink: 0, background: dataSource === 'csv' ? t.blue : t.green }} />
               <span style={{ fontWeight: 800, color: dataSource === 'csv' ? t.blue : t.green, flexShrink: 0 }}>
@@ -1750,29 +1750,30 @@ export default function App() {
                 {/* Brand pills — card background for contrast */}
                 <div style={{
                   ...glassPanel, borderRadius: 12, padding: '12px 16px',
-                  // Height guard: in extreme cases scroll rather than burying the
-                  // table/menus below; the proportional layout keeps it short normally.
-                  ...(isMobile ? {} : { maxHeight: '44vh', overflowY: 'auto' }),
+                  // No inner max-height/scroll here on purpose: the full-width band
+                  // layout below scales height predictably with brand count (unlike
+                  // the old narrow-column layout, which could grow one column
+                  // unboundedly tall). Letting the panel take its natural height and
+                  // scroll with the page avoids a nested inner scrollbar.
                 }}>
-                  {/* Categorized brand pills — side-by-side columns (one per category,
-                      label on top, pills wrap WITHIN the column) divided by vertical
-                      rules. Each column's width is proportional to its TOTAL TEXT
-                      LENGTH (flex-grow = sum of brand-name chars, basis 0). Pills
-                      inside a column are a flex-wrap row (NOT a fixed-row-count grid,
-                      which forced every pill to stretch to its track's 1fr width even
-                      when its own name was short) — each pill sizes to its own content
-                      and wraps, packing short brand names tightly instead of eating a
-                      full row. Mobile: stack full-width. */}
-                  <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', flexWrap: isMobile ? 'nowrap' : 'wrap', alignItems: 'flex-start', justifyContent: 'space-between', gap: isMobile ? 0 : '14px 0' }}>
-                    {BRAND_CATEGORIES.filter(c => brandGroups[c]?.length).map((cat, i) => {
-                      const totalChars = brandGroups[cat].reduce((s, b) => s + b.length, 0)
-                      return (
+                  {/* Categorized brand pills — full-width labeled bands, stacked
+                      vertically (desktop AND mobile alike). Each band's pill row
+                      flow-wraps across the panel's ENTIRE width, so a busy category
+                      (Personal Care, Pet) wraps into a couple of wide rows instead
+                      of being walled into its own narrow column. A prior side-by-side
+                      column layout gave each category a fixed width slice of the row
+                      and let pills wrap only inside that slice — busy categories
+                      stacked many rows tall in a narrow column while idle categories
+                      left dead space beside them, and the tallest column's height
+                      forced the panel past its scroll guard. Bands share the full
+                      width instead, so total height reflects actual pill count, not
+                      column imbalance. */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+                    {BRAND_CATEGORIES.filter(c => brandGroups[c]?.length).map((cat, i) => (
                       <div key={cat} style={{
-                        flex: `${totalChars} 1 0`, minWidth: 'min-content',
-                        display: 'flex', flexDirection: 'column', gap: 10,
-                        ...(isMobile
-                          ? { paddingTop: i ? 9 : 0, marginTop: i ? 9 : 0, borderTop: i ? `1px solid ${t.border}` : 'none' }
-                          : { paddingLeft: i ? 10 : 0, paddingRight: 10, borderLeft: i ? `1px solid ${t.border}` : 'none' }),
+                        display: 'flex', flexDirection: 'column', gap: 8,
+                        paddingTop: i ? 10 : 0, marginTop: i ? 10 : 0,
+                        borderTop: i ? `1px solid ${t.border}` : 'none',
                       }}>
                         <span style={{
                           fontSize: 10.5, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.08em', color: t.muted, whiteSpace: 'nowrap',
@@ -1781,8 +1782,7 @@ export default function App() {
                           {brandGroups[cat].map(renderBrandPill)}
                         </div>
                       </div>
-                      );
-                    })}
+                    ))}
                   </div>
                 </div>
               </div>
