@@ -90,9 +90,9 @@ const BRAND_LOGOS = {
   'WMF': '/brands/wmf.png',
 }
 const BP_DIMS = {
-  s: { h: 30, plaqueH: 24, pillR: 9,  plaqueR: 7,  tileFont: 8,    capFont: 10,   pad: '0 10px 0 3px', gap: 6 },
-  m: { h: 40, plaqueH: 34, pillR: 12, plaqueR: 9,  tileFont: 9.5,  capFont: 11,   pad: '0 13px 0 3px', gap: 9 },
-  l: { h: 50, plaqueH: 44, pillR: 15, plaqueR: 11, tileFont: 11.5, capFont: 12.5, pad: '0 16px 0 4px', gap: 11 },
+  s: { h: 38, plaqueH: 30, pillR: 11, plaqueR: 9,  tileFont: 10,   capFont: 12,   pad: '0 12px 0 4px', gap: 7 },
+  m: { h: 50, plaqueH: 42, pillR: 15, plaqueR: 11, tileFont: 12,   capFont: 13.5, pad: '0 16px 0 4px', gap: 11 },
+  l: { h: 63, plaqueH: 55, pillR: 19, plaqueR: 14, tileFont: 14,   capFont: 15.5, pad: '0 20px 0 5px', gap: 13 },
 }
 // Plaque width = clamp(1.0x, naturalAR*1.0x, 2.3x) the plaque height — square logos
 // stay square, wide wordmarks get a wide stage, nothing runs away unbounded. AR is
@@ -577,7 +577,10 @@ function ProductPopup({ product, onClose, t, dark, isMobile = false, pricing = {
     </div>
   )
 
-  const pricingBlock = () => Object.keys(pricing).length > 0 ? (
+  const pricingBlock = () => {
+    if (Object.keys(pricing).length === 0) return null
+    const anyRemark = RETAILERS.some(r => pricing[r]?.remark)
+    return (
     <div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
         <div style={{ fontSize: 11, color: t.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.8 }}>Retailer Pricing</div>
@@ -627,6 +630,7 @@ function ProductPopup({ product, onClose, t, dark, isMobile = false, pricing = {
                 <th style={{ textAlign: 'left', padding: '4px 8px', color: t.muted, fontWeight: 700, fontSize: 9.5, textTransform: 'uppercase', letterSpacing: 0.5 }}>Retailer</th>
                 <th style={{ textAlign: 'right', padding: '4px 8px', color: t.muted, fontWeight: 700, fontSize: 9.5, textTransform: 'uppercase', letterSpacing: 0.5 }}>Cost/Unit</th>
                 <th style={{ textAlign: 'right', padding: '4px 8px', color: t.muted, fontWeight: 700, fontSize: 9.5, textTransform: 'uppercase', letterSpacing: 0.5 }}>GP</th>
+                {anyRemark && <th style={{ textAlign: 'left', padding: '4px 8px', color: t.muted, fontWeight: 700, fontSize: 9.5, textTransform: 'uppercase', letterSpacing: 0.5 }}>Remark</th>}
               </tr>
             </thead>
             <tbody>
@@ -638,6 +642,7 @@ function ProductPopup({ product, onClose, t, dark, isMobile = false, pricing = {
                     <td style={{ padding: '5px 8px', fontWeight: 700, color: t.text, whiteSpace: 'nowrap' }}>{r}</td>
                     <td style={{ padding: '5px 8px', textAlign: 'right', color: t.text, whiteSpace: 'nowrap' }}>{d.costUnit != null ? '฿' + d.costUnit.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}</td>
                     <td style={{ padding: '5px 8px', textAlign: 'right', fontWeight: 700, color: d.gp != null ? gpColor : t.muted }}>{d.gp != null ? Math.round(d.gp * 100) + '%' : '—'}</td>
+                    {anyRemark && <td style={{ padding: '5px 8px', color: t.muted, fontSize: 11 }}>{d.remark || ''}</td>}
                   </tr>
                 )
               })}
@@ -646,7 +651,8 @@ function ProductPopup({ product, onClose, t, dark, isMobile = false, pricing = {
         </div>
       )}
     </div>
-  ) : null
+    )
+  }
 
   const coverageBlock = (cols) => (
     <div>
@@ -1500,7 +1506,7 @@ export default function App() {
             <div style={{ fontWeight: 800, fontSize: isMobile ? 14 : 17, color: t.text, letterSpacing: 0.2, whiteSpace: 'nowrap', flexShrink: 0 }}>
               Product Master
             </div>
-            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v3.9.0</span>
+            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v3.10.0</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: isMobile ? 11 : 13, background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, padding: isMobile ? '3px 8px' : '5px 12px', overflow: 'hidden', minWidth: 0, flexShrink: 1 }}>
               <span style={{ width: isMobile ? 6 : 7, height: isMobile ? 6 : 7, borderRadius: '50%', flexShrink: 0, background: dataSource === 'csv' ? t.blue : t.green }} />
               <span style={{ fontWeight: 800, color: dataSource === 'csv' ? t.blue : t.green, flexShrink: 0 }}>

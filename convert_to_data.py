@@ -199,10 +199,11 @@ def parse_retailer(ws, sheet_name):
         print(f"    [!] No barcode header in {sheet_name}")
         return {}
 
-    bc_col   = find_col(header, 'barcode')
-    unit_col = find_col(header, 'cost/unit', 'unit (ex')
-    case_col = find_col(header, 'cost/case', 'case (ex')
-    gp_col   = find_col(header, 'gp%', 'normal gp')
+    bc_col     = find_col(header, 'barcode')
+    unit_col   = find_col(header, 'cost/unit', 'unit (ex')
+    case_col   = find_col(header, 'cost/case', 'case (ex')
+    gp_col     = find_col(header, 'gp%', 'normal gp')
+    remark_col = find_col(header, 'remark')
 
     result = {}
     for row in ws.iter_rows(min_row=hrow_idx + 2, values_only=True, max_col=15):
@@ -212,12 +213,14 @@ def parse_retailer(ws, sheet_name):
         if not is_bc(bc):
             continue
         e = {}
-        cu  = to_num(row[unit_col] if unit_col and unit_col < len(row) else None)
-        cc  = to_num(row[case_col] if case_col and case_col < len(row) else None)
-        gp  = to_num(row[gp_col]   if gp_col   and gp_col   < len(row) else None)
+        cu  = to_num(row[unit_col]   if unit_col   and unit_col   < len(row) else None)
+        cc  = to_num(row[case_col]   if case_col   and case_col   < len(row) else None)
+        gp  = to_num(row[gp_col]     if gp_col     and gp_col     < len(row) else None)
+        rk  = tr(row[remark_col])    if remark_col is not None and remark_col < len(row) else ''
         if cu  is not None: e['costUnit'] = cu
         if cc  is not None: e['costCase'] = cc
         if gp  is not None: e['gp']       = gp
+        if rk: e['remark'] = rk
         if e:
             result[bc] = e
 
