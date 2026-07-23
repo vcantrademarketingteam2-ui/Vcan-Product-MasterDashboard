@@ -1044,8 +1044,11 @@ export default function App() {
     scoped.forEach(p => { const b = p.brand.trim(); m[b] = (m[b] || 0) + 1 })
     return m
   }, [rawData, vendorFilter, selectedRetailers, search])
+  // size="s" here only — this feeds the Products-tab category filter panel, which
+  // needs to fit many brands without scrolling; popup/packshot/analytics pills stay
+  // at their bigger size elsewhere (BrandPill's other call sites are unaffected).
   const renderBrandPill = (b) => (
-    <BrandPill key={b} brand={b} company={brandCompany[b]} t={t} size="m"
+    <BrandPill key={b} brand={b} company={brandCompany[b]} t={t} size="s"
       selected={selectedBrands.includes(b)} count={brandCounts[b] || 0}
       onClick={() => toggleBrand(b)} />
   )
@@ -1506,7 +1509,7 @@ export default function App() {
             <div style={{ fontWeight: 800, fontSize: isMobile ? 14 : 17, color: t.text, letterSpacing: 0.2, whiteSpace: 'nowrap', flexShrink: 0 }}>
               Product Master
             </div>
-            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v3.10.2</span>
+            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v3.10.5</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: isMobile ? 11 : 13, background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, padding: isMobile ? '3px 8px' : '5px 12px', overflow: 'hidden', minWidth: 0, flexShrink: 1 }}>
               <span style={{ width: isMobile ? 6 : 7, height: isMobile ? 6 : 7, borderRadius: '50%', flexShrink: 0, background: dataSource === 'csv' ? t.blue : t.green }} />
               <span style={{ fontWeight: 800, color: dataSource === 'csv' ? t.blue : t.green, flexShrink: 0 }}>
@@ -1756,24 +1759,30 @@ export default function App() {
                   // unboundedly tall). Letting the panel take its natural height and
                   // scroll with the page avoids a nested inner scrollbar.
                 }}>
-                  {/* Categorized brand pills — full-width labeled bands, stacked
-                      vertically (desktop AND mobile alike). Each band's pill row
-                      flow-wraps across the panel's ENTIRE width, so a busy category
-                      (Personal Care, Pet) wraps into a couple of wide rows instead
-                      of being walled into its own narrow column. A prior side-by-side
-                      column layout gave each category a fixed width slice of the row
-                      and let pills wrap only inside that slice — busy categories
-                      stacked many rows tall in a narrow column while idle categories
-                      left dead space beside them, and the tallest column's height
-                      forced the panel past its scroll guard. Bands share the full
-                      width instead, so total height reflects actual pill count, not
-                      column imbalance. */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-                    {BRAND_CATEGORIES.filter(c => brandGroups[c]?.length).map((cat, i) => (
+                  {/* Categorized brand pills — CSS multi-column masonry. Two prior
+                      layouts both failed: (1) one narrow column PER category, pills
+                      wrapping only inside that sliver, forced busy categories
+                      (Personal Care, Pet) into many single-pill rows while idle
+                      categories left dead space beside them; (2) an equal-width card
+                      grid gave every category the same width regardless of brand
+                      count, so a busy category still got squeezed tall in its share.
+                      `columns` with only a column-WIDTH hint (no count) fixed the
+                      height-balance problem — category cards (break-inside: avoid,
+                      so one never splits across columns) distribute into however
+                      many columns the content needs to balance — but that same
+                      auto-balance stops adding columns once the content's happy with
+                      fewer, leaving the rest of the panel's width empty rather than
+                      spreading into more/narrower columns. Pinning an explicit
+                      column-COUNT (4) forces the browser to actually use the
+                      available width; column-width stays as a floor so it still
+                      degrades gracefully (fewer columns) on a narrower window.
+                      Mobile: single column. */}
+                  <div style={{ columns: isMobile ? '1' : '260px 4', columnGap: 12, width: '100%' }}>
+                    {BRAND_CATEGORIES.filter(c => brandGroups[c]?.length).map(cat => (
                       <div key={cat} style={{
+                        breakInside: 'avoid', WebkitColumnBreakInside: 'avoid', marginBottom: 12,
                         display: 'flex', flexDirection: 'column', gap: 8,
-                        paddingTop: i ? 10 : 0, marginTop: i ? 10 : 0,
-                        borderTop: i ? `1px solid ${t.border}` : 'none',
+                        background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 10, padding: '10px 12px',
                       }}>
                         <span style={{
                           fontSize: 10.5, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.08em', color: t.muted, whiteSpace: 'nowrap',
