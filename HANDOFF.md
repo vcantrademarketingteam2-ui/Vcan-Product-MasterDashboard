@@ -1,8 +1,8 @@
 # V-Can Dashboard Handoff for Claude
 
-Last updated: 2026-08-03 (Asia/Bangkok)
+Last updated: 2026-08-04 (Asia/Bangkok)
 
-## Current Authoritative Control State — 2026-08-03
+## Current Authoritative Control State — 2026-08-04
 
 This section records current control-plane state under `.hermes.md`. `MISSION.md` defines the
 controlled execution workflow, and `CLAUDE.md` defines implementation-specific repository rules.
@@ -10,13 +10,18 @@ Git and actual source files are authoritative for repository state and implement
 
 - Repository: `D:\Project Vcan Dashboard\vcan-dashboard`
 - Baseline branch: `baseline/agentic-os-2026-07-23`
-- Baseline commit: `c1f00961689808d25515cd1b18a68bb13ed2b762`
-- Control-file tracking at reconciliation start: `CLAUDE.md` tracked; `.hermes.md`, `MISSION.md`, and `HANDOFF.md` untracked.
+- Application/source baseline: `c1f00961689808d25515cd1b18a68bb13ed2b762`
+- Initial control-plane baseline: `ffd69bcfe575639f0030e023774408cf3f9f4b2f`
+- Pilot execution base: the current verified full `HEAD` recorded immediately before a separately approved pilot begins.
+- Control-file tracking: commit `ffd69bcfe575639f0030e023774408cf3f9f4b2f` tracks `.hermes.md`, `CLAUDE.md`, `MISSION.md`, and `HANDOFF.md`.
 - Delegation safety verified: one flat Luna child was created; nested delegation was unavailable and blocked.
 - Claude Code connection verified: authenticated one-turn inference succeeded and reported model `claude-sonnet-5`.
 - Worktree isolation verified: a manual detached worktree was created from the baseline, verified clean and detached, and removed from Git registration.
 - Windows cleanup recovery verified: the leftover unregistered empty directory was inspected for exact path, parent, emptiness, `.git`, and reparse/link safety, then deleted only after explicit human approval.
 - **Automated worker dispatch remains disabled.** The successful component tests do not enable the Crew bridge.
+- A one-shot write-capable pilot is policy-eligible only after this reconciliation is committed, a
+  fresh full `HEAD` is recorded, and a human separately and explicitly approves one attempt. This
+  exception does not enable permanent dispatch.
 
 Remaining end-to-end blockers:
 
@@ -28,12 +33,16 @@ Remaining end-to-end blockers:
 
 Next approved sequence:
 
-1. Review the control-plane diff without staging or committing.
-2. Obtain explicit human approval for a control-plane-only commit.
-3. Verify that a fresh isolated worktree receives the committed control files.
-4. Run one human-approved read-only Crew task-branch dispatch test with allowed-path and rule-injection checks.
-5. Exercise and document non-destructive end-to-end failure recovery.
-6. Reassess blockers and obtain separate explicit human approval before enabling automated dispatch.
+1. Review this control-plane reconciliation diff without staging or committing.
+2. Obtain separate explicit human approval for a control-plane-only commit.
+3. After that commit, record a fresh full `HEAD` and verify the committed control files.
+4. Obtain separate explicit human approval for exactly one sequential write-capable pilot attempt.
+5. If approved, use one detached worktree without a task branch and allow only
+   `docs/agentic-pilot/END_TO_END_PILOT.md` to be written, unstaged and uncommitted.
+6. Stop after read-only verification. Do not retry, roll back, or clean up without the required
+   separate approval; the attempt is consumed whether it succeeds or fails.
+7. Reassess the blockers and obtain another explicit human approval before enabling permanent
+   automated worker dispatch.
 
 ## Historical Evidence Notice
 

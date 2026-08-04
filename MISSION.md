@@ -32,9 +32,35 @@ another child. Run only one heavy worker process at a time on this 16 GB machine
 
 Automated worker dispatch remains disabled until the capability blockers recorded in
 `.hermes.md` and the current authoritative section of `HANDOFF.md` are verified and a human
-explicitly enables it.
+explicitly enables it. The one-shot pilot exception below does not enable permanent automated
+worker dispatch.
 
-When execution is authorized and the bridge is enabled:
+### One-Shot Write-Capable Pilot Exception
+
+After the reconciliation controls are committed and a fresh full `HEAD` check is recorded, a
+human may separately and explicitly authorize one pilot attempt. This is the only exception to
+the disabled-dispatch and task-branch requirements above:
+
+1. Hermes records the repository, branch, full `HEAD`, worktree list, and all pre-existing status
+   entries before execution.
+2. Crew creates one isolated detached worktree, without a task branch, from that recorded full
+   `HEAD` and supplies the committed controls and approved brief.
+3. Crew dispatches exactly one Claude Code / Sonnet worker process. Execution is sequential in
+   this order: Hermes, Crew, Claude Code / Sonnet, Crew, Hermes.
+4. The worker may write only `docs/agentic-pilot/END_TO_END_PILOT.md`. This governance-only
+   artifact must remain unstaged and uncommitted, and every pre-existing untracked path must be
+   preserved without alteration.
+5. Network access is limited to Claude authentication and one first-party model inference. Web
+   search, web fetch, MCP, and every other external network access are prohibited.
+6. The authorization is consumed when the attempt begins, whether the attempt succeeds or fails.
+   No retry, fallback dispatch, parallel worker, or nested worker is allowed under it.
+7. Crew performs only the approved read-only verification after the worker exits. Hermes reports
+   the evidence and stops before `git add`, commit, branch creation, merge or rebase, push, deploy,
+   retry, permanent-dispatch enablement, rollback, or cleanup.
+8. Rollback and cleanup require separate destructive-action approval and must follow the non-force
+   procedure below.
+
+Outside that one-shot exception, when execution is authorized and the bridge is enabled:
 
 1. Crew validates the repository, verified baseline, and clean separation from unrelated work.
 2. Crew creates a task branch and isolated task worktree from the approved baseline.
@@ -53,6 +79,10 @@ When execution is authorized and the bridge is enabled:
 4. Verify the exact resolved path and parent, zero entries, no `.git`, and no symbolic link, junction, mount point, or reparse point.
 5. Obtain explicit human approval before deleting only that exact verified-empty directory.
 6. Never use force, `git worktree prune`, wildcards, or recursive raw deletion automatically.
+
+For the one-shot pilot, rollback or cleanup may begin only after separate destructive-action
+approval. Only non-force `git worktree remove` is permitted; `--force`, `git worktree prune`,
+wildcards, and recursive raw deletion are prohibited.
 
 ## Human Approval Gates
 
