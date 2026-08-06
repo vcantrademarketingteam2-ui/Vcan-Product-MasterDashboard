@@ -1,8 +1,8 @@
 # V-Can Dashboard Handoff for Claude
 
-Last updated: 2026-08-05 (Asia/Bangkok)
+Last updated: 2026-08-06 (Asia/Bangkok)
 
-## Current Authoritative Control State — 2026-08-05
+## Current Authoritative Control State — 2026-08-06
 
 This section records current control-plane state under `.hermes.md`. `MISSION.md` defines the
 controlled execution workflow, and `CLAUDE.md` defines implementation-specific repository rules.
@@ -15,7 +15,7 @@ Git and actual source files are authoritative for repository state and implement
 - Pilot execution base: the current verified full `HEAD` recorded immediately before a separately approved pilot begins.
 - Control-file tracking: `.hermes.md`, `CLAUDE.md`, `MISSION.md`, and `HANDOFF.md` are tracked and committed in the current baseline.
 - Control-plane reconciliation baseline commit: `68839b6b34b3870e6f9af520b9e94f7bdd6f30e3`.
-- Last verified HEAD before this documentation reconciliation: `68839b6b34b3870e6f9af520b9e94f7bdd6f30e3`.
+- Last verified HEAD before this documentation reconciliation: `439c41f90c6ed39a6607dd55f03618d5763119b6`.
 - Current tracked application behavior remains the `v3.10.5` masonry category layout.
 - The Branch Navigator with Mini Capsules localhost-only prototype/presentation was completed on 2026-08-04. It remains proposal-only; it was not committed, merged, pushed, deployed, or counted as the one-shot pilot.
 - On 2026-08-05, Hermes inspected the state and generated a work report only; no additional implementation was performed.
