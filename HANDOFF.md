@@ -1,6 +1,6 @@
 # V-Can Dashboard Handoff for Claude
 
-Last updated: 2026-08-06 (Asia/Bangkok)
+Last updated: 2026-08-10 (Asia/Bangkok)
 
 ## Current Authoritative Control State — 2026-08-06
 
@@ -30,11 +30,24 @@ Git and actual source files are authoritative for repository state and implement
   explicitly approves exactly one attempt. It has not run. This exception does not enable permanent
   dispatch.
 
+### Communication-contract audit — 2026-08-10
+
+The failed smoke attempts were a control-plane communication mismatch, not an application or
+Claude component outage. Repository controls required a committed brief and approval evidence,
+while Crew supplied approval through invocation context and the worker received only the pilot
+title in the observed run. Claude therefore asked for a new approval and correctly made no write.
+
+The binding contract is now explicit: Crew must pass a structured authorization record plus the
+complete brief in the worker invocation. That record is the one-shot approval evidence; no second
+approval file is required in the worktree. Obsidian is Hermes-only project context and is never a
+worker instruction source. A missing record or brief is a hard `missing_crew_authorization` stop.
+
 Remaining end-to-end blockers:
 
 1. Crew task-branch creation and worker dispatch have not been verified end to end.
 2. Task-specific allowed-path enforcement has not been verified.
-3. Worker receipt of committed control files in its assigned worktree has not been verified.
+3. Worker receipt of the complete brief and controller authorization record has not been verified
+   end to end; the contract and prompt are now explicit.
 4. Read-only worker rule injection has not been verified.
 5. End-to-end failure recovery across Crew, Git, and the worker process has not been verified.
 

@@ -44,8 +44,12 @@ the disabled-dispatch and task-branch requirements above:
 1. Hermes records the repository, branch, full `HEAD`, worktree list, and all pre-existing status
    entries before execution.
 2. Crew creates one isolated detached worktree, without a task branch, from that recorded full
-   `HEAD` and supplies the committed controls and approved brief.
-3. Crew dispatches exactly one Claude Code / Sonnet worker process. Execution is sequential in
+   `HEAD` and supplies the committed controls, the complete approved brief, and a structured
+   controller authorization record. The record is invocation context, not a required source-tree
+   approval file.
+3. Crew dispatches exactly one Claude Code / Sonnet worker process. The invocation must contain
+   the complete brief, exact allowed path, acceptance content, one-attempt limit, and an explicit
+   instruction not to request a second approval or infer scope from the pilot title. Execution is sequential in
    this order: Hermes, Crew, Claude Code / Sonnet, Crew, Hermes.
 4. The worker may write only `docs/agentic-pilot/END_TO_END_PILOT.md`. This governance-only
    artifact must remain unstaged and uncommitted, and every pre-existing untracked path must be
@@ -64,7 +68,9 @@ Outside that one-shot exception, when execution is authorized and the bridge is 
 
 1. Crew validates the repository, verified baseline, and clean separation from unrelated work.
 2. Crew creates a task branch and isolated task worktree from the approved baseline.
-3. Crew injects the committed control files, Hermes brief, and task-specific allowed paths.
+3. Crew injects the committed control files, the complete Hermes brief, the controller
+   authorization record, and task-specific allowed paths. Obsidian notes remain Hermes context;
+   they are not copied as worker instructions.
 4. Claude Code / Sonnet implements only inside that worktree and only within allowed paths.
 5. Crew records all changes and runs repository-specific verification.
 6. Sol compares evidence with acceptance criteria when included in the approved workflow.

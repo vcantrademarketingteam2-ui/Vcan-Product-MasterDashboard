@@ -31,6 +31,11 @@ This narrow exception applies only when all of the following are true:
 Application or behavior changes continue to require every original versioning, backup, build,
 test, regeneration, and verification rule in this file.
 
+When Crew supplies the structured authorization record and complete approved brief for the
+document-only one-shot pilot, that context is the human approval for that attempt. Do not ask for
+another approval, search Obsidian for one, or reduce the task to the pilot title. If the record or
+brief is absent, stop before writing and report `missing_crew_authorization`.
+
 ## Token management & task priority
 
 - **Resource awareness:** Always monitor token usage and the context limit.
