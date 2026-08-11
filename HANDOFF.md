@@ -34,6 +34,19 @@ Git and actual source files are authoritative for repository state and implement
   `D:\Agentic OS\crew\Invoke-ProductMasterCrew.ps1`. Hermes may run from this repository, but
   implementation must use the launcher after a fresh explicit approval; direct source edits and
   direct Claude invocation remain prohibited.
+- Multi-file allowlists now cross the Bash/Windows PowerShell boundary through one
+  `-AllowedWritePathsFile` JSON manifest. Direct arrays, repeated parameters, and comma-joined paths
+  are prohibited. Regression evidence confirms two POSIX paths remain distinct without creating a
+  worktree or invoking Claude.
+- Worker turn budgets are task-specific through bounded `-MaxTurns` (1-40); the global default
+  remains unchanged. The controller's former smoke-specific “documentation artifact” completion
+  sentence was replaced with a generic approved-brief completion boundary.
+- The failed combined Timeline/Pills and two-file Timeline briefs are superseded. Timeline JSX and
+  CSS are separate sequential tasks. The existing uncommitted Brand Navigator worktree must be
+  reviewed and promoted explicitly; a fresh worker cannot see or infer its uncommitted diff.
+- `D:\Agentic OS\crew\Get-ProductMasterReleaseReadiness.ps1` is the mandatory read-only structural
+  gate before commit/integration/push requests. It does not replace build, test, browser, human, or
+  deployment approval gates.
 - These four control documents must be committed together before their routing state is present in
   newly created Crew worktrees.
 
