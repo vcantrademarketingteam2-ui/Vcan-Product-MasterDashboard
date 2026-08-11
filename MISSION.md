@@ -30,52 +30,26 @@ another child. Run only one heavy worker process at a time on this 16 GB machine
 
 ## Controlled Execution Phase
 
-Automated worker dispatch remains disabled until the capability blockers recorded in
-`.hermes.md` and the current authoritative section of `HANDOFF.md` are verified and a human
-explicitly enables it. The one-shot pilot exception below does not enable permanent automated
-worker dispatch.
+Product-local Crew routing is enabled through
+`D:\Agentic OS\crew\Invoke-ProductMasterCrew.ps1`. Hermes may run from the Product Master folder,
+but all write-capable implementation must follow this sequence:
 
-### One-Shot Write-Capable Pilot Exception
+1. Hermes verifies Git state, creates one complete task brief, and proposes exact allowed paths.
+2. The human explicitly approves one sequential attempt. The approval is consumed when dispatch
+   begins and never authorizes a retry.
+3. Hermes stores the approved brief under `D:\Agentic OS\crew\briefs` and invokes the launcher
+   with `-HumanApproved`; it never invokes Claude or edits application files directly.
+4. The launcher captures the current full source `HEAD` and delegates to Crew.
+5. Crew validates the source and existing worktrees, creates one isolated detached worktree, and
+   injects the complete brief plus a structured authorization record.
+6. Claude Code / Sonnet implements only in that worktree and only within the exact allowlist.
+7. Crew captures structured output, enforces changed and staged paths, and proves that the source
+   repository and all pre-existing worktrees were preserved.
+8. Hermes synthesizes the evidence and stops before commit, merge, push, deployment, retry, or
+   cleanup unless the human separately authorizes the next gated action.
 
-After the reconciliation controls are committed and a fresh full `HEAD` check is recorded, a
-human may separately and explicitly authorize one pilot attempt. This is the only exception to
-the disabled-dispatch and task-branch requirements above:
-
-1. Hermes records the repository, branch, full `HEAD`, worktree list, and all pre-existing status
-   entries before execution.
-2. Crew creates one isolated detached worktree, without a task branch, from that recorded full
-   `HEAD` and supplies the committed controls, the complete approved brief, and a structured
-   controller authorization record. The record is invocation context, not a required source-tree
-   approval file.
-3. Crew dispatches exactly one Claude Code / Sonnet worker process. The invocation must contain
-   the complete brief, exact allowed path, acceptance content, one-attempt limit, and an explicit
-   instruction not to request a second approval or infer scope from the pilot title. Execution is sequential in
-   this order: Hermes, Crew, Claude Code / Sonnet, Crew, Hermes.
-4. The worker may write only `docs/agentic-pilot/END_TO_END_PILOT.md`. This governance-only
-   artifact must remain unstaged and uncommitted, and every pre-existing untracked path must be
-   preserved without alteration.
-5. Network access is limited to Claude authentication and one first-party model inference. Web
-   search, web fetch, MCP, and every other external network access are prohibited.
-6. The authorization is consumed when the attempt begins, whether the attempt succeeds or fails.
-   No retry, fallback dispatch, parallel worker, or nested worker is allowed under it.
-7. Crew performs only the approved read-only verification after the worker exits. Hermes reports
-   the evidence and stops before `git add`, commit, branch creation, merge or rebase, push, deploy,
-   retry, permanent-dispatch enablement, rollback, or cleanup.
-8. Rollback and cleanup require separate destructive-action approval and must follow the non-force
-   procedure below.
-
-Outside that one-shot exception, when execution is authorized and the bridge is enabled:
-
-1. Crew validates the repository, verified baseline, and clean separation from unrelated work.
-2. Crew creates a task branch and isolated task worktree from the approved baseline.
-3. Crew injects the committed control files, the complete Hermes brief, the controller
-   authorization record, and task-specific allowed paths. Obsidian notes remain Hermes context;
-   they are not copied as worker instructions.
-4. Claude Code / Sonnet implements only inside that worktree and only within allowed paths.
-5. Crew records all changes and runs repository-specific verification.
-6. Sol compares evidence with acceptance criteria when included in the approved workflow.
-7. Opus may review the final diff when available and risk warrants it.
-8. Hermes synthesizes the evidence, reports remaining risk and rollback, and stops at the human approval gate.
+Obsidian remains optional Hermes context. It is not copied to the worker, is not an authorization
+source, and cannot override the committed controls, the approved brief, Git, or actual source files.
 
 ## Windows Worktree Removal and Cleanup
 
@@ -86,9 +60,9 @@ Outside that one-shot exception, when execution is authorized and the bridge is 
 5. Obtain explicit human approval before deleting only that exact verified-empty directory.
 6. Never use force, `git worktree prune`, wildcards, or recursive raw deletion automatically.
 
-For the one-shot pilot, rollback or cleanup may begin only after separate destructive-action
-approval. Only non-force `git worktree remove` is permitted; `--force`, `git worktree prune`,
-wildcards, and recursive raw deletion are prohibited.
+Rollback or cleanup may begin only after separate destructive-action approval. Only non-force
+`git worktree remove` is permitted; `--force`, `git worktree prune`, wildcards, and recursive raw
+deletion are prohibited.
 
 ## Human Approval Gates
 

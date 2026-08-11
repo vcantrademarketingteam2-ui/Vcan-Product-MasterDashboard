@@ -1,8 +1,8 @@
 # V-Can Dashboard Handoff for Claude
 
-Last updated: 2026-08-10 (Asia/Bangkok)
+Last updated: 2026-08-11 (Asia/Bangkok)
 
-## Current Authoritative Control State — 2026-08-06
+## Current Authoritative Control State — 2026-08-11
 
 This section records current control-plane state under `.hermes.md`. `MISSION.md` defines the
 controlled execution workflow, and `CLAUDE.md` defines implementation-specific repository rules.
@@ -12,7 +12,7 @@ Git and actual source files are authoritative for repository state and implement
 - Baseline branch: `baseline/agentic-os-2026-07-23`
 - Application/source baseline: `c1f00961689808d25515cd1b18a68bb13ed2b762`
 - Initial control-plane baseline: `ffd69bcfe575639f0030e023774408cf3f9f4b2f`
-- Pilot execution base: the current verified full `HEAD` recorded immediately before a separately approved pilot begins.
+- Execution base: the current verified full `HEAD` recorded immediately before each approved task begins.
 - Control-file tracking: `.hermes.md`, `CLAUDE.md`, `MISSION.md`, and `HANDOFF.md` are tracked and committed in the current baseline.
 - Control-plane reconciliation baseline commit: `68839b6b34b3870e6f9af520b9e94f7bdd6f30e3`.
 - Last verified HEAD before this documentation reconciliation: `439c41f90c6ed39a6607dd55f03618d5763119b6`.
@@ -24,42 +24,34 @@ Git and actual source files are authoritative for repository state and implement
 - Claude Code connection verified: authenticated one-turn inference succeeded and reported model `claude-sonnet-5`.
 - Worktree isolation verified: a manual detached worktree was created from the baseline, verified clean and detached, and removed from Git registration.
 - Windows cleanup recovery verified: the leftover unregistered empty directory was inspected for exact path, parent, emptiness, `.git`, and reparse/link safety, then deleted only after explicit human approval.
-- **Automated worker dispatch remains disabled.** The successful component tests do not enable the Crew bridge.
-- A one-shot write-capable pilot is eligible only after all control-document changes are committed,
-  then a fresh full `HEAD` is recorded immediately before the pilot, and a human separately and
-  explicitly approves exactly one attempt. It has not run. This exception does not enable permanent
-  dispatch.
+- The end-to-end smoke run `product-master-crew-smoke-20260811-final02` succeeded from verified
+  `HEAD` `b4a9fbed63d6a96796f03cc890088fa3c2c89f8c`: Crew created one detached worktree,
+  invoked Claude exactly once, created only the authorized documentation artifact, passed the
+  allowlist, and preserved the source and every pre-existing worktree.
+- The Windows PowerShell 5.1 inline MCP JSON transport defect was fixed by passing the absolute
+  `D:\Agentic OS\crew\empty-mcp-config.json` path. Parser and regression checks passed.
+- Product-local Crew routing is enabled through
+  `D:\Agentic OS\crew\Invoke-ProductMasterCrew.ps1`. Hermes may run from this repository, but
+  implementation must use the launcher after a fresh explicit approval; direct source edits and
+  direct Claude invocation remain prohibited.
+- These four control documents must be committed together before their routing state is present in
+  newly created Crew worktrees.
 
-### Communication-contract audit — 2026-08-10
+### Communication-contract resolution — 2026-08-11
 
-The failed smoke attempts were a control-plane communication mismatch, not an application or
-Claude component outage. Repository controls required a committed brief and approval evidence,
-while Crew supplied approval through invocation context and the worker received only the pilot
-title in the observed run. Claude therefore asked for a new approval and correctly made no write.
+The earlier smoke failures were control-plane transport and harness defects, not an application,
+Claude authentication, network, model-access, or Obsidian outage. The final successful run proved
+the corrected invocation and communication contract end to end.
 
-The binding contract is now explicit: Crew must pass a structured authorization record plus the
-complete brief in the worker invocation. That record is the one-shot approval evidence; no second
-approval file is required in the worktree. Obsidian is Hermes-only project context and is never a
-worker instruction source. A missing record or brief is a hard `missing_crew_authorization` stop.
+The binding contract is explicit: Crew passes one structured authorization record plus the
+complete approved brief in the worker invocation. The record is approval evidence for that single
+attempt; no second approval file is required in the worktree. Obsidian is Hermes-only context and
+never a worker instruction source. Missing authorization or a missing brief is a hard
+`missing_crew_authorization` stop.
 
-Remaining end-to-end blockers:
-
-1. Crew task-branch creation and worker dispatch have not been verified end to end.
-2. Task-specific allowed-path enforcement has not been verified.
-3. Worker receipt of the complete brief and controller authorization record has not been verified
-   end to end; the contract and prompt are now explicit.
-4. Read-only worker rule injection has not been verified.
-5. End-to-end failure recovery across Crew, Git, and the worker process has not been verified.
-
-Next approved sequence:
-
-1. Obtain separate explicit human approval for exactly one sequential write-capable pilot attempt.
-2. If approved, use one detached worktree without a task branch and allow only
-   `docs/agentic-pilot/END_TO_END_PILOT.md` to be written, unstaged and uncommitted.
-3. Stop after read-only verification. Do not retry, roll back, or clean up without the required
-   separate approval; the attempt is consumed whether it succeeds or fails.
-4. Reassess the blockers and obtain another explicit human approval before enabling permanent
-   automated worker dispatch.
+For the next implementation request, Hermes should operate from the Product Master folder, create
+one central Crew brief, request approval for its exact allowlist, and invoke the Product Master
+launcher. Commit, merge, push, deployment, retry, and worktree cleanup remain separate gates.
 
 ## Historical Evidence Notice
 
