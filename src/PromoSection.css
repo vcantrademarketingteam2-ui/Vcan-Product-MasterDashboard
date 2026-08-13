@@ -207,6 +207,94 @@
 .ps-sched-bar-off { font-size: 9px; font-weight: 700; color: rgba(255,255,255,.8); white-space: nowrap; line-height: 1; margin-top: 1px; }
 .ps-sched-bar-dots { display: flex; gap: 3px; align-items: center; margin-top: 1px; }
 
+/* ---------- calendar pulse (v3.11.0) ---------- */
+/* Six-week window variant of the schedule track/bar system above. Gridlines,
+   week tint and the NOW line are painted by PulseTrackBg() as plain `left: X%`
+   children (.ps-sched-gridcol / .ps-sched-nowline) — layout comes from the
+   existing .ps-sched-* rules; the ps-pulse-* classes below only add the
+   status-specific decoration (live/attention/unassigned) on top. Bars already
+   carry inline background/border/box-shadow driven by activity color, so all
+   pulse-status cues here use `outline` (a separate box-model layer) and
+   pseudo-elements rather than box-shadow/background/border, which inline
+   styles would otherwise win over. */
+.ps-pulse-track { border-radius: 10px; }
+.ps-sched-track--axis.ps-pulse-track { min-height: 46px; }
+
+.ps-pulse-week-lbl b { font-size: 11.5px; }
+.ps-pulse-week-lbl small { font-size: 9.5px; }
+.ps-pulse-week-lbl--live {
+  background: linear-gradient(180deg, rgba(212,168,106,.16), rgba(212,168,106,.02));
+  border-radius: 6px 6px 0 0;
+}
+
+/* bar status rings — static by design (brief: no new animation) */
+.ps-sched-bar.ps-pulse-live {
+  outline: 2px solid rgba(63,185,80,.75);
+  outline-offset: 1px;
+}
+.ps-sched-bar.ps-pulse-attention {
+  outline: 3px solid rgba(248,81,73,.85);
+  outline-offset: 1px;
+}
+
+/* unassigned bars — faint diagonal hazard stripe overlay on top of the ice pill */
+.ps-sched-bar.ps-pulse-unassigned::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: repeating-linear-gradient(135deg, rgba(0,0,0,.05) 0 6px, transparent 6px 12px);
+}
+.ps-pulse-unassigned-tag {
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: .03em;
+  white-space: nowrap;
+  opacity: .85;
+  margin-top: 1px;
+}
+
+/* discontinued lead tag — reuses .ps-pulse-attention for the red palette */
+.ps-pulse-lead-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+.ps-pulse-lead-tag.ps-pulse-attention {
+  color: #fff;
+  background: #cf222e;
+}
+
+/* legend + tooltip badges — solid saturated fill + white text (matches the
+   .ps-now-tag / .ps-sched-now-tag pattern) so contrast holds in both the
+   dark and porcelain-light themes without needing a `dark` prop in this file. */
+.ps-pulse-legend--live, .ps-pulse-legend--attention { font-weight: 700; }
+.ps-pulse-status-dot--live {
+  background: #1a7f37;
+  box-shadow: 0 0 5px -1px #1a7f37;
+}
+.ps-pulse-status-dot--attention {
+  background: #cf222e;
+  box-shadow: 0 0 5px -1px #cf222e;
+}
+
+.ps-pulse-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 5px;
+  color: #fff;
+}
+.ps-pulse-badge--live { background: #1a7f37; }
+.ps-pulse-badge--attention { background: #cf222e; }
+
 /* ---------- mobile ---------- */
 @media (max-width: 767px) {
   /* Slim, consistent sticky lead columns across all three views so the data
@@ -248,6 +336,12 @@
   /* Schedule keeps a usable proportional width and scrolls horizontally. */
   .ps-sched-inner { min-width: 600px; }
   .ps-sched-bar-txt { font-size: 11.5px; }
+
+  /* Calendar Pulse — six week columns need to stay legible at 600px width. */
+  .ps-pulse-week-lbl b { font-size: 10.5px; }
+  .ps-pulse-week-lbl small { font-size: 8.5px; }
+  .ps-pulse-unassigned-tag { font-size: 8px; }
+  .ps-pulse-badge { font-size: 8.5px; padding: 2px 6px; }
 }
 
 /* ---------- neon interactivity (v2.19.1) ---------- */
