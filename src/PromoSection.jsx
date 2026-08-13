@@ -150,10 +150,9 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
   const [retailer, setRetailer] = useState(PROMO_RETAILERS[0] || '')
   const [brandFilter, setBrandFilter] = useState([])
   const [layout, setLayout] = useState('timeline')
-  const [tlView, setTlView] = useState('schedule')
+  const [tlView, setTlView] = useState('pulse')
   const [spotTab, setSpotTab] = useState('live')
   const [barTip, setBarTip] = useState(null)
-  const [schedWindow, setSchedWindow] = useState('6mo')
   const [unlocked, setUnlocked] = useState(null)
   const [pin, setPin] = useState('')
   const [pinErr, setPinErr] = useState(false)
@@ -186,68 +185,41 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
     return Object.entries(g)
   }, [items])
 
-  // ── Schedule / Spotlight memos ───────────────────────────────────────────────
-  // Full range spanning all periods (using inferPeriodDate fallback for empty dateRange)
-  const schedRange = useMemo(() => {
-    const drs = periods.map(p => parseDR(p.dateRange) || inferPeriodDate(p)).filter(Boolean)
-    if (!drs.length) return null
-    const start   = new Date(Math.min(...drs.map(d => d.s.getTime())))
-    const end     = new Date(Math.max(...drs.map(d => d.e.getTime())))
-    const totalMs = end.getTime() - start.getTime()
-    return totalMs > 0 ? { start, end, totalMs } : null
-  }, [periods])
+  // ── Calendar Pulse / Spotlight memos ─────────────────────────────────────────
+  // Fixed six-week axis: the Monday-start week containing today, plus the five
+  // weeks that follow. Day-accurate boundaries — this is the single coordinate
+  // system the axis labels, gridlines, NOW line and bar positions all share
+  // (pulseWeeks / nowPct / pulseBarPos below), so nothing can drift apart.
+  const pulseRange = useMemo(() => {
+    const wd = TODAY.getDay()
+    const start = new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate() - (wd === 0 ? 6 : wd - 1))
+    const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 42)
+    end.setTime(end.getTime() - 1)
+    return { start, end, totalMs: end.getTime() - start.getTime() }
+  }, [])
 
-  // Clipped range based on time-window selector (3mo / 6mo / full)
-  const filteredSchedRange = useMemo(() => {
-    if (!schedRange) return null
-    if (schedWindow === 'full') return schedRange
-    const months = schedWindow === '3mo' ? 3 : 6
-    const halfBack = Math.floor(months / 3)
-    const wStart = new Date(TODAY.getFullYear(), TODAY.getMonth() - halfBack, 1)
-    const wEnd   = new Date(TODAY.getFullYear(), TODAY.getMonth() + (months - halfBack), 0, 23, 59, 59, 999)
-    const start  = new Date(Math.max(schedRange.start.getTime(), wStart.getTime()))
-    const end    = new Date(Math.min(schedRange.end.getTime(), wEnd.getTime()))
-    const totalMs = end.getTime() - start.getTime()
-    return totalMs > 0 ? { start, end, totalMs } : null
-  }, [schedRange, schedWindow])
+  // Six equal-width week cells (each 1/6 of the axis) — bars inside stay day-accurate.
+  const pulseWeeks = useMemo(() => {
+    const { start } = pulseRange
+    return Array.from({ length: 6 }, (_, i) => {
+      const wStart = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i * 7)
+      const wEnd = new Date(wStart.getFullYear(), wStart.getMonth(), wStart.getDate() + 7)
+      wEnd.setTime(wEnd.getTime() - 1)
+      return {
+        idx: i, start: wStart, end: wEnd,
+        left: (i / 6) * 100, width: 100 / 6,
+        isNow: i === 0,
+        label: i === 0 ? 'THIS WEEK' : `WK +${i}`,
+        dateLabel: `${wStart.getDate()} ${MONTH_NAMES[wStart.getMonth()]}`,
+      }
+    })
+  }, [pulseRange])
 
-  // Month cells for the Schedule axis, proportional to filtered range
-  const schedMonths = useMemo(() => {
-    if (!filteredSchedRange) return []
-    const { start, end, totalMs } = filteredSchedRange
-    const out = []
-    let cur = new Date(start.getFullYear(), start.getMonth(), 1)
-    while (cur <= end) {
-      const mEnd = new Date(cur.getFullYear(), cur.getMonth() + 1, 0, 23, 59, 59, 999)
-      const ms   = Math.max(start.getTime(), cur.getTime())
-      const me   = Math.min(end.getTime(), mEnd.getTime())
-      const flex = (me - ms) / totalMs * 100
-      if (flex > 0) out.push({
-        name: MONTH_NAMES[cur.getMonth()],
-        year: cur.getFullYear(),
-        flex,
-        isNow: cur.getMonth() === TODAY.getMonth() && cur.getFullYear() === TODAY.getFullYear(),
-      })
-      cur = new Date(cur.getFullYear(), cur.getMonth() + 1, 1)
-    }
-    return out
-  }, [filteredSchedRange])
-
-  // Cumulative left/width % for each month cell — the SAME numbers drive the axis
-  // labels, the gridline/tint background, and (with nowPct) the NOW line, all
-  // inside the identical width:100% track that positions the bars (barPos below).
-  // One coordinate system, pure %, no JS pixel measurement anywhere.
-  const schedMonthPos = useMemo(() => {
-    let acc = 0
-    return schedMonths.map(m => { const left = acc; acc += m.flex; return { ...m, left, width: m.flex } })
-  }, [schedMonths])
-
-  // NOW position as 0–100% across the filtered range
+  // NOW position as 0–100% across the six-week window
   const nowPct = useMemo(() => {
-    if (!filteredSchedRange) return null
-    const pct = (TODAY.getTime() - filteredSchedRange.start.getTime()) / filteredSchedRange.totalMs * 100
+    const pct = (TODAY.getTime() - pulseRange.start.getTime()) / pulseRange.totalMs * 100
     return Math.max(0, Math.min(100, pct))
-  }, [filteredSchedRange])
+  }, [pulseRange])
 
   // Spotlight: products in current / next / past periods
   const spotLive = useMemo(() => {
@@ -379,11 +351,11 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
     }
   }
 
-  // Bar position clipped to the filtered visible range; uses inferPeriodDate for empty dateRange
-  const barPos = p => {
+  // Bar position clipped to the six-week Pulse window; uses inferPeriodDate for empty dateRange
+  const pulseBarPos = p => {
     const dr = parseDR(p.dateRange) || inferPeriodDate(p)
-    if (!filteredSchedRange || !dr) return null
-    const { start, end, totalMs } = filteredSchedRange
+    if (!dr) return null
+    const { start, end, totalMs } = pulseRange
     const barStart = Math.max(dr.s.getTime(), start.getTime())
     const barEnd   = Math.min(dr.e.getTime(), end.getTime())
     if (barEnd <= barStart) return null
@@ -427,24 +399,22 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
     ) : null)
   }
 
-  // Shared background layer for every Schedule Gantt track (the month axis strip
-  // AND each product lane) — month gridlines + alternating tint + the NOW line.
-  // Every position here is `left: X%` sourced from schedMonthPos / nowPct, the
-  // exact same numbers barPos() below uses for the bars — one coordinate system,
-  // so the axis, the gridlines and the NOW line can never drift apart again.
-  function SchedTrackBg() {
+  // Shared background layer for every Pulse track (the week axis strip AND each
+  // product lane) — week gridlines + alternating tint + the NOW line. Every
+  // position here is `left: X%` sourced from pulseWeeks / nowPct, the exact same
+  // numbers pulseBarPos() below uses to place the bars — one coordinate system,
+  // so the axis, the gridlines and the NOW line can never drift apart.
+  function PulseTrackBg() {
     return (
       <>
-        {schedMonthPos.map((m, i) => (
-          <div key={i} className="ps-sched-gridcol" style={{
-            left: `${m.left}%`, width: `${m.width}%`,
+        {pulseWeeks.map((w, i) => (
+          <div key={i} className="ps-sched-gridcol ps-pulse-week-col" style={{
+            left: `${w.left}%`, width: `${w.width}%`,
             borderLeft: i === 0 ? 'none' : `1px solid ${dim}`,
-            background: m.isNow ? nowBg : (i % 2 === 1 ? (dark ? 'rgba(255,255,255,.03)' : 'rgba(0,0,0,.02)') : 'transparent'),
+            background: w.isNow ? nowBg : (i % 2 === 1 ? (dark ? 'rgba(255,255,255,.03)' : 'rgba(0,0,0,.02)') : 'transparent'),
           }} />
         ))}
-        {nowPct !== null && (
-          <div className="ps-sched-nowline" style={{ left: `${nowPct}%`, background: GOLD_A, boxShadow: `0 0 7px 1px ${GOLD_A}cc, 0 0 15px 2px ${GOLD_A}55` }} />
-        )}
+        <div className="ps-sched-nowline" style={{ left: `${nowPct}%`, background: GOLD_A, boxShadow: `0 0 7px 1px ${GOLD_A}cc, 0 0 15px 2px ${GOLD_A}55` }} />
       </>
     )
   }
@@ -545,43 +515,33 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
     )
   }
 
-  // Schedule view — proportional Gantt with date-accurate bar widths.
-  // v3.5.0 structural NOW-line fix: the axis strip AND every product lane render
-  // their gridlines/tint/NOW-line via the shared SchedTrackBg() using
-  // schedMonthPos / nowPct — the identical % numbers barPos() below uses to
-  // place the bars. Everything lives inside the same width:100% `.ps-sched-track`
-  // box (an axis variant included), so there is no cross-container DOM
-  // measurement anywhere in this view and nothing can drift out of alignment.
-  function Schedule() {
+  // Calendar Pulse view — proportional bars over a fixed six-week window
+  // (this week + the five that follow). The axis strip AND every product
+  // lane render their gridlines/tint/NOW-line via the shared PulseTrackBg()
+  // using pulseWeeks / nowPct — the identical % numbers pulseBarPos() below
+  // uses to place the bars. Everything lives inside the same width:100%
+  // `.ps-sched-track` box (an axis variant included), so there is no
+  // cross-container DOM measurement anywhere in this view and nothing can
+  // drift out of alignment. Empty capacity is left as plain whitespace —
+  // no placeholder slots, no second grid.
+  function CalendarPulse() {
     return (
       <>
-        {/* Window selector — flat toolbar OUTSIDE the scroll container so it never
-            collides with the sticky month axis while scrolling */}
         <div style={{
           display: 'flex', alignItems: 'center', gap: 7, padding: '8px 18px',
           borderBottom: `1px solid ${bdr}`,
           background: dark ? 'rgba(255,255,255,.025)' : 'rgba(0,0,0,.02)',
         }}>
-          <span style={{ fontSize: 10.5, fontWeight: 700, color: mu, textTransform: 'uppercase', letterSpacing: '.08em' }}>Window</span>
-          {[['3mo','3 mo'],['6mo','6 mo'],['full','Full']].map(([k, l]) => (
-            <button key={k} onClick={() => setSchedWindow(k)}
-              className={`ps-glow${schedWindow === k ? ' ps-glow-on' : ''}`} style={{
-              '--g': GOLD_A,
-              fontSize: 11, padding: '3px 10px', borderRadius: 6,
-              border: `1px solid ${schedWindow === k ? GOLD_A : bdr}`,
-              background: schedWindow === k ? `${GOLD_A}22` : s2,
-              color: schedWindow === k ? (dark ? GOLD_A : GOLD_B) : mu,
-              cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700, transition: 'border-color .12s, background .12s',
-            }}>{l}</button>
-          ))}
+          <span style={{ fontSize: 10.5, fontWeight: 700, color: mu, textTransform: 'uppercase', letterSpacing: '.08em' }}>Calendar Pulse</span>
+          <span style={{ fontSize: 10, color: mu }}>this week + next 5 weeks</span>
           <span style={{ marginLeft: 'auto', fontSize: 10, color: mu, fontStyle: 'italic' }}>hover bars for details</span>
         </div>
         <div className="ps-sched-scroll" style={{ scrollbarColor: `${bdr} transparent`, overflow: 'auto', maxHeight: '70vh' }}
           onMouseLeave={() => setBarTip(null)}>
           <div className="ps-sched-inner">
 
-            {/* Month axis — frosted glass over scrolling rows. Gridlines, month tint
-                and the NOW line/tag are all painted by SchedTrackBg — same math as
+            {/* Week axis — frosted glass over scrolling rows. Gridlines, week tint
+                and the NOW line/tag are all painted by PulseTrackBg — same math as
                 every row's track below it, so the axis can never drift from the rows. */}
             <div className="ps-sched-axis" style={{
               background: dark ? 'rgba(33,38,45,.72)' : 'rgba(251,248,243,.7)',
@@ -590,23 +550,17 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
               <div className="ps-sched-axis-lead" style={{ background: s2, borderRight: `1px solid ${bdr}` }}>
                 <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.1em', color: mu }}>Product</span>
               </div>
-              <div className="ps-sched-months">
-                {schedMonthPos.length > 0 ? (
-                  <div className="ps-sched-track ps-sched-track--axis">
-                    <SchedTrackBg />
-                    {schedMonthPos.map((m, i) => (
-                      <div key={i} className="ps-sched-month-lbl" style={{ left: `${m.left}%`, width: `${m.width}%` }}>
-                        <b style={{ color: m.isNow ? t.accent : tx }}>{m.name.toUpperCase()}</b>
-                        <small style={{ color: m.isNow ? t.accent + 'bb' : mu }}>{m.isNow ? 'NOW' : m.year}</small>
-                      </div>
-                    ))}
-                    {nowPct !== null && (
-                      <div className="ps-sched-now-tag" style={{ left: `${nowPct}%`, background: GOLD_GRAD }}>TODAY</div>
-                    )}
-                  </div>
-                ) : (
-                  <div style={{ padding: '10px 14px', fontSize: 12, color: mu }}>กรุณาตรวจสอบข้อมูลวันที่</div>
-                )}
+              <div className="ps-sched-months ps-pulse-weeks">
+                <div className="ps-sched-track ps-sched-track--axis ps-pulse-track">
+                  <PulseTrackBg />
+                  {pulseWeeks.map((w, i) => (
+                    <div key={i} className={`ps-sched-month-lbl ps-pulse-week-lbl${w.isNow ? ' ps-pulse-week-lbl--live' : ''}`} style={{ left: `${w.left}%`, width: `${w.width}%` }}>
+                      <b style={{ color: w.isNow ? t.accent : tx }}>{w.label}</b>
+                      <small style={{ color: w.isNow ? t.accent + 'bb' : mu }}>{w.dateLabel}</small>
+                    </div>
+                  ))}
+                  <div className="ps-sched-now-tag" style={{ left: `${nowPct}%`, background: GOLD_GRAD }}>TODAY</div>
+                </div>
               </div>
             </div>
 
@@ -626,7 +580,9 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
                 </div>
 
                 {/* Product rows */}
-                {list.map(it => (
+                {list.map(it => {
+                  const discontinued = disconIdxOf(it) >= 0
+                  return (
                   <div key={it.barcode} className="ps-sched-row" style={{ borderColor: dim, background: dark ? 'rgba(255,255,255,.015)' : 'rgba(255,255,255,.28)' }}>
                     {/* Left sticky panel */}
                     <div className="ps-sched-lead" style={{ background: s, borderRight: `1px solid ${bdr}` }}
@@ -636,46 +592,31 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
                         <span style={{ fontSize: 11, fontFamily: 'ui-monospace,monospace', fontWeight: 700, color: mu }}>RSP ฿{it.rspIncVat}</span>
                         {canSeeGP && <span style={{ fontSize: 10, fontFamily: 'ui-monospace,monospace', fontWeight: 700, color: gpColor(it.gp) }}>GP {Math.round(it.gp * 100)}%</span>}
                         {it.clearance && <span style={{ fontSize: 8.5, fontWeight: 800, color: neon(CLEAR_COLOR), background: `${neon(CLEAR_COLOR)}22`, borderRadius: 4, padding: '1px 5px', letterSpacing: '.04em' }}>CLEAR</span>}
+                        {discontinued && <span className="ps-pulse-attention ps-pulse-lead-tag" style={{ fontSize: 8.5, fontWeight: 800, letterSpacing: '.04em' }}>ยกเลิกขาย</span>}
                       </div>
                     </div>
 
-                    {/* Proportional Gantt lane */}
+                    {/* Proportional Pulse lane — empty capacity is plain whitespace */}
                     <div className="ps-sched-lane">
                       <div className="ps-sched-track" onMouseLeave={() => setBarTip(null)}>
-                        <SchedTrackBg />
-                        {/* Discontinued band — spans from the discontinue period to year-end.
-                            No explicit z-index: it stays in the auto-z paint layer with the
-                            gridlines, below the bars (which carry z-index via .ps-sched-bar). */}
-                        {(() => {
-                          const di = disconIdxOf(it)
-                          if (di < 0 || !filteredSchedRange) return null
-                          const dr = parseDR(periods[di].dateRange) || inferPeriodDate(periods[di])
-                          if (!dr) return null
-                          const { start, end, totalMs } = filteredSchedRange
-                          const bs2 = Math.max(dr.s.getTime(), start.getTime())
-                          if (end.getTime() <= bs2) return null
-                          const left = (bs2 - start.getTime()) / totalMs * 100
-                          const width = (end.getTime() - bs2) / totalMs * 100
-                          return (
-                            <div style={{ position: 'absolute', left: `${left}%`, width: `${width}%`, top: 4, bottom: 4, pointerEvents: 'none',
-                              background: `repeating-linear-gradient(45deg, ${disconClr}20, ${disconClr}20 6px, transparent 6px, transparent 13px)`,
-                              border: `1px dashed ${disconClr}66`, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                              <span style={{ fontSize: 10, fontWeight: 800, color: disconClr, background: dark ? 'rgba(13,17,23,.72)' : 'rgba(244,239,233,.82)', padding: '2px 7px', borderRadius: 5, whiteSpace: 'nowrap' }}>ยกเลิกขาย</span>
-                            </div>
-                          )
-                        })()}
+                        <PulseTrackBg />
                         {periods.map(p => {
                           const pd = it.periods?.[p.name]
                           if (!pd) return null
-                          const pos = barPos(p)
+                          const pos = pulseBarPos(p)
                           if (!pos) return null
                           const bs = getBarStyle(pd.activities, it.clearance, pd.branchExclusive)
                           const offPct = offPctOf(it, pd)
                           const dr = parseDR(p.dateRange) || inferPeriodDate(p)
                           const dateDisplay = p.dateRange || (dr ? `${MONTH_NAMES[dr.s.getMonth()]} ${dr.s.getFullYear()}` : '')
                           const multiAct = (pd.activities || []).length > 1
+                          const isLive = !!p.isCurrent
+                          const daysLeft = dr ? Math.ceil((dr.e.getTime() - TODAY.getTime()) / 86400000) : null
+                          const isAttention = isLive && daysLeft != null && daysLeft <= 3
+                          const isUnassigned = !!bs.ice
+                          const statusCls = `${isLive ? ' ps-pulse-live' : ''}${isAttention ? ' ps-pulse-attention' : ''}${isUnassigned ? ' ps-pulse-unassigned' : ''}`
                           return (
-                            <div key={p.name} className="ps-sched-bar"
+                            <div key={p.name} className={`ps-sched-bar${statusCls}`}
                               style={{ left: `${pos.left}%`, width: `${pos.width}%`, background: bs.bg,
                                 border: `1px solid ${bs.clr}${bs.ice ? '66' : '55'}`,
                                 boxShadow: `inset 0 1px 0 rgba(255,255,255,.3), 0 0 7px ${bs.clr}66, 0 0 16px -3px ${bs.clr}` }}
@@ -688,12 +629,15 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
                                 activities: pd.activities || [],
                                 clearance: it.clearance,
                                 branch: pd.branchExclusive,
+                                unassigned: isUnassigned,
+                                live: isLive,
+                                attention: isAttention,
                               })}
                               onMouseLeave={e => { e.stopPropagation(); setBarTip(null) }}
                               onMouseMove={e => setBarTip(prev => prev ? { ...prev, x: e.clientX, y: e.clientY } : prev)}
                             >
                               {/* min-width on .ps-sched-bar guarantees room, so the price
-                                  always shows — bars stay identifiable even in Full view. */}
+                                  always shows — bars stay identifiable even at 6-week scale. */}
                               <span className="ps-sched-bar-txt"
                                 style={bs.ice ? { color: bs.txt, textShadow: 'none' } : undefined}>{priceTxt(pd)}</span>
                               {pos.width >= 6 && offPct != null && offPct > 0 && (
@@ -705,13 +649,17 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
                               {pd.branchExclusive && pos.width >= 5 && (
                                 <span style={{ fontSize: 8.5, fontWeight: 800, color: '#fff', background: 'rgba(0,0,0,.28)', borderRadius: 4, padding: '0 4px', marginLeft: 2, whiteSpace: 'nowrap' }}>K.Village</span>
                               )}
+                              {isUnassigned && pos.width >= 16 && (
+                                <span className="ps-pulse-unassigned-tag" style={bs.ice ? { color: mu } : undefined}>Promotion unassigned</span>
+                              )}
                             </div>
                           )
                         })}
                       </div>
                     </div>
                   </div>
-                ))}
+                  )
+                })}
               </div>
             ))}
 
@@ -980,7 +928,7 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingLeft: 3 }}>
               <span style={{ fontSize: 10.5, color: dim, fontWeight: 600 }}>view:</span>
               <div className="ps-seg" style={{ background: s2, border: `1px solid ${bdr}`, padding: 2 }}>
-                {[['schedule','Schedule'], ['spotlight','Spotlight']].map(([k, l]) => (
+                {[['pulse','Calendar Pulse'], ['spotlight','Spotlight']].map(([k, l]) => (
                   <button key={k} className={`ps-glow${tlView === k ? ' on ps-glow-on' : ''}`} onClick={() => setTlView(k)} style={{
                     '--g': GOLD_A,
                     fontSize: 11.5, padding: '5px 12px',
@@ -1004,6 +952,18 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
           <span className="ps-actleg" style={{ color: mu }}>
             <span className="ps-actleg-dot" style={{ background: neon(CLEAR_COLOR), boxShadow: `0 0 5px -1px ${neon(CLEAR_COLOR)}` }} />
             เคลียร์สินค้า
+          </span>
+          <span className="ps-actleg" style={{ color: mu }}>
+            <span className="ps-actleg-dot" style={{ background: dark ? '#1c2630' : '#fbf9f5', border: `1px solid ${dark ? '#a8c5da' : '#8fa9bd'}` }} />
+            Promotion unassigned
+          </span>
+          <span className="ps-actleg ps-pulse-legend--live" style={{ color: mu }}>
+            <span className="ps-actleg-dot ps-pulse-status-dot ps-pulse-status-dot--live" />
+            Live / Active
+          </span>
+          <span className="ps-actleg ps-pulse-legend--attention" style={{ color: mu }}>
+            <span className="ps-actleg-dot ps-pulse-status-dot ps-pulse-status-dot--attention" />
+            Attention
           </span>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginLeft: 'auto' }}>
@@ -1055,7 +1015,7 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
         {items.length === 0
           ? <div style={{ padding: '56px 0', textAlign: 'center', color: mu }}>ไม่พบข้อมูลที่ตรงกับ filter</div>
           : layout === 'grid' ? Calendar()
-          : tlView === 'schedule' ? Schedule()
+          : tlView === 'pulse' ? CalendarPulse()
           : Spotlight()
         }
       </div>
@@ -1073,6 +1033,12 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
         }}>
           <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: barTip.color, marginBottom: 2 }}>{barTip.brand}</div>
           <div style={{ fontSize: 12.5, fontWeight: 700, color: tx, lineHeight: 1.35, marginBottom: 6 }}>{barTip.product}</div>
+          {(barTip.live || barTip.attention) && (
+            <div style={{ display: 'flex', gap: 5, marginBottom: 5 }}>
+              {barTip.live && <span className="ps-pulse-badge ps-pulse-badge--live">Live</span>}
+              {barTip.attention && <span className="ps-pulse-badge ps-pulse-badge--attention">Attention</span>}
+            </div>
+          )}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 3 }}>
             <span style={{ fontSize: 11, fontWeight: 700, color: t.accent, letterSpacing: '.04em' }}>{barTip.period}</span>
             <span style={{ fontSize: 10.5, color: mu }}>{barTip.dates}</span>
