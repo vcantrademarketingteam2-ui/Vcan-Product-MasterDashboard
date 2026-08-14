@@ -86,6 +86,7 @@ const BRAND_LOGOS = {
   'VITAKRAFT DOG': '/brands/vitakraft.png',
   'VITAKRAFT Rabbit': '/brands/vitakraft.png',
   'VITAKRAFT Rodent': '/brands/vitakraft.png',
+  'Vernel': '/brands/vernel.png',
   'Vnew': '/brands/vnew.png',
   'WMF': '/brands/wmf.png',
 }
@@ -192,8 +193,9 @@ function BrandCategoryFilter({ idPrefix, brandList, selectedBrands, onToggle, on
 
   return (
     <div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
       <div role="tablist" aria-label="Brand category" style={{
-        display: 'flex', gap: 6, overflowX: 'auto', WebkitOverflowScrolling: 'touch', alignItems: 'center',
+        display: 'flex', gap: 6, overflowX: 'auto', WebkitOverflowScrolling: 'touch', alignItems: 'center', minWidth: 0,
       }}>
         {cats.map((cat, idx) => {
           const active = cat === activeCat
@@ -222,11 +224,12 @@ function BrandCategoryFilter({ idPrefix, brandList, selectedBrands, onToggle, on
             </button>
           )
         })}
+      </div>
         {selectedBrands.length > 0 && (
-          <button type="button" onClick={onClear} style={{
+          <button type="button" onClick={onClear} className="vc-lift" style={{
             flexShrink: 0, display: 'inline-flex', alignItems: 'center', height: isMobile ? 40 : 32,
             padding: '0 12px', fontSize: 11.5, fontWeight: 700, fontFamily: 'inherit', borderRadius: 8,
-            color: t.muted, background: 'transparent', border: `1px solid ${t.border}`, cursor: 'pointer', marginLeft: 'auto',
+            color: t.accent, background: `${t.accent}18`, border: `1.5px solid ${t.accent}`, cursor: 'pointer',
           }}>Clear all</button>
         )}
       </div>
@@ -1588,7 +1591,7 @@ export default function App() {
             <div style={{ fontWeight: 800, fontSize: isMobile ? 14 : 17, color: t.text, letterSpacing: 0.2, whiteSpace: 'nowrap', flexShrink: 0 }}>
               Product Master
             </div>
-            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v3.11.2</span>
+            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v3.11.3</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: isMobile ? 11 : 13, background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, padding: isMobile ? '3px 8px' : '5px 12px', overflow: 'hidden', minWidth: 0, flexShrink: 1 }}>
               <span style={{ width: isMobile ? 6 : 7, height: isMobile ? 6 : 7, borderRadius: '50%', flexShrink: 0, background: dataSource === 'csv' ? t.blue : t.green }} />
               <span style={{ fontWeight: 800, color: dataSource === 'csv' ? t.blue : t.green, flexShrink: 0 }}>

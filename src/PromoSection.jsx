@@ -200,36 +200,56 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
   }, [items])
 
   // ── Calendar Pulse / Spotlight memos ─────────────────────────────────────────
-  // Fixed six-week axis: the Monday-start week containing today, plus the five
-  // weeks that follow. Day-accurate boundaries — this is the single coordinate
-  // system the axis labels, gridlines, NOW line and bar positions all share
-  // (pulseWeeks / nowPct / pulseBarPos below), so nothing can drift apart.
-  const pulseRange = useMemo(() => {
-    const wd = TODAY.getDay()
-    const start = new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate() - (wd === 0 ? 6 : wd - 1))
-    const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 42)
-    end.setTime(end.getTime() - 1)
-    return { start, end, totalMs: end.getTime() - start.getTime() }
-  }, [])
+  // Plan-window month axis: one shared percentage coordinate system (start/end
+  // dates → 0–100%) reused for axis month columns, the NOW line and every bar's
+  // left/width. "Full year" spans the full available period range; "3 months"
+  // and "6 months" are a fixed window from the start of the current month.
+  const [planWindow, setPlanWindow] = useState('6m')
 
-  // Six equal-width week cells (each 1/6 of the axis) — bars inside stay day-accurate.
+  const fullRange = useMemo(() => {
+    const drs = periods.map(p => parseDR(p.dateRange) || inferPeriodDate(p)).filter(Boolean)
+    if (!drs.length) {
+      return { start: new Date(TODAY.getFullYear(), TODAY.getMonth(), 1), end: new Date(TODAY.getFullYear(), TODAY.getMonth() + 1, 0, 23, 59, 59, 999) }
+    }
+    const minS = new Date(Math.min(...drs.map(d => d.s.getTime())))
+    const maxE = new Date(Math.max(...drs.map(d => d.e.getTime())))
+    return { start: new Date(minS.getFullYear(), minS.getMonth(), 1), end: maxE }
+  }, [periods])
+
+  const pulseRange = useMemo(() => {
+    if (planWindow === 'full') return { ...fullRange, totalMs: fullRange.end.getTime() - fullRange.start.getTime() }
+    const months = planWindow === '3m' ? 3 : 6
+    const start = new Date(TODAY.getFullYear(), TODAY.getMonth(), 1)
+    const end = new Date(start.getFullYear(), start.getMonth() + months, 0, 23, 59, 59, 999)
+    return { start, end, totalMs: end.getTime() - start.getTime() }
+  }, [planWindow, fullRange])
+
+  // Month columns spanning the active window — each cell is `left/width: X%` of
+  // the same coordinate system pulseBarPos() below uses for the bars.
   const pulseWeeks = useMemo(() => {
-    const { start } = pulseRange
-    return Array.from({ length: 6 }, (_, i) => {
-      const wStart = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i * 7)
-      const wEnd = new Date(wStart.getFullYear(), wStart.getMonth(), wStart.getDate() + 7)
-      wEnd.setTime(wEnd.getTime() - 1)
-      return {
-        idx: i, start: wStart, end: wEnd,
-        left: (i / 6) * 100, width: 100 / 6,
-        isNow: i === 0,
-        label: i === 0 ? 'THIS WEEK' : `WK +${i}`,
-        dateLabel: `${wStart.getDate()} ${MONTH_NAMES[wStart.getMonth()]}`,
-      }
-    })
+    const { start, end, totalMs } = pulseRange
+    const cols = []
+    let cur = new Date(start.getFullYear(), start.getMonth(), 1)
+    let i = 0
+    while (cur <= end) {
+      const mStart = new Date(Math.max(cur.getTime(), start.getTime()))
+      const mEndRaw = new Date(cur.getFullYear(), cur.getMonth() + 1, 0, 23, 59, 59, 999)
+      const mEnd = new Date(Math.min(mEndRaw.getTime(), end.getTime()))
+      const left = (mStart.getTime() - start.getTime()) / totalMs * 100
+      const width = Math.max(0, (mEnd.getTime() - mStart.getTime()) / totalMs * 100)
+      const isNow = cur.getFullYear() === TODAY.getFullYear() && cur.getMonth() === TODAY.getMonth()
+      cols.push({
+        idx: i, start: mStart, end: mEnd, left, width, isNow,
+        label: MONTH_NAMES[cur.getMonth()],
+        dateLabel: String(cur.getFullYear()),
+      })
+      cur = new Date(cur.getFullYear(), cur.getMonth() + 1, 1)
+      i++
+    }
+    return cols
   }, [pulseRange])
 
-  // NOW position as 0–100% across the six-week window
+  // NOW position as 0–100% across the active window
   const nowPct = useMemo(() => {
     const pct = (TODAY.getTime() - pulseRange.start.getTime()) / pulseRange.totalMs * 100
     return Math.max(0, Math.min(100, pct))
@@ -365,7 +385,7 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
     }
   }
 
-  // Bar position clipped to the six-week Pulse window; uses inferPeriodDate for empty dateRange
+  // Bar position clipped to the active plan window; uses inferPeriodDate for empty dateRange
   const pulseBarPos = p => {
     const dr = parseDR(p.dateRange) || inferPeriodDate(p)
     if (!dr) return null
@@ -542,17 +562,28 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
     return (
       <>
         <div style={{
-          display: 'flex', alignItems: 'center', gap: 7, padding: '8px 18px',
-          borderBottom: `1px solid ${bdr}`,
+          display: 'flex', alignItems: 'center', gap: 10, padding: '8px 18px',
+          borderBottom: `1px solid ${bdr}`, flexWrap: 'wrap',
           background: dark ? 'rgba(255,255,255,.025)' : 'rgba(0,0,0,.02)',
         }}>
-          <span style={{ fontSize: 10.5, fontWeight: 700, color: mu, textTransform: 'uppercase', letterSpacing: '.08em' }}>Calendar Pulse</span>
-          <span style={{ fontSize: 10, color: mu }}>this week + next 5 weeks</span>
+          <span style={{ fontSize: 10.5, fontWeight: 700, color: mu, textTransform: 'uppercase', letterSpacing: '.08em' }}>Calendar</span>
+          <div style={{ display: 'flex', gap: 4, background: s2, border: `1px solid ${bdr}`, borderRadius: 8, padding: 2 }}>
+            {[['3m', '3 months'], ['6m', '6 months'], ['full', 'Full year']].map(([k, l]) => (
+              <button key={k} onClick={() => setPlanWindow(k)} className={`ps-glow${planWindow === k ? ' ps-glow-on' : ''}`} style={{
+                '--g': GOLD_A,
+                fontSize: 10.5, fontWeight: 700, padding: '4px 10px', borderRadius: 6, fontFamily: 'inherit',
+                background: planWindow === k ? `${GOLD_A}22` : 'none',
+                color: planWindow === k ? (dark ? GOLD_A : GOLD_B) : mu,
+                border: planWindow === k ? `1px solid ${GOLD_A}66` : '1px solid transparent',
+                cursor: 'pointer', whiteSpace: 'nowrap',
+              }}>{l}</button>
+            ))}
+          </div>
           <span style={{ marginLeft: 'auto', fontSize: 10, color: mu, fontStyle: 'italic' }}>hover bars for details</span>
         </div>
         <div className="ps-sched-scroll" style={{ scrollbarColor: `${bdr} transparent`, overflow: 'auto', maxHeight: '70vh' }}
           onMouseLeave={() => setBarTip(null)}>
-          <div className="ps-sched-inner">
+          <div className="ps-sched-inner" style={{ minWidth: planWindow === 'full' ? Math.max(900, periods.length * 62 + 252) : planWindow === '6m' ? 1100 : 900 }}>
 
             {/* Week axis — frosted glass over scrolling rows. Gridlines, week tint
                 and the NOW line/tag are all painted by PulseTrackBg — same math as
@@ -603,7 +634,7 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
                       onClick={() => openProduct(it)}>
                       <div style={{ fontSize: 12.5, fontWeight: 600, color: tx, lineHeight: 1.35, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.product}</div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
-                        <span style={{ fontSize: 11, fontFamily: 'ui-monospace,monospace', fontWeight: 700, color: mu }}>RSP ฿{it.rspIncVat}</span>
+                        <span style={{ fontSize: 13, fontFamily: 'ui-monospace,monospace', fontWeight: 800, color: dark ? GOLD_A : GOLD_B, background: `${GOLD_A}18`, borderRadius: 4, padding: '2px 5px' }}>RSP ฿{it.rspIncVat}</span>
                         {canSeeGP && <span style={{ fontSize: 10, fontFamily: 'ui-monospace,monospace', fontWeight: 700, color: gpColor(it.gp) }}>GP {Math.round(it.gp * 100)}%</span>}
                         {it.clearance && <span style={{ fontSize: 8.5, fontWeight: 800, color: neon(CLEAR_COLOR), background: `${neon(CLEAR_COLOR)}22`, borderRadius: 4, padding: '1px 5px', letterSpacing: '.04em' }}>CLEAR</span>}
                         {discontinued && <span className="ps-pulse-attention ps-pulse-lead-tag" style={{ fontSize: 8.5, fontWeight: 800, letterSpacing: '.04em' }}>ยกเลิกขาย</span>}
@@ -651,20 +682,19 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
                               onMouseMove={e => setBarTip(prev => prev ? { ...prev, x: e.clientX, y: e.clientY } : prev)}
                             >
                               {/* min-width on .ps-sched-bar guarantees room, so the price
-                                  always shows — bars stay identifiable even at 6-week scale. */}
+                                  always shows — bars stay identifiable as compact blocks even
+                                  on the widest (Full year) window. Unassigned status is conveyed
+                                  by the ice-pill styling, legend and hover tooltip, not bar text. */}
                               <span className="ps-sched-bar-txt"
                                 style={bs.ice ? { color: bs.txt, textShadow: 'none' } : undefined}>{priceTxt(pd)}</span>
-                              {pos.width >= 6 && offPct != null && offPct > 0 && (
-                                <span className="ps-sched-bar-off" style={bs.ice ? { color: mu } : undefined}>−{offPct}%</span>
+                              {pos.width >= 3 && offPct != null && offPct > 0 && (
+                                <span className="ps-sched-bar-off" style={bs.ice ? { color: bs.txt } : undefined}>−{offPct}%</span>
                               )}
-                              {multiAct && pos.width >= 8 && (
+                              {multiAct && pos.width >= 4 && (
                                 <span className="ps-sched-bar-dots"><ActDots acts={pd.activities} size={4.5} /></span>
                               )}
-                              {pd.branchExclusive && pos.width >= 5 && (
+                              {pd.branchExclusive && pos.width >= 3 && (
                                 <span style={{ fontSize: 8.5, fontWeight: 800, color: '#fff', background: 'rgba(0,0,0,.28)', borderRadius: 4, padding: '0 4px', marginLeft: 2, whiteSpace: 'nowrap' }}>K.Village</span>
-                              )}
-                              {isUnassigned && pos.width >= 16 && (
-                                <span className="ps-pulse-unassigned-tag" style={bs.ice ? { color: mu } : undefined}>Promotion unassigned</span>
                               )}
                             </div>
                           )
@@ -927,7 +957,7 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingLeft: 3 }}>
               <span style={{ fontSize: 10.5, color: dim, fontWeight: 600 }}>view:</span>
               <div className="ps-seg" style={{ background: s2, border: `1px solid ${bdr}`, padding: 2 }}>
-                {[['pulse','Calendar Pulse'], ['spotlight','Spotlight']].map(([k, l]) => (
+                {[['pulse','Calendar'], ['spotlight','Spotlight']].map(([k, l]) => (
                   <button key={k} className={`ps-glow${tlView === k ? ' on ps-glow-on' : ''}`} onClick={() => setTlView(k)} style={{
                     '--g': GOLD_A,
                     fontSize: 11.5, padding: '5px 12px',
