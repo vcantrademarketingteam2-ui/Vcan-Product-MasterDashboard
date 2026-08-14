@@ -140,13 +140,15 @@ function enrich(items, rawData) {
       const di = nm.indexOf('-')
       return (di > 0 && di < 26) ? nm.slice(0, di).trim() : nm.split(/\s+/)[0] || '—'
     })()
-    const company = m?.company || p.company || ''
+    // Vernel promo rows arrive with no master match and empty company, which made
+    // them render with the Moola/red fallback treatment — Vernel is a Vcan brand.
+    const company = m?.company || p.company || (brand.trim().toLowerCase() === 'vernel' ? 'Vcan' : '')
     return { ...p, brand, company }
   })
 }
 
 // ── component ─────────────────────────────────────────────────────────────────
-export default function PromoSection({ rawData, t, dark, isMobile, onSelect, RetailerLogo, MonogramTile }) {
+export default function PromoSection({ rawData, t, dark, isMobile, onSelect, RetailerLogo, MonogramTile, BrandCategoryFilter }) {
   const [retailer, setRetailer] = useState(PROMO_RETAILERS[0] || '')
   const [brandFilter, setBrandFilter] = useState([])
   const [layout, setLayout] = useState('timeline')
@@ -173,6 +175,18 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
   }, [retailer, rawData])
 
   const brandList = useMemo(() => [...new Set(allItems.map(i => i.brand))].filter(Boolean).sort(), [allItems])
+
+  // brand → company / promo-item count for the shared BrandCategoryFilter pills
+  const brandCompany = useMemo(() => {
+    const m = {}
+    allItems.forEach(i => { if (!m[i.brand]) m[i.brand] = i.company })
+    return m
+  }, [allItems])
+  const brandCounts = useMemo(() => {
+    const m = {}
+    allItems.forEach(i => { m[i.brand] = (m[i.brand] || 0) + 1 })
+    return m
+  }, [allItems])
 
   const items = useMemo(() => {
     if (!brandFilter.length) return allItems
@@ -886,27 +900,12 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
         ))}
       </div>
 
-      {/* brand filter */}
-      {brandList.length > 0 && (
-        <div className="ps-pills">
-          <span className="ps-label" style={{ color: mu }}>Brand</span>
-          <button className={`ps-brand-pill ps-glow${!brandFilter.length ? ' ps-glow-on' : ''}`} onClick={() => setBrandFilter([])} style={{
-            '--g': GOLD_A,
-            background: !brandFilter.length ? GOLD_GRAD : s2, color: !brandFilter.length ? '#fff' : tx,
-            border: `1.5px solid ${!brandFilter.length ? GOLD_A : bdr}`,
-            borderRadius: 99, padding: '6px 14px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
-          }}>All</button>
-          {brandList.map(b => (
-            <button key={b} onClick={() => toggleBrand(b)}
-              className={`ps-glow${brandFilter.includes(b) ? ' ps-glow-on' : ''}`} style={{
-              '--g': GOLD_A,
-              background: brandFilter.includes(b) ? GOLD_GRAD : s2,
-              color: brandFilter.includes(b) ? '#fff' : tx,
-              border: `1.5px solid ${brandFilter.includes(b) ? GOLD_A : bdr}`,
-              borderRadius: 99, padding: '6px 14px', fontSize: 12.5, fontWeight: brandFilter.includes(b) ? 700 : 500,
-              cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap',
-            }}>{b}</button>
-          ))}
+      {/* brand filter — shared category navigator (passed from App.jsx) */}
+      {brandList.length > 0 && BrandCategoryFilter && (
+        <div style={{ marginBottom: 12 }}>
+          <BrandCategoryFilter idPrefix="ps-promo" brandList={brandList}
+            selectedBrands={brandFilter} onToggle={toggleBrand} onClear={() => setBrandFilter([])}
+            brandCompany={brandCompany} brandCounts={brandCounts} t={t} isMobile={isMobile} />
         </div>
       )}
 

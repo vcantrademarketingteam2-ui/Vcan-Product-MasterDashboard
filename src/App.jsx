@@ -160,6 +160,98 @@ function BrandPill({ brand, company, t, size = 'm', selected = false, count = nu
   )
 }
 
+function catSlug(cat) {
+  return cat.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+}
+
+// Brand Category Switcher (v3.11.2) — one shared compact category tab rail + active-
+// category brand-pill panel, reused for the Products, Packshot and Promotion Plan
+// brand filters. Selections live in the caller's state (selectedBrands/onToggle), so
+// they survive switching categories or callers; only the active tab is local here.
+function BrandCategoryFilter({ idPrefix, brandList, selectedBrands, onToggle, onClear, brandCompany, brandCounts, t, isMobile, size = 's' }) {
+  const groups = useMemo(() => {
+    const g = {}
+    brandList.forEach(b => { (g[brandCategory(b)] = g[brandCategory(b)] || []).push(b) })
+    return g
+  }, [brandList])
+  const cats = BRAND_CATEGORIES.filter(c => groups[c]?.length)
+  const [activeCatState, setActiveCatState] = useState(cats[0] || BRAND_CATEGORIES[0])
+  const activeCat = cats.includes(activeCatState) ? activeCatState : cats[0]
+  const tabRefs = useRef({})
+
+  if (!cats.length) return null
+
+  const onTabKeyDown = (e, idx) => {
+    if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return
+    e.preventDefault()
+    const dir = e.key === 'ArrowRight' ? 1 : -1
+    const next = cats[(idx + dir + cats.length) % cats.length]
+    setActiveCatState(next)
+    tabRefs.current[next]?.focus()
+  }
+
+  return (
+    <div>
+      <div role="tablist" aria-label="Brand category" style={{
+        display: 'flex', gap: 6, overflowX: 'auto', WebkitOverflowScrolling: 'touch', alignItems: 'center',
+      }}>
+        {cats.map((cat, idx) => {
+          const active = cat === activeCat
+          const slug = catSlug(cat)
+          const selCount = groups[cat].filter(b => selectedBrands.includes(b)).length
+          return (
+            <button key={cat} type="button" role="tab" id={`${idPrefix}-tab-${slug}`}
+              aria-selected={active} aria-controls={`${idPrefix}-panel-${slug}`}
+              tabIndex={active ? 0 : -1}
+              ref={el => { tabRefs.current[cat] = el }}
+              onClick={() => setActiveCatState(cat)}
+              onKeyDown={(e) => onTabKeyDown(e, idx)}
+              style={{
+                flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 6,
+                height: isMobile ? 40 : 32, padding: '0 14px', borderRadius: '8px 8px 0 0',
+                fontSize: 12, fontWeight: active ? 700 : 600, fontFamily: 'inherit',
+                color: active ? t.accent : t.muted,
+                background: active ? t.surface : t.surface2,
+                border: `1.5px solid ${active ? t.accent : t.border}`, borderBottom: 'none',
+                cursor: 'pointer', whiteSpace: 'nowrap',
+              }}>
+              {cat}
+              {selCount > 0 && (
+                <span style={{ fontSize: 10, fontWeight: 700, color: t.accent, background: `${t.accent}22`, borderRadius: 99, padding: '1px 6px', fontVariantNumeric: 'tabular-nums' }}>{selCount}</span>
+              )}
+            </button>
+          )
+        })}
+        {selectedBrands.length > 0 && (
+          <button type="button" onClick={onClear} style={{
+            flexShrink: 0, display: 'inline-flex', alignItems: 'center', height: isMobile ? 40 : 32,
+            padding: '0 12px', fontSize: 11.5, fontWeight: 700, fontFamily: 'inherit', borderRadius: 8,
+            color: t.muted, background: 'transparent', border: `1px solid ${t.border}`, cursor: 'pointer', marginLeft: 'auto',
+          }}>Clear all</button>
+        )}
+      </div>
+      {cats.map(cat => {
+        const slug = catSlug(cat)
+        const active = cat === activeCat
+        return (
+          <div key={cat} role="tabpanel" id={`${idPrefix}-panel-${slug}`} aria-labelledby={`${idPrefix}-tab-${slug}`}
+            hidden={!active} style={{
+              borderTop: `2px solid ${t.accent}`, borderLeft: `1px solid ${t.border}`, borderRight: `1px solid ${t.border}`, borderBottom: `1px solid ${t.border}`,
+              borderRadius: '0 10px 10px 10px', background: t.surface, padding: 12,
+              display: active ? 'grid' : 'none', gridTemplateColumns: `repeat(auto-fill, minmax(${isMobile ? 130 : 150}px, 1fr))`, gap: 10,
+            }}>
+            {groups[cat].map(b => (
+              <BrandPill key={b} brand={b} company={brandCompany[b]} t={t} size={size}
+                selected={selectedBrands.includes(b)} count={brandCounts[b] || 0}
+                onClick={() => onToggle(b)} />
+            ))}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 // Status the summary cards (and card-click filter) bucket by:
 // no retailer scope → the product's global master status; with retailer(s)
 // scoped → its status AT those retailers, matching the column dots
@@ -1015,11 +1107,6 @@ export default function App() {
   }
 
   const visibleBrands = VENDOR_BRANDS[vendorFilter] || VENDOR_BRANDS.ALL
-  const brandGroups = useMemo(() => {
-    const g = {}
-    visibleBrands.forEach(b => { (g[brandCategory(b)] = g[brandCategory(b)] || []).push(b) })
-    return g
-  }, [visibleBrands])
   const handleVendorChange = (v) => { setVendorFilter(v); setSelectedBrands([]) }
   const toggleBrand = (b) => setSelectedBrands(prev => prev.includes(b) ? prev.filter(x => x !== b) : [...prev, b])
   // brand → company (stable, for the monogram tile's vendor color) and brand → SKU count
@@ -1044,14 +1131,6 @@ export default function App() {
     scoped.forEach(p => { const b = p.brand.trim(); m[b] = (m[b] || 0) + 1 })
     return m
   }, [rawData, vendorFilter, selectedRetailers, search])
-  // size="s" here only — this feeds the Products-tab category filter panel, which
-  // needs to fit many brands without scrolling; popup/packshot/analytics pills stay
-  // at their bigger size elsewhere (BrandPill's other call sites are unaffected).
-  const renderBrandPill = (b) => (
-    <BrandPill key={b} brand={b} company={brandCompany[b]} t={t} size="s"
-      selected={selectedBrands.includes(b)} count={brandCounts[b] || 0}
-      onClick={() => toggleBrand(b)} />
-  )
   const clearAll = () => { setSearch(''); setSelectedBrands([]); setSelectedRetailers([]); setStatusTab('ALL'); setVendorFilter('ALL'); setSortCol(null); setSortDir('asc') }
   const toggleRetailer = (r) => setSelectedRetailers(prev => prev.includes(r) ? prev.filter(x => x !== r) : [...prev, r])
   const toggleStatus = (k) => setStatusTab(s => (s === k ? 'ALL' : k))
@@ -1509,7 +1588,7 @@ export default function App() {
             <div style={{ fontWeight: 800, fontSize: isMobile ? 14 : 17, color: t.text, letterSpacing: 0.2, whiteSpace: 'nowrap', flexShrink: 0 }}>
               Product Master
             </div>
-            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v3.11.1</span>
+            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v3.11.2</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: isMobile ? 11 : 13, background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, padding: isMobile ? '3px 8px' : '5px 12px', overflow: 'hidden', minWidth: 0, flexShrink: 1 }}>
               <span style={{ width: isMobile ? 6 : 7, height: isMobile ? 6 : 7, borderRadius: '50%', flexShrink: 0, background: dataSource === 'csv' ? t.blue : t.green }} />
               <span style={{ fontWeight: 800, color: dataSource === 'csv' ? t.blue : t.green, flexShrink: 0 }}>
@@ -1750,49 +1829,11 @@ export default function App() {
                   </div>
                 </div>}
 
-                {/* Brand pills — card background for contrast */}
-                <div style={{
-                  ...glassPanel, borderRadius: 12, padding: '12px 16px',
-                  // No inner max-height/scroll here on purpose: the full-width band
-                  // layout below scales height predictably with brand count (unlike
-                  // the old narrow-column layout, which could grow one column
-                  // unboundedly tall). Letting the panel take its natural height and
-                  // scroll with the page avoids a nested inner scrollbar.
-                }}>
-                  {/* Categorized brand pills — CSS multi-column masonry. Two prior
-                      layouts both failed: (1) one narrow column PER category, pills
-                      wrapping only inside that sliver, forced busy categories
-                      (Personal Care, Pet) into many single-pill rows while idle
-                      categories left dead space beside them; (2) an equal-width card
-                      grid gave every category the same width regardless of brand
-                      count, so a busy category still got squeezed tall in its share.
-                      `columns` with only a column-WIDTH hint (no count) fixed the
-                      height-balance problem — category cards (break-inside: avoid,
-                      so one never splits across columns) distribute into however
-                      many columns the content needs to balance — but that same
-                      auto-balance stops adding columns once the content's happy with
-                      fewer, leaving the rest of the panel's width empty rather than
-                      spreading into more/narrower columns. Pinning an explicit
-                      column-COUNT (4) forces the browser to actually use the
-                      available width; column-width stays as a floor so it still
-                      degrades gracefully (fewer columns) on a narrower window.
-                      Mobile: single column. */}
-                  <div style={{ columns: isMobile ? '1' : '260px 4', columnGap: 12, width: '100%' }}>
-                    {BRAND_CATEGORIES.filter(c => brandGroups[c]?.length).map(cat => (
-                      <div key={cat} style={{
-                        breakInside: 'avoid', WebkitColumnBreakInside: 'avoid', marginBottom: 12,
-                        display: 'flex', flexDirection: 'column', gap: 8,
-                        background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 10, padding: '10px 12px',
-                      }}>
-                        <span style={{
-                          fontSize: 10.5, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.08em', color: t.muted, whiteSpace: 'nowrap',
-                        }}>{cat}</span>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', alignContent: 'flex-start', gap: '10px 14px', width: '100%' }}>
-                          {brandGroups[cat].map(renderBrandPill)}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                {/* Brand category navigator — card background for contrast */}
+                <div style={{ ...glassPanel, borderRadius: 12, padding: '12px 16px' }}>
+                  <BrandCategoryFilter idPrefix="pm-products" brandList={visibleBrands}
+                    selectedBrands={selectedBrands} onToggle={toggleBrand} onClear={() => setSelectedBrands([])}
+                    brandCompany={brandCompany} brandCounts={brandCounts} t={t} isMobile={isMobile} />
                 </div>
               </div>
 
@@ -2286,15 +2327,11 @@ export default function App() {
                   <button onClick={() => setPsRetailers([])} style={{ background: 'none', border: 'none', color: t.muted, fontSize: 11, fontWeight: 600, cursor: 'pointer', padding: '4px 6px', flexShrink: 0 }}>✕ Clear</button>
                 )}
               </div>
-              {/* ── Brand pills ── */}
-              <div style={{ display: 'flex', gap: 7, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-                <span style={{ fontSize: 12, color: t.muted, fontWeight: 600, flexShrink: 0 }}>Brand:</span>
-                <button key="ALL" className="bpill" onClick={() => setSelectedBrands([])} style={{ background: selectedBrands.length === 0 ? t.accent : t.surface2, color: selectedBrands.length === 0 ? '#000' : t.text, border: `1px solid ${selectedBrands.length === 0 ? t.accent : t.border}`, borderRadius: 20, padding: '5px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>All</button>
-                {VENDOR_BRANDS.ALL.map(b => (
-                  <BrandPill key={b} brand={b} company={brandCompany[b]} t={t} size="m"
-                    selected={selectedBrands.includes(b)} count={brandCounts[b] || 0}
-                    onClick={() => toggleBrand(b)} />
-                ))}
+              {/* ── Brand category navigator (shared with Products tab) ── */}
+              <div style={{ marginBottom: 12 }}>
+                <BrandCategoryFilter idPrefix="pm-packshot" brandList={VENDOR_BRANDS.ALL}
+                  selectedBrands={selectedBrands} onToggle={toggleBrand} onClear={() => setSelectedBrands([])}
+                  brandCompany={brandCompany} brandCounts={brandCounts} t={t} isMobile={isMobile} />
               </div>
               {/* ── Legend + count bar ── */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 14, padding: '8px 14px', background: t.surface, border: `1px solid ${t.border}`, borderRadius: 10, flexWrap: 'wrap' }}>
@@ -2350,6 +2387,7 @@ export default function App() {
               onSelect={setSelectedProduct}
               RetailerLogo={RetailerLogo}
               MonogramTile={BrandPlaque}
+              BrandCategoryFilter={BrandCategoryFilter}
             />
           )}
 
