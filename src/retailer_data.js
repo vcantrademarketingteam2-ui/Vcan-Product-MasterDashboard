@@ -223,8 +223,8 @@ const RETAILER_DATA = {
       "gp": 0.21
     },
     "Foodland": {
-      "costUnit": 204.0187,
-      "costCase": 1224.1121,
+      "costUnit": 273.1776,
+      "costCase": 1639.0654,
       "gp": 0.26
     }
   },
@@ -255,8 +255,8 @@ const RETAILER_DATA = {
       "gp": 0.21
     },
     "Foodland": {
-      "costUnit": 204.0187,
-      "costCase": 1224.1121,
+      "costUnit": 273.1776,
+      "costCase": 1639.0654,
       "gp": 0.26
     }
   },
@@ -287,8 +287,8 @@ const RETAILER_DATA = {
       "gp": 0.21
     },
     "Foodland": {
-      "costUnit": 204.0187,
-      "costCase": 1224.1121,
+      "costUnit": 273.1776,
+      "costCase": 1639.0654,
       "gp": 0.26
     }
   },
@@ -1234,6 +1234,8 @@ const RETAILER_DATA = {
       "gp": 0.3
     },
     "Foodland": {
+      "costUnit": 185.0467,
+      "costCase": 3330.8411,
       "gp": 0.28
     }
   },
@@ -1279,9 +1281,6 @@ const RETAILER_DATA = {
       "costUnit": 179.9065,
       "costCase": 3238.3178,
       "gp": 0.3
-    },
-    "Foodland": {
-      "gp": 0.28
     }
   },
   "011111610699": {
@@ -1306,6 +1305,8 @@ const RETAILER_DATA = {
       "gp": 0.3
     },
     "Foodland": {
+      "costUnit": 185.0467,
+      "costCase": 3330.8411,
       "gp": 0.28
     }
   },
@@ -1701,7 +1702,14 @@ const RETAILER_DATA = {
       "costCase": 2207.9439,
       "gp": 0.25
     },
+    "Lotus": {
+      "costUnit": 318.9252,
+      "costCase": 1913.5514,
+      "gp": 0.35
+    },
     "Foodland": {
+      "costUnit": 358.1776,
+      "costCase": 2149.0654,
       "gp": 0.27
     }
   },
@@ -1721,7 +1729,14 @@ const RETAILER_DATA = {
       "costCase": 2207.9439,
       "gp": 0.25
     },
+    "Lotus": {
+      "costUnit": 318.9252,
+      "costCase": 1913.5514,
+      "gp": 0.35
+    },
     "Foodland": {
+      "costUnit": 358.1776,
+      "costCase": 2149.0654,
       "gp": 0.27
     }
   },
@@ -1741,7 +1756,14 @@ const RETAILER_DATA = {
       "costCase": 2207.9439,
       "gp": 0.25
     },
+    "Lotus": {
+      "costUnit": 318.9252,
+      "costCase": 1913.5514,
+      "gp": 0.35
+    },
     "Foodland": {
+      "costUnit": 358.1776,
+      "costCase": 2149.0654,
       "gp": 0.27
     }
   },
@@ -1750,6 +1772,11 @@ const RETAILER_DATA = {
       "costUnit": 353.271,
       "costCase": 8478.5047,
       "gp": 0.28
+    },
+    "Lotus": {
+      "costUnit": 318.9252,
+      "costCase": 1913.5514,
+      "gp": 0.35
     }
   },
   "9358131000798": {
@@ -1757,6 +1784,11 @@ const RETAILER_DATA = {
       "costUnit": 353.271,
       "costCase": 8478.5047,
       "gp": 0.28
+    },
+    "Lotus": {
+      "costUnit": 318.9252,
+      "costCase": 1913.5514,
+      "gp": 0.35
     }
   },
   "9358131000507": {
@@ -1764,6 +1796,11 @@ const RETAILER_DATA = {
       "costUnit": 353.271,
       "costCase": 8478.5047,
       "gp": 0.28
+    },
+    "Lotus": {
+      "costUnit": 318.9252,
+      "costCase": 1913.5514,
+      "gp": 0.35
     }
   },
   "9358131000040": {
@@ -1782,7 +1819,14 @@ const RETAILER_DATA = {
       "costCase": 2207.9439,
       "gp": 0.25
     },
+    "Lotus": {
+      "costUnit": 318.9252,
+      "costCase": 1913.5514,
+      "gp": 0.35
+    },
     "Foodland": {
+      "costUnit": 358.1776,
+      "costCase": 2149.0654,
       "gp": 0.27
     }
   },
@@ -1797,7 +1841,14 @@ const RETAILER_DATA = {
       "costCase": 2207.9439,
       "gp": 0.25
     },
+    "Lotus": {
+      "costUnit": 318.9252,
+      "costCase": 1913.5514,
+      "gp": 0.35
+    },
     "Foodland": {
+      "costUnit": 358.1776,
+      "costCase": 2149.0654,
       "gp": 0.27
     }
   },
@@ -1808,6 +1859,8 @@ const RETAILER_DATA = {
       "gp": 0.28
     },
     "Foodland": {
+      "costUnit": 303.5981,
+      "costCase": 1821.5888,
       "gp": 0.27
     }
   },
@@ -1818,6 +1871,8 @@ const RETAILER_DATA = {
       "gp": 0.28
     },
     "Foodland": {
+      "costUnit": 303.5981,
+      "costCase": 1821.5888,
       "gp": 0.27
     }
   },
@@ -1831,6 +1886,11 @@ const RETAILER_DATA = {
       "costUnit": 396.028,
       "costCase": 2376.1682,
       "gp": 0.25
+    },
+    "Lotus": {
+      "costUnit": 343.2243,
+      "costCase": 2059.3458,
+      "gp": 0.35
     }
   },
   "9358131000736": {
@@ -1849,6 +1909,11 @@ const RETAILER_DATA = {
       "costUnit": 557.243,
       "costCase": 3343.4579,
       "gp": 0.25
+    },
+    "Lotus": {
+      "costUnit": 482.9439,
+      "costCase": 2897.6636,
+      "gp": 0.35
     }
   },
   "9358131001221": {
@@ -1867,6 +1932,11 @@ const RETAILER_DATA = {
       "costUnit": 557.243,
       "costCase": 3343.4579,
       "gp": 0.25
+    },
+    "Lotus": {
+      "costUnit": 482.9439,
+      "costCase": 2897.6636,
+      "gp": 0.35
     }
   },
   "079400266552": {

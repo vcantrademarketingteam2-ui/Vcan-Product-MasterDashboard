@@ -101,15 +101,66 @@
   },
   {
     "retailer": "Tops",
+    "period": "2639/40",
+    "startDate": "2026-09-16",
+    "activities": [
+      "media"
+    ],
+    "brands": [
+      "General Fresh"
+    ],
+    "title": "Tops 2639/40"
+  },
+  {
+    "retailer": "Tops",
     "period": "2641/42",
     "startDate": "2026-09-30",
     "activities": [
       "media"
     ],
     "brands": [
-      "PEARS BODY WASH"
+      "PEARS BODY WASH",
+      "Sundae Bath Foam"
     ],
     "title": "Tops 2641/42"
+  },
+  {
+    "retailer": "Tops",
+    "period": "2643/44",
+    "startDate": "2026-10-14",
+    "activities": [
+      "looks",
+      "media"
+    ],
+    "brands": [
+      "Sundae Bath Foam",
+      "Vnew"
+    ],
+    "title": "Tops 2643/44"
+  },
+  {
+    "retailer": "Tops",
+    "period": "2645/46",
+    "startDate": "2026-10-28",
+    "activities": [
+      "media"
+    ],
+    "brands": [
+      "L'Arbre Vert"
+    ],
+    "title": "Tops 2645/46"
+  },
+  {
+    "retailer": "Tops",
+    "period": "2647/48",
+    "startDate": "2026-11-11",
+    "activities": [
+      "media"
+    ],
+    "brands": [
+      "Brilly"
+    ],
+    "title": "Tops 2647/48"
   },
   {
     "retailer": "Tops",
@@ -122,6 +173,18 @@
       "Tempo"
     ],
     "title": "Tops 2649/50"
+  },
+  {
+    "retailer": "Tops",
+    "period": "2651/52",
+    "startDate": "2026-12-09",
+    "activities": [
+      "media"
+    ],
+    "brands": [
+      "Sofix"
+    ],
+    "title": "Tops 2651/52"
   },
   {
     "retailer": "Villa",
@@ -209,6 +272,54 @@
       "Tempo"
     ],
     "title": "Homepro Jun"
+  },
+  {
+    "retailer": "Homepro",
+    "period": "Jul",
+    "startDate": "2026-07-01",
+    "activities": [
+      "field"
+    ],
+    "brands": [
+      "Tempo"
+    ],
+    "title": "Homepro Jul"
+  },
+  {
+    "retailer": "Homepro",
+    "period": "Aug",
+    "startDate": "2026-08-01",
+    "activities": [
+      "field"
+    ],
+    "brands": [
+      "Tempo"
+    ],
+    "title": "Homepro Aug"
+  },
+  {
+    "retailer": "Homepro",
+    "period": "Sep",
+    "startDate": "2026-09-01",
+    "activities": [
+      "field"
+    ],
+    "brands": [
+      "Tempo"
+    ],
+    "title": "Homepro Sep"
+  },
+  {
+    "retailer": "Homepro",
+    "period": "Oct",
+    "startDate": "2026-10-01",
+    "activities": [
+      "field"
+    ],
+    "brands": [
+      "Tempo"
+    ],
+    "title": "Homepro Oct"
   },
   {
     "retailer": "Homepro",
