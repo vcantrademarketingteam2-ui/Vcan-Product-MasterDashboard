@@ -56,6 +56,8 @@ const IcoCalc = ({ size = 14 }) => (
   </svg>
 )
 const GOLD_GRAD = `linear-gradient(135deg,${GOLD_A},${GOLD_B})`
+// Appended only when absent, so this collapses to the untouched array once promo data carries Watsons.
+const CUSTOMERS = PROMO_RETAILERS.includes('Watsons') ? PROMO_RETAILERS : [...PROMO_RETAILERS, 'Watsons']
 const TODAY = new Date()
 const TODAY_ISO = `${TODAY.getFullYear()}-${String(TODAY.getMonth() + 1).padStart(2, '0')}-${String(TODAY.getDate()).padStart(2, '0')}`
 
@@ -149,7 +151,7 @@ function enrich(items, rawData) {
 
 // ── component ─────────────────────────────────────────────────────────────────
 export default function PromoSection({ rawData, t, dark, isMobile, onSelect, RetailerLogo, MonogramTile, BrandCategoryFilter }) {
-  const [retailer, setRetailer] = useState(PROMO_RETAILERS[0] || '')
+  const [retailer, setRetailer] = useState(CUSTOMERS[0] || '')
   const [brandFilter, setBrandFilter] = useState([])
   const [layout, setLayout] = useState('timeline')
   const [tlView, setTlView] = useState('pulse')
@@ -161,6 +163,8 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
   const [openKey, setOpenKey] = useState(null)
   const [calcOpen, setCalcOpen] = useState(false)
   const canSeeGP = unlocked && canSeeRetailer(unlocked, retailer)
+  // Watsons has no generated promo data yet — show the placeholder until it does
+  const comingSoon = retailer === 'Watsons' && !PROMO_RETAILERS.includes('Watsons')
 
   // ── derived data ────────────────────────────────────────────────────────────
   const periods = useMemo(() => {
@@ -910,7 +914,7 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
       {/* customer select */}
       <div className="ps-pills">
         <span className="ps-label" style={{ color: mu }}>Customer</span>
-        {PROMO_RETAILERS.map(r => (
+        {CUSTOMERS.map(r => (
           <button key={r} onClick={() => { setRetailer(r); setBrandFilter([]) }} title={r}
             className={`ps-glow${retailer === r ? ' ps-glow-on' : ''}`} style={{
             '--g': GOLD_A,
@@ -931,7 +935,7 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
       </div>
 
       {/* brand filter — shared category navigator (passed from App.jsx) */}
-      {brandList.length > 0 && BrandCategoryFilter && (
+      {!comingSoon && brandList.length > 0 && BrandCategoryFilter && (
         <div style={{ marginBottom: 12 }}>
           <BrandCategoryFilter idPrefix="ps-promo" brandList={brandList}
             selectedBrands={brandFilter} onToggle={toggleBrand} onClear={() => setBrandFilter([])}
@@ -940,6 +944,7 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
       )}
 
       {/* toolbar: layout toggle + sub-toggle + activity legend + tools */}
+      {!comingSoon && (
       <div className="ps-toolbar">
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 8 }}>
           {/* main view toggle */}
@@ -1018,8 +1023,19 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
           )}
         </div>
       </div>
+      )}
 
       {/* main card */}
+      {comingSoon ? (
+        <div style={{
+          background: dark ? 'rgba(22,27,34,.6)' : 'rgba(251,248,243,.66)',
+          backdropFilter: 'blur(16px) saturate(1.45)', WebkitBackdropFilter: 'blur(16px) saturate(1.45)',
+          border: `1px solid ${dark ? bdr : 'rgba(255,255,255,.65)'}`,
+          borderRadius: 12, overflow: 'hidden',
+          boxShadow: dark ? '0 8px 28px rgba(0,0,0,.35)' : '0 8px 28px rgba(82,62,40,.10), inset 0 1px 0 rgba(255,255,255,.7)' }}>
+          <div style={{ padding: isMobile ? '56px 0' : '80px 0', textAlign: 'center', color: mu, fontSize: 15, fontWeight: 600 }}>Coming soon</div>
+        </div>
+      ) : (
       <div style={{
         background: dark ? 'rgba(22,27,34,.6)' : 'rgba(251,248,243,.66)',
         backdropFilter: 'blur(16px) saturate(1.45)', WebkitBackdropFilter: 'blur(16px) saturate(1.45)',
@@ -1048,6 +1064,7 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
           : Spotlight()
         }
       </div>
+      )}
 
       {/* Bar hover popup — fixed overlay, follows mouse */}
       {barTip && (
