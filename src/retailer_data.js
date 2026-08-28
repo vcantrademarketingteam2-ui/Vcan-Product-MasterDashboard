@@ -5484,6 +5484,55 @@ const RETAILER_DATA = {
       "costUnit": 672.224,
       "gp": 0.28
     }
+  },
+  "9358131001665": {
+    "Watsons": {
+      "costUnit": 318.93,
+      "costCase": 1913.58,
+      "gp": 0.35
+    }
+  },
+  "9358131001672": {
+    "Watsons": {
+      "costUnit": 318.93,
+      "costCase": 1913.58,
+      "gp": 0.35
+    }
+  },
+  "9369998231256": {
+    "Watsons": {
+      "costUnit": 318.93,
+      "costCase": 1913.58,
+      "gp": 0.35
+    }
+  },
+  "9358131000064": {
+    "Watsons": {
+      "costUnit": 318.93,
+      "costCase": 1913.58,
+      "gp": 0.35
+    }
+  },
+  "9358131001832": {
+    "Watsons": {
+      "costUnit": 258.4117,
+      "costCase": 3100.94,
+      "gp": 0.3
+    }
+  },
+  "9358131001849": {
+    "Watsons": {
+      "costUnit": 258.4117,
+      "costCase": 3100.94,
+      "gp": 0.3
+    }
+  },
+  "9358131001856": {
+    "Watsons": {
+      "costUnit": 258.4117,
+      "costCase": 3100.94,
+      "gp": 0.3
+    }
   }
 }
 export default RETAILER_DATA

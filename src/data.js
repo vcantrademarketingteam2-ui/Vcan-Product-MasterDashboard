@@ -1677,7 +1677,8 @@ const PRODUCT_DATA = [
       "Foodland": "",
       "Central Department": "",
       "Pet'n me": "",
-      "Fuji": ""
+      "Fuji": "",
+      "Watsons": "A"
     }
   },
   {
@@ -1700,7 +1701,8 @@ const PRODUCT_DATA = [
       "Foodland": "",
       "Central Department": "",
       "Pet'n me": "",
-      "Fuji": ""
+      "Fuji": "",
+      "Watsons": "A"
     }
   },
   {
@@ -1723,7 +1725,8 @@ const PRODUCT_DATA = [
       "Foodland": "",
       "Central Department": "",
       "Pet'n me": "",
-      "Fuji": ""
+      "Fuji": "",
+      "Watsons": "A"
     }
   },
   {
@@ -1746,7 +1749,8 @@ const PRODUCT_DATA = [
       "Foodland": "",
       "Central Department": "",
       "Pet'n me": "",
-      "Fuji": ""
+      "Fuji": "",
+      "Watsons": "A"
     }
   },
   {
@@ -1838,7 +1842,8 @@ const PRODUCT_DATA = [
       "Foodland": "",
       "Central Department": "",
       "Pet'n me": "",
-      "Fuji": ""
+      "Fuji": "",
+      "Watsons": "A"
     }
   },
   {
@@ -1861,7 +1866,8 @@ const PRODUCT_DATA = [
       "Foodland": "",
       "Central Department": "",
       "Pet'n me": "",
-      "Fuji": ""
+      "Fuji": "",
+      "Watsons": "A"
     }
   },
   {
@@ -1884,7 +1890,8 @@ const PRODUCT_DATA = [
       "Foodland": "",
       "Central Department": "",
       "Pet'n me": "",
-      "Fuji": ""
+      "Fuji": "",
+      "Watsons": "A"
     }
   },
   {

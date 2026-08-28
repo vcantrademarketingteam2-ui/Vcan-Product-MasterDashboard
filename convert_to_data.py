@@ -21,7 +21,7 @@ BRAND_FALLBACK = {
 
 RETAILERS = [
     'Tops', 'Villa', 'The Mall', 'Lotus', 'Homepro', 'Big C',
-    'TWD', 'Boots', 'Foodland', 'Central Department', "Pet'n me", 'Fuji'
+    'TWD', 'Boots', 'Foodland', 'Central Department', "Pet'n me", 'Fuji', 'Watsons'
 ]
 
 # sheet tab name -> dashboard retailer name
@@ -38,6 +38,7 @@ SHEET_MAP = {
     'Boots'       : 'Boots',
     'central WMF' : 'Central Department',
     "Pet'n me"    : "Pet'n me",
+    'Watsons'     : 'Watsons',
 }
 
 # Some retailers carry WMF through a dedicated sheet that the MASTER coverage grid

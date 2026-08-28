@@ -295,7 +295,7 @@ function CountUp({ v, dec = 0 }) {
   return dec ? n.toFixed(dec) : Math.round(n).toLocaleString()
 }
 
-const RETAILERS = ['Tops', 'Villa', 'The Mall', 'Lotus', 'Homepro', 'Big C', 'TWD', 'Boots', 'Foodland', 'Central Department', "Pet'n me", 'Fuji']
+const RETAILERS = ['Tops', 'Villa', 'The Mall', 'Lotus', 'Homepro', 'Big C', 'TWD', 'Boots', 'Foodland', 'Central Department', "Pet'n me", 'Fuji', 'Watsons']
 
 const fmtTs = (d) => {
   const dt = new Date(d)
@@ -305,7 +305,7 @@ const fmtTs = (d) => {
 const RETAILER_SHORT = {
   'Tops': 'TOPS', 'Villa': 'VILLA', 'The Mall': 'THE MALL', 'Lotus': 'LOTUS',
   'Homepro': 'HOMEPRO', 'Big C': 'BIG C', 'TWD': 'TWD', 'Boots': 'BOOTS',
-  'Foodland': 'FOODLAND', 'Central Department': 'CENTRAL', "Pet'n me": "PET'N ME", 'Fuji': 'FUJI'
+  'Foodland': 'FOODLAND', 'Central Department': 'CENTRAL', "Pet'n me": "PET'N ME", 'Fuji': 'FUJI', 'Watsons': 'WATSONS'
 }
 // Drop logo files into public/retailers/ with these exact names to replace the text labels.
 const RETAILER_LOGOS = {
@@ -321,6 +321,7 @@ const RETAILER_LOGOS = {
   'Central Department': '/retailers/central.jpg',
   "Pet'n me": '/retailers/petnme.png',
   'Fuji': '/retailers/fuji.png',
+  'Watsons': '/retailers/Watsons.png',
 }
 // Tops/Villa/Lotus/Homepro/BigC/TWD/Boots/Central/Pet'n me ship as solid brand-color
 // tiles (no alpha) — render bare, no wrapper background, or a second white box doubles
@@ -341,6 +342,7 @@ const RETAILER_GLOW = {
   'Tops': '#ff3c1c', 'Villa': '#3aa0ff', 'The Mall': '#ed1c24', 'Lotus': '#00beb5',
   'Homepro': '#1867b2', 'Big C': '#a0c515', 'TWD': '#9b1c20', 'Boots': '#05054b',
   'Foodland': '#ec2029', 'Central Department': '#e23b3b', "Pet'n me": '#ffc502', 'Fuji': '#e4151b',
+  'Watsons': '#00a04a',
 }
 
 // Activity badge colors for Promotion Plan — defined here (not imported) so colors are
@@ -1591,7 +1593,7 @@ export default function App() {
             <div style={{ fontWeight: 800, fontSize: isMobile ? 14 : 17, color: t.text, letterSpacing: 0.2, whiteSpace: 'nowrap', flexShrink: 0 }}>
               Product Master
             </div>
-            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v3.11.3</span>
+            <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v3.12.0</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: isMobile ? 11 : 13, background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, padding: isMobile ? '3px 8px' : '5px 12px', overflow: 'hidden', minWidth: 0, flexShrink: 1 }}>
               <span style={{ width: isMobile ? 6 : 7, height: isMobile ? 6 : 7, borderRadius: '50%', flexShrink: 0, background: dataSource === 'csv' ? t.blue : t.green }} />
               <span style={{ fontWeight: 800, color: dataSource === 'csv' ? t.blue : t.green, flexShrink: 0 }}>

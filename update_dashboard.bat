@@ -5,7 +5,7 @@ echo   VCAN Dashboard - Full Update
 echo ============================================
 echo.
 
-echo [1/5] Converting Excel to data.js...
+echo [1/5] Converting Excel to product + retailer data.js...
 py convert_to_data.py
 if errorlevel 1 (
     echo FAILED - check convert_to_data.py
@@ -36,6 +36,8 @@ echo.
 echo [5/5] Pushing to GitHub...
 git add src/data.js src/retailer_data.js src/promo_data.js
 git add public/packshots/*.webp
+git add public/retailers
+git add public/notification_schedule.json
 git add -u
 git status
 echo.

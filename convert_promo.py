@@ -274,6 +274,12 @@ CONFIG = {
         # A=Barcode, B=Item Code, C=Product, D=Pack, E=Cost, F=RSP, G=GP%, H+=periods
         'cols': {'barcode': 1, 'product': 3, 'pack': 4, 'cost': 5, 'rsp': 6, 'gp': 7, 'period_start': 8},
     },
+    'Watsons': {
+        'file': 'Watsons - Activity Promotion 2026.xlsx',
+        'sheets': ['VCAN(SUNDAE)'],
+        'header_row': 8,
+        'cols': {'barcode': 1, 'product': 2, 'pack': 3, 'cost': 4, 'rsp': 5, 'gp': 6, 'period_start': 7},
+    },
     # Central: add path when available
     # 'Central Department': {
     #     'file': 'Central - Activity Promotion 2026.xlsx',
