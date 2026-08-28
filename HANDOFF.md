@@ -151,3 +151,12 @@ There was no root `HANDOFF.md` before this update, and `.agents/AGENTS.md` is al
 - Generated artifacts: none.
 - Compatibility behavior: unchanged.
 - Verification: confirmed current version/commit/status and recorded the successful build, JavaScript tests, Python test, and existing lint failures from the audit above.
+
+## 2026-08-28 — Handoff update
+
+- Hermes/Crew had already committed `v3.13.0` locally on `main` (`7c55734` feat: Watsons promo coming soon, `34b1496` chore: crop Watsons logo) but hit its token limit before requesting the push/deploy approval gate.
+- The human gave direct, explicit approval in a live Claude Code session ("push and deploy to cloudflare") to push those already-committed, already-verified commits. Claude Code pushed `origin/main` `e6e967e..34b1496` under that direct approval — this bypassed the Hermes/Crew launcher route entirely; it was not a Crew-dispatched task.
+- Deployment: Cloudflare Pages/Workers auto-builds `dist/` on push to `main` (per `CLAUDE.md`); this session did not separately verify the live production URL after the push.
+- Governance-only edit: `.hermes.md` Human Approval Gates section — merged the two separate "Pushing to `main`..." and "Deploying." bullets into one bullet, since pushing to `main` already is the deploy trigger for this repo. No other section of `.hermes.md` was changed. Backed up to `backups/20260828_165500_hermes_gate_trim/` before editing.
+- Source changes: `HANDOFF.md` and `.hermes.md` only; no application code, `package.json` version, or generated data changed this session.
+- Reconciliation note for the next Hermes session: if Obsidian `Current State.md` still shows work stuck at "merged, not pushed," trust Git (`origin/main` at `34b1496`) and this entry over that stale note, per `.hermes.md`'s own reconciliation rule.
