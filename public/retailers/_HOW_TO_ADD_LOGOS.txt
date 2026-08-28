@@ -15,6 +15,7 @@ the dashboard shows the text label instead — nothing breaks.
   central.png      -> Central
   petnme.png       -> Pet'n me
   fuji.png         -> UFM Fuji Super
+  Watsons.png      -> Watsons
 
 Recommended: square-ish or wordmark logos, ~200px tall, trimmed of extra whitespace.
 After adding files, just refresh the page (no rebuild needed in dev).
