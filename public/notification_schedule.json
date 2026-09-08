@@ -251,87 +251,17 @@
     "period": "May",
     "startDate": "2026-05-01",
     "activities": [
+      "field",
       "media"
     ],
     "brands": [
       "Brilly",
       "General Fresh",
       "L'Arbre Vert",
+      "Purex",
       "Vnew"
     ],
     "title": "Homepro May"
-  },
-  {
-    "retailer": "Homepro",
-    "period": "Jun",
-    "startDate": "2026-06-01",
-    "activities": [
-      "field"
-    ],
-    "brands": [
-      "Tempo"
-    ],
-    "title": "Homepro Jun"
-  },
-  {
-    "retailer": "Homepro",
-    "period": "Jul",
-    "startDate": "2026-07-01",
-    "activities": [
-      "field"
-    ],
-    "brands": [
-      "Tempo"
-    ],
-    "title": "Homepro Jul"
-  },
-  {
-    "retailer": "Homepro",
-    "period": "Aug",
-    "startDate": "2026-08-01",
-    "activities": [
-      "field"
-    ],
-    "brands": [
-      "Tempo"
-    ],
-    "title": "Homepro Aug"
-  },
-  {
-    "retailer": "Homepro",
-    "period": "Sep",
-    "startDate": "2026-09-01",
-    "activities": [
-      "field"
-    ],
-    "brands": [
-      "Tempo"
-    ],
-    "title": "Homepro Sep"
-  },
-  {
-    "retailer": "Homepro",
-    "period": "Oct",
-    "startDate": "2026-10-01",
-    "activities": [
-      "field"
-    ],
-    "brands": [
-      "Tempo"
-    ],
-    "title": "Homepro Oct"
-  },
-  {
-    "retailer": "Homepro",
-    "period": "Nov",
-    "startDate": "2026-11-01",
-    "activities": [
-      "field"
-    ],
-    "brands": [
-      "Tempo"
-    ],
-    "title": "Homepro Nov"
   },
   {
     "retailer": "Lotus",

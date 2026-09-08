@@ -140,6 +140,11 @@ const RETAILER_DATA = {
       "costUnit": 201.2617,
       "costCase": 2415.1402,
       "gp": 0.27
+    },
+    "Homepro": {
+      "costUnit": 220.5607,
+      "costCase": 2646.729,
+      "gp": 0.2
     }
   },
   "024200060572": {
@@ -309,14 +314,50 @@ const RETAILER_DATA = {
       "gp": 0.21
     },
     "Homepro": {
-      "costUnit": 400.0,
-      "costCase": 2400.0,
+      "costUnit": 370.0935,
+      "costCase": 2220.5607,
       "gp": 0.2
     },
     "Foodland": {
       "costUnit": 342.3364,
       "costCase": 2054.0187,
       "gp": 0.26
+    }
+  },
+  "8857130119278": {
+    "Tops": {
+      "costUnit": 136.6822,
+      "costCase": 1093.4579,
+      "gp": 0.25
+    },
+    "Homepro": {
+      "costUnit": 145.7944,
+      "costCase": 1166.3551,
+      "gp": 0.2
+    }
+  },
+  "8857130119162": {
+    "Tops": {
+      "costUnit": 136.6822,
+      "costCase": 1093.4579,
+      "gp": 0.25
+    },
+    "Homepro": {
+      "costUnit": 145.7944,
+      "costCase": 1166.3551,
+      "gp": 0.2
+    }
+  },
+  "8857130119384": {
+    "Tops": {
+      "costUnit": 136.6822,
+      "costCase": 1093.4579,
+      "gp": 0.25
+    },
+    "Homepro": {
+      "costUnit": 145.7944,
+      "costCase": 1166.3551,
+      "gp": 0.2
     }
   },
   "3450601046315": {
