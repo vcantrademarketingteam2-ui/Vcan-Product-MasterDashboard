@@ -1,8 +1,48 @@
 # V-Can Dashboard Handoff for Claude
 
-Last updated: 2026-08-11 (Asia/Bangkok)
+Last reconciled: 2026-09-08 (Asia/Bangkok)
 
-## Current Authoritative Control State — 2026-08-11
+## Current Verified State — 2026-09-08 (update pipeline hardening)
+
+- Repository: `D:\Project Vcan Dashboard\vcan-dashboard`; branch: `main`.
+- Local HEAD and fetched `origin/main`: `26ed56918c1c6d074acf54487526728d586af7c5`
+  (`git fetch origin` performed; ahead 0 / behind 0).
+- Local application version: `3.13.2` in `package.json`, `package-lock.json` (both
+  version fields) and the `src/App.jsx` header badge. Watsons Promotion Plan keeps the
+  `Coming soon` placeholder in `src/PromoSection.jsx`.
+- Commits added and pushed during this session, on top of `10842a3`:
+  - `3666361` fix: harden dashboard update pipeline (v3.13.1)
+  - `657544a` data: update product master, promo plan and packshots
+  - `26ed569` fix: autostash before rebase in update_dashboard.bat (v3.13.2)
+- `update_dashboard.bat` and `copy_packshots.ps1` were rewritten. The pipeline previously
+  reached "Done!" without pushing: the Python steps blocked on `input("กด Enter...")`,
+  step 3 (PowerShell) was the only step with no `errorlevel` check, and `git add -u`
+  plus a fall-through after a failed `git commit` made the git tail unreliable. The
+  packshot matcher also silently dropped three real product shots. Details are in the
+  `v3.13.1` / `v3.13.2` rows of `CLAUDE.md`.
+- `--autostash` on `git pull --rebase` was added in `v3.13.2` after the v3.13.1 pipeline
+  failed on its first real run with `error: cannot pull with rebase: You have unstaged
+  changes.` Verified in a scratch repository against a genuinely divergent remote.
+- Generated data regenerated from the Y: drive sources and committed. `GENERATED_AT` had
+  been stale at `2026-08-24`. Current content: 366 barcodes and 1003 retailer entries,
+  287 promo records across 7 retailers, 26 notification schedule entries, plus 3 recovered
+  packshots. Foodland and Watsons still parse to zero promo products, which remains the
+  known upstream gap in the promo Excels recorded under `v3.4.1` in `CLAUDE.md`.
+- Verification performed this session: `npm run build` green (`built in 2.99s`) before the
+  final commit; `convert_to_data.py` and `convert_promo.py` run to completion; the
+  packshot copier re-run and its skip list reviewed; the batch file smoke-tested with
+  mutating steps stubbed, covering the success path, the preflight-failure path (exit 1)
+  and the "nothing changed" no-op path (exit 0).
+- Not verified: `npm run lint`, browser checks, and live Cloudflare deployment. The push
+  triggers a Cloudflare build; its outcome was not observed.
+- Untracked files removed this session: `({ok`, `({tag` and `log`, all 0 bytes. Untracked
+  work deliberately left in place and still outside version control: `public/assets/`
+  (transparent retailer logos, the held neon-logo WIP), `AI's Office/Codex's work/`, and
+  `docs/superpowers/specs/2026-07-13-retailer-glow-codex-brief.md`.
+- Current workflow authority remains `.hermes.md` followed by `MISSION.md` and `CLAUDE.md`.
+  The dated control snapshot below is historical, not current release or task status.
+
+## Historical Control Snapshot — 2026-08-11
 
 This section records current control-plane state under `.hermes.md`. `MISSION.md` defines the
 controlled execution workflow, and `CLAUDE.md` defines implementation-specific repository rules.
