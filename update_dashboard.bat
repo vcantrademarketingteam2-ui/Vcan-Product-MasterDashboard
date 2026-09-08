@@ -123,7 +123,7 @@ if errorlevel 1 (
 
 echo.
 echo   Syncing with origin/main before push ...
-git pull --rebase origin main
+git pull --rebase --autostash origin main
 if errorlevel 1 (
     echo.
     echo   [X] Rebase onto origin/main hit a conflict.
@@ -136,7 +136,7 @@ if errorlevel 1 (
 
 git push origin main
 if errorlevel 1 (
-    echo   [X] Push rejected. Run "git pull --rebase origin main" and try again.
+    echo   [X] Push rejected. Run "git pull --rebase --autostash origin main" and try again.
     goto fail
 )
 
