@@ -2093,6 +2093,78 @@ const RETAILER_DATA = {
       "gp": 0.28
     }
   },
+  "070881431774": {
+    "Tops": {
+      "costUnit": 84.1121,
+      "costCase": 1009.3458,
+      "gp": 0.28
+    },
+    "Homepro": {
+      "costUnit": 88.785,
+      "costCase": 1065.4206,
+      "gp": 0.24
+    }
+  },
+  "070881431118": {
+    "Tops": {
+      "costUnit": 84.1121,
+      "costCase": 1009.3458,
+      "gp": 0.28
+    },
+    "Homepro": {
+      "costUnit": 88.785,
+      "costCase": 1065.4206,
+      "gp": 0.24
+    }
+  },
+  "070881431224": {
+    "Tops": {
+      "costUnit": 84.1121,
+      "costCase": 1009.3458,
+      "gp": 0.28
+    },
+    "Homepro": {
+      "costUnit": 88.785,
+      "costCase": 1065.4206,
+      "gp": 0.24
+    }
+  },
+  "070881431446": {
+    "Tops": {
+      "costUnit": 84.1121,
+      "costCase": 1009.3458,
+      "gp": 0.28
+    },
+    "Homepro": {
+      "costUnit": 88.785,
+      "costCase": 1065.4206,
+      "gp": 0.24
+    }
+  },
+  "070881431330": {
+    "Tops": {
+      "costUnit": 84.1121,
+      "costCase": 1009.3458,
+      "gp": 0.28
+    },
+    "Homepro": {
+      "costUnit": 88.785,
+      "costCase": 1065.4206,
+      "gp": 0.24
+    }
+  },
+  "070881631334": {
+    "Tops": {
+      "costUnit": 84.1121,
+      "costCase": 1009.3458,
+      "gp": 0.28
+    },
+    "Homepro": {
+      "costUnit": 88.785,
+      "costCase": 1065.4206,
+      "gp": 0.24
+    }
+  },
   "4008239288158": {
     "Tops": {
       "costUnit": 74.1,
@@ -4763,6 +4835,20 @@ const RETAILER_DATA = {
       "costUnit": 121.8224,
       "costCase": 1461.8692,
       "gp": 0.21
+    }
+  },
+  "070881431354": {
+    "Homepro": {
+      "costUnit": 88.785,
+      "costCase": 1065.4206,
+      "gp": 0.24
+    }
+  },
+  "070881431750": {
+    "Homepro": {
+      "costUnit": 88.785,
+      "costCase": 1065.4206,
+      "gp": 0.24
     }
   },
   "4008239393166": {
