@@ -30,7 +30,7 @@ const BRAND_CAT_RULES = [
   ['Kitchen Ware',  [/\bwmf\b/i]],
   ['Intimate',      [/malizia\s*intimate/i, /tena/i]],
   ['Laundry',       [/perwoll/i, /purex/i, /vernel/i, /vnew/i, /^l['’]?arbre vert\s*$/i]],
-  ['Homecare',      [/sofix/i, /somat/i, /pril/i, /combat/i, /general\s*fresh/i, /brilly/i, /tempo/i]],
+  ['Homecare',      [/sofix/i, /somat/i, /pril/i, /combat/i, /general\s*fresh/i, /brilly/i, /tempo/i, /renuzit/i]],
   ['Personal Care', [/dove/i, /dial/i, /pears/i, /pepsodent/i, /jack/i, /malizia/i, /l['’]?arbre/i, /sundae/i]],
 ]
 function brandCategory(b) {
