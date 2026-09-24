@@ -6,6 +6,7 @@ Reads from Y:\\MARKETING\\Promotion Plan ทุกห้าง\\2026\\
 Writes to src/promo_data.js
 """
 import json
+import argparse
 import re
 from datetime import datetime
 from pathlib import Path
@@ -205,6 +206,41 @@ def build_notification_schedule(promo_meta, all_products, barcode_brand):
                 'title': f"{retailer} {p['name']}",
             })
     return sched
+
+
+def load_existing_promo_data(path=OUT):
+    """Load the generated exports needed for a retailer-scoped refresh."""
+    text = path.read_text(encoding='utf-8')
+
+    def extract(pattern, label):
+        match = re.search(pattern, text, re.DOTALL)
+        if not match:
+            raise ValueError(f'Could not find {label} in {path}')
+        return json.loads(match.group(1))
+
+    retailers = extract(r'export const PROMO_RETAILERS = (\[.*?\]);', 'PROMO_RETAILERS')
+    meta = extract(r'export const PROMO_META = (\{.*?\});\n\nconst promoData', 'PROMO_META')
+    products = extract(r'const promoData = (\[.*?\]);\n\nexport default', 'promoData')
+    return products, meta, retailers
+
+
+def merge_retailer_refresh(existing_products, existing_meta, existing_retailers,
+                           retailer, refreshed_products, refreshed_periods):
+    """Replace one retailer while preserving every other generated value."""
+    products = [p for p in existing_products if p.get('retailer') != retailer]
+    products.extend(refreshed_products)
+
+    meta = {name: value for name, value in existing_meta.items() if name != retailer}
+    meta[retailer] = {
+        'periods': [
+            {'name': p['name'], 'dateRange': p.get('dateRange', '')}
+            for p in refreshed_periods
+        ]
+    }
+
+    retailers = [name for name in existing_retailers if name != retailer]
+    retailers.append(retailer)
+    return products, meta, retailers
 
 
 # Per-retailer config: file name, sheets, and which row the header is on (1-indexed)
@@ -605,7 +641,7 @@ def parse_sheet(ws, cfg, retailer, non_vat=frozenset()):
     return products, periods
 
 
-def main():
+def main(retailer_filter=None):
     all_products = []
     promo_meta = {}
     promo_retailers = []
@@ -614,7 +650,10 @@ def main():
     print(f'  Non-VAT barcodes loaded: {len(non_vat_barcodes)}')
     assert non_vat_barcodes, 'No non-VAT barcodes found — data.js missing/changed? (Vitakraft lookup failed)'
 
-    for retailer, cfg in CONFIG.items():
+    configs = ((retailer_filter, CONFIG[retailer_filter]),) if retailer_filter else CONFIG.items()
+    refreshed_products = []
+    refreshed_periods = []
+    for retailer, cfg in configs:
         fpath = BASE_DIR / cfg['file']
         if not fpath.exists():
             print(f'  (!)  Skipping {retailer}: not found at {fpath}')
@@ -663,9 +702,26 @@ def main():
             all_products.extend(retailer_products)
             promo_meta[retailer] = {'periods': retailer_periods}
             promo_retailers.append(retailer)
+            if retailer_filter:
+                refreshed_products = retailer_products
+                refreshed_periods = retailer_periods
             print(f'    OK {len(retailer_products)} products, {len(retailer_periods)} periods')
         else:
             print(f'    (!)  No promo products found (check header_row in CONFIG)')
+
+    if retailer_filter:
+        if not OUT.exists():
+            raise FileNotFoundError(f'Cannot selectively refresh {retailer_filter}: {OUT} is missing')
+        if retailer_filter == 'Watsons' and (len(refreshed_products) != 7 or len(refreshed_periods) != 25):
+            raise RuntimeError(
+                f'Watsons source shape changed: expected 7 products and 25 periods, '
+                f'got {len(refreshed_products)} products and {len(refreshed_periods)} periods'
+            )
+        existing_products, existing_meta, existing_retailers = load_existing_promo_data()
+        all_products, promo_meta, promo_retailers = merge_retailer_refresh(
+            existing_products, existing_meta, existing_retailers,
+            retailer_filter, refreshed_products, refreshed_periods,
+        )
 
     # Write promo_data.js
     now = datetime.now().isoformat()
@@ -693,16 +749,23 @@ def main():
     OUT.write_text('\n'.join(js_lines), encoding='utf-8')
     print(f'\nDone -- {len(all_products)} records across {len(promo_retailers)} retailers -> {OUT}')
 
-    # Notification schedule for the promo-alerts Cron Worker + in-app bell
-    barcode_brand = load_barcode_brands()
-    schedule = build_notification_schedule(promo_meta, all_products, barcode_brand)
-    sched_path = Path('public/notification_schedule.json')
-    sched_path.write_text(json.dumps(schedule, ensure_ascii=False, indent=2), encoding='utf-8')
-    print(f'   Notification schedule -> {sched_path} ({len(schedule)} entries)')
+    # Notification schedule for the promo-alerts Cron Worker + in-app bell.
+    # A retailer-scoped refresh deliberately leaves alerts untouched.
+    if retailer_filter:
+        print('   Notification schedule unchanged (retailer-scoped refresh)')
+    else:
+        barcode_brand = load_barcode_brands()
+        schedule = build_notification_schedule(promo_meta, all_products, barcode_brand)
+        sched_path = Path('public/notification_schedule.json')
+        sched_path.write_text(json.dumps(schedule, ensure_ascii=False, indent=2), encoding='utf-8')
+        print(f'   Notification schedule -> {sched_path} ({len(schedule)} entries)')
 
     if not all_products:
         print('   Tip: If all retailers were skipped, check BASE_DIR path and CONFIG header_row values.')
 
 
 if __name__ == '__main__':
-    main()
+    parser = argparse.ArgumentParser(description='Convert promotion plan workbooks to promo_data.js')
+    parser.add_argument('--retailer', choices=sorted(CONFIG), help='Refresh only this retailer and preserve all others')
+    args = parser.parse_args()
+    main(args.retailer)

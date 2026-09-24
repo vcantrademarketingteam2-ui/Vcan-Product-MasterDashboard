@@ -64,20 +64,30 @@ const TODAY_ISO = `${TODAY.getFullYear()}-${String(TODAY.getMonth() + 1).padStar
 // ── date helpers ──────────────────────────────────────────────────────────────
 function parseDR(dr = '') {
   const s0 = (dr || '').trim()
+  const yearOf = n => {
+    const y = parseInt(n)
+    return y < 50 ? 2000 + y : y < 100 ? 1900 + y : y
+  }
+  // Explicit start and end years: "22/10/26 - 18/11/26" (Watsons).
+  const full = s0.match(/^(\d+)\/(\d+)\/(\d{2,4})\s*[–-]\s*(\d+)\/(\d+)\/(\d{2,4})$/)
+  if (full) {
+    const s = new Date(yearOf(full[3]), parseInt(full[2]) - 1, parseInt(full[1]))
+    const e = new Date(yearOf(full[6]), parseInt(full[5]) - 1, parseInt(full[4]), 23, 59, 59, 999)
+    return { s, e }
+  }
   // Villa format: "25.06.26 - 22.07.26" (dots, both sides carry year, spaces around dash).
   // Without this branch every Villa period fails to parse and falls back to inferPeriodDate,
   // which maps "Monthly7"→July and wrongly marks it NOW when today sits in Monthly6's range.
   const md = s0.match(/^(\d+)\.(\d+)\.(\d+)\s*[–-]\s*(\d+)\.(\d+)\.(\d+)$/)
   if (md) {
-    const yr = n => (parseInt(n) < 50 ? 2000 : 1900) + parseInt(n)
-    const s = new Date(yr(md[3]), parseInt(md[2]) - 1, parseInt(md[1]))
-    const e = new Date(yr(md[6]), parseInt(md[5]) - 1, parseInt(md[4]), 23, 59, 59, 999)
+    const s = new Date(yearOf(md[3]), parseInt(md[2]) - 1, parseInt(md[1]))
+    const e = new Date(yearOf(md[6]), parseInt(md[5]) - 1, parseInt(md[4]), 23, 59, 59, 999)
     return { s, e }
   }
   // "27/05-9/06/26"  or  "7/01-20/01/26"
   const m = s0.match(/^(\d+)\/(\d+)[–-](\d+)\/(\d+)(?:\/(\d+))?$/)
   if (!m) return null
-  const yr = m[5] ? (parseInt(m[5]) < 50 ? 2000 + parseInt(m[5]) : 1900 + parseInt(m[5])) : TODAY.getFullYear()
+  const yr = m[5] ? yearOf(m[5]) : TODAY.getFullYear()
   const s = new Date(yr, parseInt(m[2]) - 1, parseInt(m[1]))
   let e = new Date(yr, parseInt(m[4]) - 1, parseInt(m[3]), 23, 59, 59, 999)
   if (e < s) e.setFullYear(e.getFullYear() + 1)
