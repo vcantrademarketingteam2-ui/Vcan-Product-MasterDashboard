@@ -8,17 +8,18 @@ files remain authoritative for repository and implementation facts.
 ## Roles
 
 - Hermes plans, routes, synthesizes, verifies, controls gates, and reports. OpenAI Codex is its reasoning driver.
-- Luna is a read-only requirements, product-intent, user-flow, UX, and acceptance-criteria analyst.
-- Terra is a read-only architecture, data-flow, affected-path, implementation-sequence, and rollback analyst.
-- Sol is a read-only risk, test, edge-case, and adversarial-review analyst.
+- Crew Implementer writes the approved work inside the assigned Crew worktree and approved paths. Claude Code / Sonnet is the default/primary Implementer; the GPT team's Luna (Terra for bigger scope) is an alternate Implementer pick, dispatched via `Invoke-GptFreshTask.ps1`, requiring the same fresh Human approval as any Crew dispatch.
+- Crew Brainstormer reviews the candidate against the approved brief. Claude Opus is the default/primary Brainstormer; the GPT team's Sol reviews when the GPT team implemented.
+- When not dispatched as Implementer/Brainstormer for a task, Luna, Terra, and Sol remain read-only requirements/architecture/risk analysts as below.
 - Opus is an optional highest-tier advisor when available. It may advise or review but never orchestrates or implements.
 - Crew creates and controls task branches and isolated task worktrees, dispatches the approved worker, enforces allowed paths, runs verification, and returns evidence.
-- Claude Code / Sonnet is the sole implementation worker and may work only inside the assigned Crew worktree and approved paths.
 - n8n may trigger approved workflows but may not bypass Hermes, Crew, capability restrictions, or human approval gates.
 - Obsidian stores project state, decisions, tasks, and evidence, but never secrets, credentials, tokens, OAuth material, or PINs.
 
-Luna, Terra, Sol, and Opus remain read-only. Delegation is flat; no delegated child may create
-another child. Run only one heavy worker process at a time on this 16 GB machine.
+Outside an approved Implementer/Brainstormer dispatch, Luna, Terra, and Sol remain read-only:
+requirements/product-intent/UX analysis (Luna), architecture/data-flow/sequencing analysis (Terra),
+risk/test/edge-case analysis (Sol). Delegation is flat; no delegated child may create another
+child. Run only one heavy worker process at a time on this 16 GB machine.
 
 ## Planning and Advisory Phase
 
