@@ -79,6 +79,7 @@ const BRAND_LOGOS = {
   'Sofix': '/brands/sofix.png',
   'Somat': '/brands/somat.png',
   'Sundae Bath Foam': '/brands/sundae.png',
+  'Sundae Mini': '/brands/sundae.png',
   'Tempo': '/brands/tempo.png',
   'Tena': '/brands/tena.png',
   'VITAKRAFT Bird': '/brands/vitakraft.png',
