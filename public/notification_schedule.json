@@ -116,6 +116,8 @@
     "period": "2641/42",
     "startDate": "2026-09-30",
     "activities": [
+      "field",
+      "looks",
       "media"
     ],
     "brands": [

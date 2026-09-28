@@ -809,11 +809,6 @@ const RETAILER_DATA = {
       "costCase": 1439.2523,
       "gp": 0.23
     },
-    "The Mall": {
-      "costUnit": 93.4579,
-      "costCase": 1495.3271,
-      "gp": 0.2
-    },
     "Homepro": {
       "costUnit": 87.6168,
       "costCase": 1401.8692,
@@ -836,11 +831,6 @@ const RETAILER_DATA = {
       "costCase": 1381.5421,
       "gp": 0.27
     },
-    "The Mall": {
-      "costUnit": 100.9346,
-      "costCase": 1514.0187,
-      "gp": 0.2
-    },
     "Homepro": {
       "costUnit": 94.6262,
       "costCase": 1419.3925,
@@ -862,11 +852,6 @@ const RETAILER_DATA = {
       "costUnit": 92.1028,
       "costCase": 1381.5421,
       "gp": 0.27
-    },
-    "The Mall": {
-      "costUnit": 100.9346,
-      "costCase": 1514.0187,
-      "gp": 0.2
     },
     "Homepro": {
       "costUnit": 94.6262,
@@ -894,11 +879,6 @@ const RETAILER_DATA = {
       "costUnit": 315.4206,
       "costCase": 1892.5234,
       "gp": 0.25
-    },
-    "The Mall": {
-      "costUnit": 336.4486,
-      "costCase": 2018.6916,
-      "gp": 0.2
     },
     "Homepro": {
       "costUnit": 315.4206,
@@ -928,9 +908,9 @@ const RETAILER_DATA = {
       "gp": 0.25
     },
     "The Mall": {
-      "costUnit": 220.5607,
-      "costCase": 3528.972,
-      "gp": 0.2
+      "costUnit": 217.8037,
+      "costCase": 3484.8598,
+      "gp": 0.21
     },
     "Homepro": {
       "costUnit": 206.7757,
@@ -953,6 +933,11 @@ const RETAILER_DATA = {
       "costUnit": 201.2617,
       "costCase": 2012.6168,
       "gp": 0.27
+    },
+    "The Mall": {
+      "costUnit": 217.8037,
+      "costCase": 2178.0374,
+      "gp": 0.21
     },
     "Homepro": {
       "costUnit": 206.7757,
@@ -1007,6 +992,11 @@ const RETAILER_DATA = {
       "costUnit": 115.6542,
       "costCase": 3469.6262,
       "gp": 0.25
+    },
+    "The Mall": {
+      "costUnit": 121.8224,
+      "costCase": 3654.6729,
+      "gp": 0.21
     },
     "Homepro": {
       "costUnit": 115.6542,
@@ -4702,28 +4692,6 @@ const RETAILER_DATA = {
       "gp": 0.35
     }
   },
-  "6901236388518": {
-    "The Mall": {
-      "costUnit": 220.5607,
-      "costCase": 3528.972,
-      "gp": 0.2
-    },
-    "Homepro": {
-      "costUnit": 206.7757,
-      "costCase": 3308.4112,
-      "gp": 0.25
-    },
-    "Big C": {
-      "costUnit": 192.9907,
-      "costCase": 3087.8505,
-      "gp": 0.3
-    },
-    "Foodland": {
-      "costUnit": 206.7757,
-      "costCase": 3308.4112,
-      "gp": 0.25
-    }
-  },
   "0011111014121": {
     "Lotus": {
       "costUnit": 209.5794,
@@ -4835,6 +4803,23 @@ const RETAILER_DATA = {
       "costUnit": 121.8224,
       "costCase": 1461.8692,
       "gp": 0.21
+    }
+  },
+  "6901236388518": {
+    "Homepro": {
+      "costUnit": 206.7757,
+      "costCase": 3308.4112,
+      "gp": 0.25
+    },
+    "Big C": {
+      "costUnit": 192.9907,
+      "costCase": 3087.8505,
+      "gp": 0.3
+    },
+    "Foodland": {
+      "costUnit": 206.7757,
+      "costCase": 3308.4112,
+      "gp": 0.25
     }
   },
   "070881431354": {
