@@ -34,11 +34,16 @@ Get-ChildItem $src -Recurse -File | Where-Object { $exts -contains $_.Extension.
     $ext  = $file.Extension.ToLower()
 
     # Barcode must lead the filename; anything after it may describe the shot.
-    if ($name -notmatch '^\s*(\d{8,})\b(.*)$') {
+    # Barcode digits may be split into groups by single spaces (e.g. "0 70881 43111 8").
+    if ($name -notmatch '^\s*((?:\d+ )*\d+)\b(.*)$') {
         $skippedNames.Add("$($file.Name)  (no leading barcode)"); return
     }
-    $barcode = $Matches[1]
+    $barcode = $Matches[1] -replace ' ',''
     $rest    = $Matches[2]
+
+    if ($barcode.Length -lt 8) {
+        $skippedNames.Add("$($file.Name)  (no leading barcode)"); return
+    }
 
     if ($rest -match $excludeRe) {
         $skippedNames.Add("$($file.Name)  (label / duplicate variant)"); return
