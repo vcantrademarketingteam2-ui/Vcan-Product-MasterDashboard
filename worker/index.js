@@ -1,6 +1,12 @@
 import { dueToday, daysUntil, bangkokToday } from '../src/promoAlerts.js';
 
 const LINE_URL = 'https://api.line.me/v2/bot/message/broadcast';
+const LINE_PUSH_URL = 'https://api.line.me/v2/bot/message/push';
+const STATUS_HEAD = {
+  updated: '✅ VCAN Dashboard updated',
+  nochange: '💤 VCAN Dashboard: no changes in the Excel files today',
+  failed: '❌ VCAN Dashboard update FAILED',
+};
 const MAX_MESSAGE_LENGTH = 5000;
 const MAX_MESSAGES = 5;
 
@@ -134,6 +140,24 @@ export default {
       } catch (e) {
         return new Response(e.message, { status: 502 });
       }
+    }
+    // POST /api/update-status (header X-Status-Secret; form fields status, detail) — the
+    // local daily update_dashboard.bat reports its outcome; pushed to the admin only.
+    if (request.method === 'POST' && url.pathname === '/api/update-status') {
+      const stored = (env.STATUS_SECRET || '').trim();
+      if (!stored || (request.headers.get('X-Status-Secret') || '').trim() !== stored) return new Response('Forbidden', { status: 403 });
+      if (!env.LINE_TOKEN || !env.LINE_ADMIN_USER_ID) return new Response('LINE_TOKEN / LINE_ADMIN_USER_ID not set', { status: 500 });
+      const form = await request.formData();
+      const head = STATUS_HEAD[form.get('status')];
+      if (!head) return new Response('Bad status', { status: 400 });
+      const detail = String(form.get('detail') || '').trim().slice(0, 1000);
+      const text = `${head} (${bangkokToday()})${detail ? `\n${detail}` : ''}`;
+      const res = await fetch(LINE_PUSH_URL, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${env.LINE_TOKEN}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to: env.LINE_ADMIN_USER_ID, messages: [{ type: 'text', text }] }),
+      });
+      return new Response(res.ok ? 'OK' : `LINE push failed ${res.status}`, { status: res.ok ? 200 : 502 });
     }
     // ponytail: assets-first serving; this only runs for non-asset routes (SPA fallback)
     return env.ASSETS.fetch(request);

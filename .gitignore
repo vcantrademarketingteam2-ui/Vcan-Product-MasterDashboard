@@ -47,3 +47,6 @@ backups/
 *.local
 .env
 .env.*
+
+# Daily update -> LINE status shared secret (also a Cloudflare secret)
+.status_secret

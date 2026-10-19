@@ -4,6 +4,11 @@ cd /d "%~dp0"
 
 set "MSG=%~1"
 set "DEFMSG=data: update product master, promo plan and packshots"
+REM Daily LINE status (admin only) via the dashboard worker. Secret lives in the
+REM git-ignored .status_secret file; without it the status message is skipped.
+set "STATUS_URL=https://vcanproductmasterdashboard.vcan-trademarketingteam2.workers.dev/api/update-status"
+set "STEP=preflight checks: Y: drive, Python or npm missing"
+set "DETAIL="
 
 echo.
 echo ============================================
@@ -51,6 +56,7 @@ if defined PREERR goto fail
 echo   OK
 
 REM ---------------------------------------------------------------- 1/6
+set "STEP=[1/6] product master Excel"
 echo.
 echo [1/6] Product master -^> src/data.js + src/retailer_data.js ...
 py convert_to_data.py <nul
@@ -60,6 +66,7 @@ if errorlevel 1 (
 )
 
 REM ---------------------------------------------------------------- 2/6
+set "STEP=[2/6] promotion plan Excel"
 echo.
 echo [2/6] Promotion plans -^> src/promo_data.js + notification_schedule.json ...
 py convert_promo.py <nul
@@ -69,6 +76,7 @@ if errorlevel 1 (
 )
 
 REM ---------------------------------------------------------------- 3/6
+set "STEP=[3/6] packshot copy"
 echo.
 echo [3/6] Copying packshots from Y: drive ...
 powershell -ExecutionPolicy Bypass -NonInteractive -File "%~dp0copy_packshots.ps1" -NoPause
@@ -78,6 +86,7 @@ if errorlevel 1 (
 )
 
 REM ---------------------------------------------------------------- 4/6
+set "STEP=[4/6] WebP conversion"
 echo.
 echo [4/6] Converting new images to WebP ...
 echo. | py convert_to_webp.py
@@ -87,6 +96,7 @@ if errorlevel 1 (
 )
 
 REM ---------------------------------------------------------------- 5/6
+set "STEP=[5/6] build check"
 echo.
 echo [5/6] Build check (npm run build) ...
 call npm run build
@@ -96,6 +106,7 @@ if errorlevel 1 (
 )
 
 REM ---------------------------------------------------------------- 6/6
+set "STEP=[6/6] git commit/push"
 echo.
 echo [6/6] Commit and push ...
 
@@ -105,11 +116,26 @@ if errorlevel 1 (
     goto fail
 )
 
+set "WARN="
+if exist logs\promo_warnings.txt set /p WARN=<logs\promo_warnings.txt
+
 git diff --cached --quiet
 if not errorlevel 1 (
     echo   Nothing changed - dashboard data is already up to date.
+    set "RESULT=nochange"
+    set "DETAIL=%WARN%"
     goto done
 )
+
+set "CHG="
+git diff --cached --quiet -- src/promo_data.js || set "CHG=%CHG%promo plan, "
+git diff --cached --quiet -- src/data.js src/retailer_data.js || set "CHG=%CHG%product master, "
+git diff --cached --quiet -- public/notification_schedule.json || set "CHG=%CHG%promo alerts, "
+git diff --cached --quiet -- public/retailers || set "CHG=%CHG%retailer logos, "
+for /f %%n in ('git diff --cached --name-only -- public/packshots ^| find /c /v ""') do if not "%%n"=="0" set "CHG=%CHG%%%n packshot files, "
+if defined CHG set "CHG=%CHG:~0,-2%"
+set "RESULT=updated"
+set "DETAIL=Changed: %CHG% %WARN%"
 
 echo   Staging:
 git diff --cached --name-status
@@ -145,13 +171,26 @@ echo.
 echo ============================================
 echo   Done! Cloudflare deploys in ~2 min
 echo ============================================
-pause
-exit /b 0
+set "RC=0"
+goto finish
 
 :fail
 echo.
 echo ============================================
 echo   FAILED - nothing was pushed.
 echo ============================================
+set "RESULT=failed"
+set "DETAIL=Stopped at: %STEP%. Details in logs\daily_update.log"
+set "RC=1"
+
+:finish
+if not exist "%~dp0.status_secret" (
+    echo   [i] .status_secret missing - LINE status message skipped
+    goto end
+)
+set /p STATUS_SECRET=<"%~dp0.status_secret"
+curl.exe -s -m 20 -o nul -w "  LINE status: HTTP %%{http_code}\n" -H "X-Status-Secret: %STATUS_SECRET%" --data-urlencode "status=%RESULT%" --data-urlencode "detail=%DETAIL%" "%STATUS_URL%"
+
+:end
 pause
-exit /b 1
+exit /b %RC%

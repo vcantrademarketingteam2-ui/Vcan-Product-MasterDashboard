@@ -15,6 +15,16 @@ import openpyxl
 BASE_DIR = Path(r'Y:\MARKETING\Promotion Plan ทุกห้าง\2026')
 OUT = Path('src/promo_data.js')
 
+
+def write_if_changed(path, text):
+    """Write unless only the GENERATED_AT / '// Generated:' timestamp would change, so a
+    no-op run leaves git clean and the daily job commits/deploys nothing."""
+    strip = lambda s: re.sub(r'.*(GENERATED_AT|// Generated:).*', '', s)
+    if path.exists() and strip(path.read_text(encoding='utf-8')) == strip(text):
+        return False
+    path.write_text(text, encoding='utf-8')
+    return True
+
 # Fill colours (openpyxl ARGB AARRGGBB) grouped into families. The *meaning* of a
 # family differs per retailer (Tops yellow=media but Villa yellow=field — the stores
 # literally swap them), so we map hex -> family here and family -> activity per store.
@@ -783,7 +793,8 @@ def main(retailer_filter=None):
         'export default promoData;',
     ]
 
-    OUT.write_text('\n'.join(js_lines), encoding='utf-8')
+    if not write_if_changed(OUT, '\n'.join(js_lines)):
+        print('   promo_data.js unchanged (kept previous timestamp)')
     print(f'\nDone -- {len(all_products)} records across {len(promo_retailers)} retailers -> {OUT}')
 
     # Notification schedule for the promo-alerts Cron Worker + in-app bell.
@@ -797,9 +808,14 @@ def main(retailer_filter=None):
         sched_path.write_text(json.dumps(schedule, ensure_ascii=False, indent=2), encoding='utf-8')
         print(f'   Notification schedule -> {sched_path} ({len(schedule)} entries)')
 
+    # update_dashboard.bat forwards this file's one line in its LINE status message.
+    warn_path = Path('logs/promo_warnings.txt')
+    warn_path.unlink(missing_ok=True)
     if kept_stale:
         print()
         print(f'   WARNING: stale data kept for {", ".join(kept_stale)} — their sheets did not parse.')
+        warn_path.parent.mkdir(exist_ok=True)
+        warn_path.write_text(f'Warning: old data kept for {", ".join(kept_stale)} (sheet did not parse)', encoding='utf-8')
 
     if not all_products:
         print('   Tip: If all retailers were skipped, check BASE_DIR path and CONFIG header_row values.')
