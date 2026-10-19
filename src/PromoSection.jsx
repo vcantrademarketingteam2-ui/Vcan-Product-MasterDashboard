@@ -11,6 +11,7 @@ import { useState, useMemo } from 'react'
 import promoData, { PROMO_META, PROMO_ACTIVITY, PROMO_RETAILERS } from './promo_data.js'
 import { DEPT_PINS, canSeeRetailer, logPricingAccess } from './deptPins.js'
 import './PromoSection.css'
+import { brandKey } from './brandCategory.js'
 
 // v2.19.0 neon palette: media = neon cyan, looks = neon fuchsia, field = orange.
 // Clearance moved off cyan (→ neon coral) so media can own it.
@@ -188,23 +189,23 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
     return enrich(raw, rawData)
   }, [retailer, rawData])
 
-  const brandList = useMemo(() => [...new Set(allItems.map(i => i.brand))].filter(Boolean).sort(), [allItems])
+  const brandList = useMemo(() => [...new Set(allItems.map(i => brandKey(i.brand, i.product)))].filter(Boolean).sort(), [allItems])
 
   // brand → company / promo-item count for the shared BrandCategoryFilter pills
   const brandCompany = useMemo(() => {
     const m = {}
-    allItems.forEach(i => { if (!m[i.brand]) m[i.brand] = i.company })
+    allItems.forEach(i => { const b = brandKey(i.brand, i.product); if (!m[b]) m[b] = i.company })
     return m
   }, [allItems])
   const brandCounts = useMemo(() => {
     const m = {}
-    allItems.forEach(i => { m[i.brand] = (m[i.brand] || 0) + 1 })
+    allItems.forEach(i => { const b = brandKey(i.brand, i.product); m[b] = (m[b] || 0) + 1 })
     return m
   }, [allItems])
 
   const items = useMemo(() => {
     if (!brandFilter.length) return allItems
-    return allItems.filter(i => brandFilter.includes(i.brand))
+    return allItems.filter(i => brandFilter.includes(brandKey(i.brand, i.product)))
   }, [allItems, brandFilter])
 
   const grouped = useMemo(() => {

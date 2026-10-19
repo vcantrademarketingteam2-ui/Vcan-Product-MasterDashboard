@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
+import { BRAND_CATEGORIES, brandCategory, brandKey, keyBrand } from './brandCategory.js'
 import fallbackData, { GENERATED_AT } from './data.js'
 import retailerData from './retailer_data.js'
 import promoData, { PROMO_META } from './promo_data.js'
@@ -17,26 +18,7 @@ function alertUrgency(days) {
   return { tone: 'upcoming', text: `${days} days left until it starts` }
 }
 
-// Products brand-filter grouping. Patterns match by brand keyword so SKU variants
-// ("Malizia Bath Foam 1L", "VITAKRAFT CAT", "PEARS SOAP") inherit the base brand's
-// category. Anything unmatched lands in "Other" — VENDOR_BRANDS.ALL is data-derived,
-// so the grouping must never silently drop a brand.
-const BRAND_CATEGORIES = ['Laundry', 'Homecare', 'Personal Care', 'Intimate', 'Pet', 'Kitchen Ware', 'Other']
-// Order matters: brandCategory returns the FIRST matching category, so the more
-// specific rules (Intimate, exact-match Laundry L'Arbre Vert) come before the
-// broad Personal Care fallbacks (/malizia/, /l'arbre/).
-const BRAND_CAT_RULES = [
-  ['Pet',           [/vitakraft/i]],
-  ['Kitchen Ware',  [/\bwmf\b/i]],
-  ['Intimate',      [/malizia\s*intimate/i, /tena/i]],
-  ['Laundry',       [/perwoll/i, /purex/i, /vernel/i, /vnew/i, /^l['’]?arbre vert\s*$/i]],
-  ['Homecare',      [/sofix/i, /somat/i, /pril/i, /combat/i, /general\s*fresh/i, /brilly/i, /tempo/i, /renuzit/i]],
-  ['Personal Care', [/dove/i, /dial/i, /pears/i, /pepsodent/i, /jack/i, /malizia/i, /l['’]?arbre/i, /sundae/i]],
-]
-function brandCategory(b) {
-  for (const [cat, pats] of BRAND_CAT_RULES) if (pats.some(p => p.test(b))) return cat
-  return 'Other'
-}
+// Brand-filter grouping lives in ./brandCategory.js (shared with PromoSection).
 
 // BrandPill (v3.6.0, logos wired v3.7.0, "Marquee Capsule" redesign v3.8.0) —
 // shared brand identity chip: vendor-tinted logo plaque + name, reused on Products
@@ -247,7 +229,7 @@ function BrandCategoryFilter({ idPrefix, brandList, selectedBrands, onToggle, on
               display: active ? 'grid' : 'none', gridTemplateColumns: `repeat(auto-fill, minmax(${isMobile ? 130 : 150}px, 1fr))`, gap: 10,
             }}>
             {groups[cat].map(b => (
-              <BrandPill key={b} brand={b} company={brandCompany[b]} t={t} size={size}
+              <BrandPill key={b} brand={keyBrand(b)} company={brandCompany[b]} t={t} size={size}
                 selected={selectedBrands.includes(b)} count={brandCounts[b] || 0}
                 onClick={() => onToggle(b)} />
             ))}
@@ -1080,9 +1062,9 @@ export default function App() {
   }
 
   const VENDOR_BRANDS = useMemo(() => ({
-    ALL: [...new Set(rawData.map(p => p.brand.trim()))].filter(Boolean).sort(),
-    Vcan: [...new Set(rawData.filter(p => p.company === 'Vcan').map(p => p.brand.trim()))].filter(Boolean).sort(),
-    Moola: [...new Set(rawData.filter(p => p.company === 'Moola').map(p => p.brand.trim()))].filter(Boolean).sort(),
+    ALL: [...new Set(rawData.map(p => brandKey(p.brand, p.product)))].filter(Boolean).sort(),
+    Vcan: [...new Set(rawData.filter(p => p.company === 'Vcan').map(p => brandKey(p.brand, p.product)))].filter(Boolean).sort(),
+    Moola: [...new Set(rawData.filter(p => p.company === 'Moola').map(p => brandKey(p.brand, p.product)))].filter(Boolean).sort(),
   }), [rawData])
 
   const t = dark ? {
@@ -1122,7 +1104,7 @@ export default function App() {
   // picking a brand doesn't zero out its own count badge).
   const brandCompany = useMemo(() => {
     const m = {}
-    rawData.forEach(p => { const b = p.brand.trim(); if (!(b in m)) m[b] = p.company })
+    rawData.forEach(p => { const b = brandKey(p.brand, p.product); if (!(b in m)) m[b] = p.company })
     return m
   }, [rawData])
   const brandCounts = useMemo(() => {
@@ -1136,7 +1118,7 @@ export default function App() {
       return true
     })
     const m = {}
-    scoped.forEach(p => { const b = p.brand.trim(); m[b] = (m[b] || 0) + 1 })
+    scoped.forEach(p => { const b = brandKey(p.brand, p.product); m[b] = (m[b] || 0) + 1 })
     return m
   }, [rawData, vendorFilter, selectedRetailers, search])
   const clearAll = () => { setSearch(''); setSelectedBrands([]); setSelectedRetailers([]); setStatusTab('ALL'); setVendorFilter('ALL'); setSortCol(null); setSortDir('asc') }
@@ -1157,7 +1139,7 @@ export default function App() {
   // driver (task 3): pick "Tops" and the cards show only products listed at Tops.
   const statsBase = useMemo(() => rawData.filter(p => {
     if (vendorFilter !== 'ALL' && p.company !== vendorFilter) return false
-    if (selectedBrands.length > 0 && !selectedBrands.includes(p.brand.trim())) return false
+    if (selectedBrands.length > 0 && !selectedBrands.includes(brandKey(p.brand, p.product))) return false
     if (selectedRetailers.length > 0 && !selectedRetailers.some(r => p.retailers[r])) return false
     if (search) {
       const q = search.toLowerCase()
@@ -1206,7 +1188,7 @@ export default function App() {
 
   const psFiltered = useMemo(() => rawData.filter(p => {
     if (vendorFilter !== 'ALL' && p.company !== vendorFilter) return false
-    if (selectedBrands.length > 0 && !selectedBrands.includes(p.brand.trim())) return false
+    if (selectedBrands.length > 0 && !selectedBrands.includes(brandKey(p.brand, p.product))) return false
     if (statusTab !== 'ALL' && p.status !== statusTab) return false
     if (psRetailers.length > 0) {
       // keep product only if listed at ≥1 selected retailer (not discontinued/empty)
@@ -1596,7 +1578,7 @@ export default function App() {
             <div style={{ fontWeight: 800, fontSize: isMobile ? 14 : 17, color: t.text, letterSpacing: 0.2, whiteSpace: 'nowrap', flexShrink: 0 }}>
               Product Master
             </div>
-              <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v3.14.0</span>
+              <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v3.14.1</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: isMobile ? 11 : 13, background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, padding: isMobile ? '3px 8px' : '5px 12px', overflow: 'hidden', minWidth: 0, flexShrink: 1 }}>
               <span style={{ width: isMobile ? 6 : 7, height: isMobile ? 6 : 7, borderRadius: '50%', flexShrink: 0, background: dataSource === 'csv' ? t.blue : t.green }} />
               <span style={{ fontWeight: 800, color: dataSource === 'csv' ? t.blue : t.green, flexShrink: 0 }}>
