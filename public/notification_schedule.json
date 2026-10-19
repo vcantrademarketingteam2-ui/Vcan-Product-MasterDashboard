@@ -182,12 +182,26 @@
     "period": "2651/52",
     "startDate": "2026-12-09",
     "activities": [
+      "field"
+    ],
+    "brands": [
+      "Vnew Pouch 700ML"
+    ],
+    "title": "Tops 2651/52"
+  },
+  {
+    "retailer": "Tops",
+    "period": "2701/02",
+    "startDate": "2027-12-23",
+    "activities": [
+      "field",
       "media"
     ],
     "brands": [
-      "Sofix"
+      "L'Arbre Vert",
+      "Sundae Bath Foam"
     ],
-    "title": "Tops 2651/52"
+    "title": "Tops 2701/02"
   },
   {
     "retailer": "Villa",
@@ -265,16 +279,6 @@
       "Vnew"
     ],
     "title": "Homepro May"
-  },
-  {
-    "retailer": "Lotus",
-    "period": "WK 25-29",
-    "startDate": "2025-06-19",
-    "activities": [
-      "media"
-    ],
-    "brands": [],
-    "title": "Lotus WK 25-29"
   },
   {
     "retailer": "TWD",

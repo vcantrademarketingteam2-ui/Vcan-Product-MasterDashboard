@@ -334,6 +334,11 @@ const RETAILER_DATA = {
       "costUnit": 145.7944,
       "costCase": 1166.3551,
       "gp": 0.2
+    },
+    "TWD": {
+      "costUnit": 143.972,
+      "costCase": 1151.7757,
+      "gp": 0.21
     }
   },
   "8857130119162": {
@@ -346,6 +351,11 @@ const RETAILER_DATA = {
       "costUnit": 145.7944,
       "costCase": 1166.3551,
       "gp": 0.2
+    },
+    "TWD": {
+      "costUnit": 143.972,
+      "costCase": 1151.7757,
+      "gp": 0.21
     }
   },
   "8857130119384": {
@@ -358,6 +368,11 @@ const RETAILER_DATA = {
       "costUnit": 145.7944,
       "costCase": 1166.3551,
       "gp": 0.2
+    },
+    "TWD": {
+      "costUnit": 143.972,
+      "costCase": 1151.7757,
+      "gp": 0.21
     }
   },
   "3450601046315": {

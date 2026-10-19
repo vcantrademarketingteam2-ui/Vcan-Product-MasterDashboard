@@ -114,9 +114,10 @@ def parse_start_date(date_range, year_hint=None):
         if 1 <= month <= 12 and 1 <= day <= 31:
             return f'{_year_of(y):04d}-{month:02d}-{day:02d}'
         return None
-    # Standard slash format: "D/M-D/M/YY" or "D/M/YY"
+    # Standard slash format: "D/M-D/M/YY" or "D/M/YY". When the start carries its own year
+    # ("10/12/2026-6/1/2027", Lotus) use it — the trailing year belongs to the end date.
     m = re.match(r'(\d{1,2})\s*/\s*(\d{1,2})', s)
-    yr = re.search(r'/(\d{2,4})\s*$', s)
+    yr = re.match(r'\d{1,2}\s*/\s*\d{1,2}\s*/\s*(\d{2,4})', s) or re.search(r'/(\d{2,4})\s*$', s)
     if m and yr:
         day, month = int(m.group(1)), int(m.group(2))
         y = int(yr.group(1))
@@ -146,6 +147,9 @@ def _selftest_parse_start_date():
         ('25.06.26 - 22.07.26', None, '2026-06-25'),      # Villa dot format
         ('5-25/1/23', None, '2023-01-05'),                # Big C day-range/slash
         ('1-31/1/2569', None, '2026-01-01'),              # Foodland Thai-Buddhist name
+        ('23/7-5/8/2569', None, '2026-07-23'),            # Foodland cross-month, Buddhist year
+        ('10/12/2026-6/1/2027', None, '2026-12-10'),      # Lotus: start carries its own year
+        ('22/10/26 - 18/11/26', None, '2026-10-22'),      # Watsons: both sides carry year
         ('Monthly7', 2026, '2026-07-01'),                 # Villa bare name fallback
         ('Jan', 2026, '2026-01-01'),                      # Homepro bare name fallback
         ('SP6', None, None),                              # unparseable -> None
@@ -282,8 +286,9 @@ CONFIG = {
         'file': 'Foodland - Activity Promotion 2026.xlsx',
         'sheets': None,
         'header_row': 7,
-        # A=Barcode, B=Code Foodland, C=Product, D=Pack, E=Cost, F=RSP, G=GP%, H+=periods
-        'cols': {'barcode': 1, 'product': 3, 'pack': 4, 'cost': 5, 'rsp': 6, 'gp': 7, 'period_start': 8},
+        # A=No (hidden, inserted Oct 2026), B=Barcode, C=Code Foodland, D=Product, E=Pack,
+        # F=Cost, G=RSP, H=GP%, I+=periods
+        'cols': {'barcode': 2, 'product': 4, 'pack': 5, 'cost': 6, 'rsp': 7, 'gp': 8, 'period_start': 9},
     },
     'Homepro': {
         'file': 'Homepro - Activity Promotion 2026.xlsx',
@@ -444,6 +449,15 @@ def parse_sheet(ws, cfg, retailer, non_vat=frozenset()):
     c = cfg['cols']
     ps = c['period_start'] - 1  # 0-indexed
 
+    # Planners insert/delete columns (Foodland gained a "No" column at A), which silently
+    # shifts every fixed index. Refuse to guess: the configured barcode column must hold
+    # the "Barcode" header, otherwise the caller keeps this retailer's last good data.
+    hdr = rows[h][c['barcode'] - 1].value if c['barcode'] - 1 < len(rows[h]) else None
+    if str(hdr or '').strip().lower() != 'barcode':
+        print(f'    FAIL "{ws.title}": column {c["barcode"]} header is {hdr!r}, not "Barcode" — '
+              f'columns shifted? Update CONFIG["{retailer}"]["cols"]')
+        return [], []
+
     # Period-name row location varies. Villa's two sheets both put the period NAMES
     # (Monthly1..N) on the row directly above the Barcode row — and detect_header_row
     # finds that Barcode row per sheet — so 'period_names_above' = h - 1 works for both,
@@ -467,15 +481,17 @@ def parse_sheet(ws, cfg, retailer, non_vat=frozenset()):
     seen_names = set()
     for ci in range(ps, len(name_row)):
         cell = name_row[ci]
-        val = cell.value
-        if not val:
-            continue
-        name = str(val).strip()
-        if not name or name.lower() in SKIP_HEADER_KEYWORDS:
-            continue
         date_range = ''
         if ci < len(date_row) and date_row[ci].value:
             date_range = fmt_date_cell(date_row[ci].value)
+        name = str(cell.value or '').strip()
+        # Sub-period columns (Foodland's 14-day "23/7-5/8/2569" next to the monthly "Aug")
+        # carry a date but no name — name them by their date. Only a parseable date counts,
+        # so trailing calc columns ("RSP ถอดvat", "compensate") stay excluded.
+        if not name and parse_start_date(date_range):
+            name = date_range
+        if not name or name.lower() in SKIP_HEADER_KEYWORDS:
+            continue
         if not looks_like_period(name, date_range):
             continue  # skip junk columns (promo values, calc columns)
         if name in seen_names:
@@ -653,10 +669,28 @@ def main(retailer_filter=None):
     configs = ((retailer_filter, CONFIG[retailer_filter]),) if retailer_filter else CONFIG.items()
     refreshed_products = []
     refreshed_periods = []
+
+    # A broken/missing sheet must not silently wipe a retailer off the dashboard: on a full
+    # run, fall back to that retailer's last generated data and say so loudly.
+    previous = load_existing_promo_data() if (not retailer_filter and OUT.exists()) else ([], {}, [])
+    kept_stale = []
+
+    def keep_previous(retailer):
+        old = [p for p in previous[0] if p.get('retailer') == retailer]
+        if not old or retailer not in previous[1]:
+            print(f'    (!)  {retailer}: no previous data to keep — retailer omitted')
+            return
+        all_products.extend(old)
+        promo_meta[retailer] = previous[1][retailer]
+        promo_retailers.append(retailer)
+        kept_stale.append(retailer)
+        print(f'    (!)  {retailer}: KEPT PREVIOUS DATA ({len(old)} products) — fix the sheet/CONFIG')
+
     for retailer, cfg in configs:
         fpath = BASE_DIR / cfg['file']
         if not fpath.exists():
             print(f'  (!)  Skipping {retailer}: not found at {fpath}')
+            keep_previous(retailer)
             continue
 
         print(f'  Parsing {retailer}...')
@@ -664,6 +698,7 @@ def main(retailer_filter=None):
             wb = openpyxl.load_workbook(fpath, read_only=False, data_only=True)
         except Exception as e:
             print(f'    FAIL Failed to open: {e}')
+            keep_previous(retailer)
             continue
 
         sheets = cfg.get('sheets') or [wb.sheetnames[0]]
@@ -708,6 +743,8 @@ def main(retailer_filter=None):
             print(f'    OK {len(retailer_products)} products, {len(retailer_periods)} periods')
         else:
             print(f'    (!)  No promo products found (check header_row in CONFIG)')
+            if not retailer_filter:
+                keep_previous(retailer)
 
     if retailer_filter:
         if not OUT.exists():
@@ -759,6 +796,10 @@ def main(retailer_filter=None):
         sched_path = Path('public/notification_schedule.json')
         sched_path.write_text(json.dumps(schedule, ensure_ascii=False, indent=2), encoding='utf-8')
         print(f'   Notification schedule -> {sched_path} ({len(schedule)} entries)')
+
+    if kept_stale:
+        print()
+        print(f'   WARNING: stale data kept for {", ".join(kept_stale)} — their sheets did not parse.')
 
     if not all_products:
         print('   Tip: If all retailers were skipped, check BASE_DIR path and CONFIG header_row values.')

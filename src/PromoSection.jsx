@@ -67,7 +67,14 @@ function parseDR(dr = '') {
   const s0 = (dr || '').trim()
   const yearOf = n => {
     const y = parseInt(n)
-    return y < 50 ? 2000 + y : y < 100 ? 1900 + y : y
+    // Thai Buddhist years (Foodland "…/2569") → Gregorian
+    return y < 50 ? 2000 + y : y < 100 ? 1900 + y : y > 2400 ? y - 543 : y
+  }
+  // Foodland same-month day range: "1-31/7/2569"
+  const dd = s0.match(/^(\d+)\s*[–-]\s*(\d+)\s*\/\s*(\d+)\s*\/\s*(\d{2,4})$/)
+  if (dd) {
+    const yr = yearOf(dd[4]), mo = parseInt(dd[3]) - 1
+    return { s: new Date(yr, mo, parseInt(dd[1])), e: new Date(yr, mo, parseInt(dd[2]), 23, 59, 59, 999) }
   }
   // Explicit start and end years: "22/10/26 - 18/11/26" (Watsons).
   const full = s0.match(/^(\d+)\/(\d+)\/(\d{2,4})\s*[–-]\s*(\d+)\/(\d+)\/(\d{2,4})$/)
