@@ -4,7 +4,7 @@ cd /d "%~dp0"
 
 set "MSG=%~1"
 set "DEFMSG=data: update product master, promo plan and packshots"
-REM Daily LINE status (admin only) via the dashboard worker. Secret lives in the
+REM Daily LINE status (broadcast to bot followers) via the dashboard worker. Secret lives in the
 REM git-ignored .status_secret file; without it the status message is skipped.
 set "STATUS_URL=https://vcanproductmasterdashboard.vcan-trademarketingteam2.workers.dev/api/update-status"
 set "STEP=preflight checks: Y: drive, Python or npm missing"
@@ -189,6 +189,12 @@ if not exist "%~dp0.status_secret" (
     goto end
 )
 set /p STATUS_SECRET=<"%~dp0.status_secret"
+REM Announce only after Cloudflare has deployed (~2 min). ping, not timeout: timeout
+REM aborts when stdin is redirected, which is how the scheduled task runs this file.
+if "%RESULT%"=="updated" (
+    echo   Waiting 3 min for the Cloudflare deploy before announcing on LINE ...
+    ping -n 181 127.0.0.1 >nul
+)
 curl.exe -s -m 20 -o nul -w "  LINE status: HTTP %%{http_code}\n" -H "X-Status-Secret: %STATUS_SECRET%" --data-urlencode "status=%RESULT%" --data-urlencode "detail=%DETAIL%" "%STATUS_URL%"
 
 :end
