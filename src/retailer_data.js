@@ -330,6 +330,11 @@ const RETAILER_DATA = {
       "costCase": 1093.4579,
       "gp": 0.25
     },
+    "The Mall": {
+      "costUnit": 143.972,
+      "costCase": 1151.7757,
+      "gp": 0.21
+    },
     "Homepro": {
       "costUnit": 145.7944,
       "costCase": 1166.3551,
@@ -347,6 +352,11 @@ const RETAILER_DATA = {
       "costCase": 1093.4579,
       "gp": 0.25
     },
+    "The Mall": {
+      "costUnit": 143.972,
+      "costCase": 1151.7757,
+      "gp": 0.21
+    },
     "Homepro": {
       "costUnit": 145.7944,
       "costCase": 1166.3551,
@@ -363,6 +373,11 @@ const RETAILER_DATA = {
       "costUnit": 136.6822,
       "costCase": 1093.4579,
       "gp": 0.25
+    },
+    "The Mall": {
+      "costUnit": 143.972,
+      "costCase": 1151.7757,
+      "gp": 0.21
     },
     "Homepro": {
       "costUnit": 145.7944,
