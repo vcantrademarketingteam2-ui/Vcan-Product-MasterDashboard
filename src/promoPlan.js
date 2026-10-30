@@ -85,3 +85,15 @@ export function periodStatus(r, today = new Date()) {
   if (!r) return 'unknown'
   return today < r.s ? 'future' : today > r.e ? 'past' : 'now'
 }
+
+// Per-store plan columns: Col = { name, idx (source index), r ({s,e}|null), status }
+export function buildPlan(periods, today = new Date()) {
+  const cols = periods.map((p, idx) => {
+    const r = periodRange(p, today)
+    return { name: p.name, idx, r, status: periodStatus(r, today) }
+  })
+  // Sort by start only when every period is dated; otherwise the source order is the only safe one.
+  if (cols.every(c => c.r)) cols.sort((a, b) => a.r.s - b.r.s || a.idx - b.idx)
+  const has = st => cols.some(c => c.status === st)
+  return { cols, hasNow: has('now'), hasFuture: has('future'), hasUnknown: has('unknown') }
+}
