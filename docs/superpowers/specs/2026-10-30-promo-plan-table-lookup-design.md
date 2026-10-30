@@ -85,6 +85,12 @@ The activity legend row is removed; activities appear as **text tags** inside ce
     one fixed-height line that scrolls horizontally. Picking a quarter/month never replaces or
     reflows the strip — it only tints the in-range periods and scrolls the first of them into
     view. (User: changing the list made "the UI shrink and expand", confusing.)
+    **No visible scrollbar** (user found the scrollbar "weird"): hide it; fade only the edge(s)
+    that hide more chips (mask gradient, toggled by scroll position); the vertical mouse wheel
+    scrolls the strip sideways (non-passive listener, page does not scroll); trackpad/touch
+    swipe works natively. The jump to the first in-range chip happens only when the pick or
+    store changes (instant, not smooth — a smooth scroll is cancelled by the re-tint
+    re-render), so a manual scroll is not undone by unrelated re-renders like selecting a cell.
   - **Colour signals — one meaning each** (user found mixed bronze outlines confusing):
     solid bronze fill = the one thing picked (only one chip filled at a time); soft bronze tint
     + bold = periods in the picked quarter/month; small bronze dot under a quarter/month = it
