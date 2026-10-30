@@ -134,3 +134,33 @@ export function pickLabel(pick) {
 
 export const pickYears = cols =>
   [...new Set(cols.flatMap(c => c.r ? [c.r.s.getFullYear(), c.r.e.getFullYear()] : []))].sort((a, b) => a - b)
+
+// ── product across stores ─────────────────────────────────────────────────────
+// Row = { retailer, item, now:{col,pd}|null, nowCol, moreLive, next:{col,pd}|null, nextCol, upcoming:{col,pd}|null }
+export function productRows(barcode, itemsByRetailer, plans, retailers) {
+  const rows = [], notIn = []
+  for (const retailer of retailers) {
+    const item = (itemsByRetailer[retailer] || []).find(i => i.barcode === barcode)
+    if (!item) { notIn.push(retailer); continue }
+    const cols = plans[retailer]?.cols || []
+    const withPd = cols.map(col => ({ col, pd: item.periods?.[col.name] })).filter(x => x.pd)
+    const live = withPd.filter(x => x.col.status === 'now').sort((a, b) => a.col.r.e - b.col.r.e)
+    const nowCol = live[0]?.col || cols.find(c => c.status === 'now') || null
+    const nextIdx = cols.findIndex(c => c.status === 'future')
+    const nextCol = cols[nextIdx] || null
+    const next = nextCol && item.periods?.[nextCol.name] ? { col: nextCol, pd: item.periods[nextCol.name] } : null
+    const upcoming = nextIdx < 0 ? null : withPd.find(x => cols.indexOf(x.col) > nextIdx && x.col.status !== 'past') || null
+    rows.push({ retailer, item, now: live[0] || null, nowCol, moreLive: Math.max(live.length - 1, 0), next, nextCol, upcoming })
+  }
+  return { rows, notIn }
+}
+
+// Lowest numeric live sale price across stores; label-only promos (salePrice null) are ignored
+export function bestNow(rows) {
+  let best = null
+  for (const r of rows) {
+    const price = r.now?.pd?.salePrice
+    if (typeof price === 'number' && (!best || price < best.price)) best = { retailer: r.retailer, price, col: r.now.col }
+  }
+  return best
+}

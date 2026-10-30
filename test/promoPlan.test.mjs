@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { parseDR, periodRange, periodStatus, buildPlan, quarterSpan, monthSpan, colsInSpan, defaultPick, colsForPick, pickLabel, pickYears } from '../src/promoPlan.js';
+import { productRows, bestNow } from '../src/promoPlan.js';
 
 const T = new Date(2026, 9, 30);
 const ymd = d => [d.getFullYear(), d.getMonth() + 1, d.getDate()];
@@ -105,4 +106,45 @@ test('pickLabel and pickYears', () => {
   assert.equal(pickLabel({ lvl: 'u' }), 'Undated periods');
   assert.equal(pickLabel(null), 'No periods');
   assert.deepEqual(pickYears(tops), [2026, 2027]);
+});
+
+const twd = buildPlan([
+  { name: 'Oct', dateRange: '1-31/10/26' }, { name: 'Bro.10', dateRange: '25/09 -29/10/26' },
+  { name: 'Bro.11', dateRange: '30/10- 26/11/26' }, { name: 'Nov', dateRange: '1-30/11/26' },
+  { name: 'Dec', dateRange: '1-31/12/26' }, { name: 'Jan', dateRange: '1-31/1/27' }], T);
+const item = (barcode, product, periods) => ({ barcode, product, periods });
+
+test('productRows uses barcode identity', () => {
+  const { rows, notIn } = productRows('111',
+    { A: [item('111', 'Name A', {})], B: [item('111', 'Different name', {})], C: [item('222', 'x', {})] },
+    { A: twd, B: twd, C: twd }, ['A', 'B', 'C']);
+  assert.deepEqual(rows.map(r => r.retailer), ['A', 'B']);
+  assert.deepEqual(notIn, ['C']);
+});
+test('now picks the live promo ending soonest', () => {
+  const { rows } = productRows('111',
+    { A: [item('111', 'n', { Oct: { salePrice: 90 }, 'Bro.11': { salePrice: 80 } })] }, { A: twd }, ['A']);
+  assert.equal(rows[0].now.col.name, 'Oct');
+  assert.equal(rows[0].nowCol.name, 'Oct');
+  assert.equal(rows[0].moreLive, 1);
+});
+test('nowCol falls back to the first live col without a promo', () => {
+  const { rows } = productRows('111', { A: [item('111', 'n', {})] }, { A: twd }, ['A']);
+  assert.equal(rows[0].now, null);
+  assert.equal(rows[0].nowCol.name, 'Oct');
+});
+test('bestNow ignores label-only promos', () => {
+  const mk = (a, b) => productRows('111', {
+    A: [item('111', 'n', { Oct: a })], B: [item('111', 'n', { Oct: b })] }, { A: twd, B: twd }, ['A', 'B']).rows;
+  const b = bestNow(mk({ salePrice: 89 }, { salePrice: null, saleLabel: '1 แถม 1' }));
+  assert.equal(b.retailer, 'A');
+  assert.equal(b.price, 89);
+  assert.equal(bestNow(mk({ salePrice: null, saleLabel: 'x' }, { salePrice: null, saleLabel: 'y' })), null);
+});
+test('next / upcoming skip past periods', () => {
+  const { rows } = productRows('111', { A: [item('111', 'n', {
+    'Bro.10': { salePrice: 70 }, Nov: { salePrice: 85 }, Jan: { salePrice: 75 } })] }, { A: twd }, ['A']);
+  assert.equal(rows[0].nextCol.name, 'Nov');
+  assert.equal(rows[0].next.pd.salePrice, 85);
+  assert.equal(rows[0].upcoming.col.name, 'Jan');
 });
