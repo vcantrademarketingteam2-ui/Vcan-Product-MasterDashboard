@@ -1,0 +1,87 @@
+// Pure date/period logic for the Promotion Plan (React-free; `today` is always injectable).
+
+export function parseDR(dr = '', today = new Date()) {
+  const s0 = (dr || '').trim()
+  const yearOf = n => {
+    const y = parseInt(n)
+    // Thai Buddhist years (Foodland "…/2569") → Gregorian
+    return y < 50 ? 2000 + y : y < 100 ? 1900 + y : y > 2400 ? y - 543 : y
+  }
+  // Foodland same-month day range: "1-31/7/2569"
+  const dd = s0.match(/^(\d+)\s*[–-]\s*(\d+)\s*\/\s*(\d+)\s*\/\s*(\d{2,4})$/)
+  if (dd) {
+    const yr = yearOf(dd[4]), mo = parseInt(dd[3]) - 1
+    return { s: new Date(yr, mo, parseInt(dd[1])), e: new Date(yr, mo, parseInt(dd[2]), 23, 59, 59, 999) }
+  }
+  // Explicit start and end years: "22/10/26 - 18/11/26" (Watsons).
+  const full = s0.match(/^(\d+)\/(\d+)\/(\d{2,4})\s*[–-]\s*(\d+)\/(\d+)\/(\d{2,4})$/)
+  if (full) {
+    const s = new Date(yearOf(full[3]), parseInt(full[2]) - 1, parseInt(full[1]))
+    const e = new Date(yearOf(full[6]), parseInt(full[5]) - 1, parseInt(full[4]), 23, 59, 59, 999)
+    return { s, e }
+  }
+  // Villa format: "25.06.26 - 22.07.26" (dots, both sides carry year, spaces around dash).
+  // Without this branch every Villa period fails to parse and falls back to inferPeriodDate,
+  // which maps "Monthly7"→July and wrongly marks it NOW when today sits in Monthly6's range.
+  const md = s0.match(/^(\d+)\.(\d+)\.(\d+)\s*[–-]\s*(\d+)\.(\d+)\.(\d+)$/)
+  if (md) {
+    const s = new Date(yearOf(md[3]), parseInt(md[2]) - 1, parseInt(md[1]))
+    const e = new Date(yearOf(md[6]), parseInt(md[5]) - 1, parseInt(md[4]), 23, 59, 59, 999)
+    return { s, e }
+  }
+  // "27/05-9/06/26"  or  "7/01-20/01/26"
+  const m = s0.match(/^(\d+)\/(\d+)\s*[–-]\s*(\d+)\/(\d+)(?:\/(\d+))?$/)
+  if (!m) return null
+  const yr = m[5] ? yearOf(m[5]) : today.getFullYear()
+  const s = new Date(yr, parseInt(m[2]) - 1, parseInt(m[1]))
+  const e = new Date(yr, parseInt(m[4]) - 1, parseInt(m[3]), 23, 59, 59, 999)
+  // Crossing new year: a written year belongs to the END date, else the end rolls forward.
+  if (e < s) { if (m[5]) s.setFullYear(s.getFullYear() - 1); else e.setFullYear(e.getFullYear() + 1) }
+  return { s, e }
+}
+
+export const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+
+// Infer a date range from the period name when dateRange is empty.
+// Handles: Foodland Thai Buddhist names "1-31/1/2569", Villa "Monthly1-Monthly12", Homepro "Jan"-"Dec"
+export function inferPeriodDate(p, today = new Date()) {
+  const name = (p?.name || '').trim()
+  // Foodland Thai Buddhist: "1-31/1/2569" or "1-30 /4/2569"
+  const th = name.match(/^(\d+)[–-]\s*(\d+)\s*\/(\d+)\/(\d{4})$/)
+  if (th) {
+    const rawYr = parseInt(th[4])
+    const yr = rawYr > 2500 ? rawYr - 543 : rawYr
+    const mo = parseInt(th[3]) - 1
+    const day1 = parseInt(th[1]), day2 = parseInt(th[2])
+    if (mo >= 0 && mo < 12 && day1 >= 1 && day2 >= day1)
+      return { s: new Date(yr, mo, day1), e: new Date(yr, mo, day2, 23, 59, 59, 999) }
+  }
+  // Monthly numbered: "Monthly1" ... "Monthly12" (Villa)
+  const mn = name.match(/^[Mm]onthly(\d+)$/i)
+  if (mn) {
+    const mo = parseInt(mn[1]) - 1
+    if (mo >= 0 && mo < 12)
+      return { s: new Date(today.getFullYear(), mo, 1), e: new Date(today.getFullYear(), mo + 1, 0, 23, 59, 59, 999) }
+  }
+  // Short month name exact match: "Jan", "Feb" ... (Homepro)
+  const mi = MONTH_NAMES.findIndex(m => m.toLowerCase() === name.toLowerCase())
+  if (mi >= 0)
+    return { s: new Date(today.getFullYear(), mi, 1), e: new Date(today.getFullYear(), mi + 1, 0, 23, 59, 59, 999) }
+  return null
+}
+
+
+// Whole calendar days b - a (DST-safe)
+export const dayDiff = (a, b) =>
+  Math.round((Date.UTC(b.getFullYear(), b.getMonth(), b.getDate()) - Date.UTC(a.getFullYear(), a.getMonth(), a.getDate())) / 86400000)
+
+// Period date range, or null when undated / implausibly long (> 62 days = mis-keyed range)
+export function periodRange(p, today = new Date()) {
+  const r = parseDR(p.dateRange, today) || inferPeriodDate(p, today)
+  return r && dayDiff(r.s, r.e) <= 62 ? r : null
+}
+
+export function periodStatus(r, today = new Date()) {
+  if (!r) return 'unknown'
+  return today < r.s ? 'future' : today > r.e ? 'past' : 'now'
+}

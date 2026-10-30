@@ -9,6 +9,7 @@
 
 import { useState, useMemo } from 'react'
 import promoData, { PROMO_META, PROMO_ACTIVITY, PROMO_RETAILERS } from './promo_data.js'
+import { MONTH_NAMES, parseDR, inferPeriodDate } from './promoPlan.js'
 import { DEPT_PINS, canSeeRetailer, logPricingAccess } from './deptPins.js'
 import './PromoSection.css'
 import { brandKey } from './brandCategory.js'
@@ -61,76 +62,6 @@ const GOLD_GRAD = `linear-gradient(135deg,${GOLD_A},${GOLD_B})`
 const CUSTOMERS = PROMO_RETAILERS.includes('Watsons') ? PROMO_RETAILERS : [...PROMO_RETAILERS, 'Watsons']
 const TODAY = new Date()
 const TODAY_ISO = `${TODAY.getFullYear()}-${String(TODAY.getMonth() + 1).padStart(2, '0')}-${String(TODAY.getDate()).padStart(2, '0')}`
-
-// ── date helpers ──────────────────────────────────────────────────────────────
-function parseDR(dr = '') {
-  const s0 = (dr || '').trim()
-  const yearOf = n => {
-    const y = parseInt(n)
-    // Thai Buddhist years (Foodland "…/2569") → Gregorian
-    return y < 50 ? 2000 + y : y < 100 ? 1900 + y : y > 2400 ? y - 543 : y
-  }
-  // Foodland same-month day range: "1-31/7/2569"
-  const dd = s0.match(/^(\d+)\s*[–-]\s*(\d+)\s*\/\s*(\d+)\s*\/\s*(\d{2,4})$/)
-  if (dd) {
-    const yr = yearOf(dd[4]), mo = parseInt(dd[3]) - 1
-    return { s: new Date(yr, mo, parseInt(dd[1])), e: new Date(yr, mo, parseInt(dd[2]), 23, 59, 59, 999) }
-  }
-  // Explicit start and end years: "22/10/26 - 18/11/26" (Watsons).
-  const full = s0.match(/^(\d+)\/(\d+)\/(\d{2,4})\s*[–-]\s*(\d+)\/(\d+)\/(\d{2,4})$/)
-  if (full) {
-    const s = new Date(yearOf(full[3]), parseInt(full[2]) - 1, parseInt(full[1]))
-    const e = new Date(yearOf(full[6]), parseInt(full[5]) - 1, parseInt(full[4]), 23, 59, 59, 999)
-    return { s, e }
-  }
-  // Villa format: "25.06.26 - 22.07.26" (dots, both sides carry year, spaces around dash).
-  // Without this branch every Villa period fails to parse and falls back to inferPeriodDate,
-  // which maps "Monthly7"→July and wrongly marks it NOW when today sits in Monthly6's range.
-  const md = s0.match(/^(\d+)\.(\d+)\.(\d+)\s*[–-]\s*(\d+)\.(\d+)\.(\d+)$/)
-  if (md) {
-    const s = new Date(yearOf(md[3]), parseInt(md[2]) - 1, parseInt(md[1]))
-    const e = new Date(yearOf(md[6]), parseInt(md[5]) - 1, parseInt(md[4]), 23, 59, 59, 999)
-    return { s, e }
-  }
-  // "27/05-9/06/26"  or  "7/01-20/01/26"
-  const m = s0.match(/^(\d+)\/(\d+)[–-](\d+)\/(\d+)(?:\/(\d+))?$/)
-  if (!m) return null
-  const yr = m[5] ? yearOf(m[5]) : TODAY.getFullYear()
-  const s = new Date(yr, parseInt(m[2]) - 1, parseInt(m[1]))
-  let e = new Date(yr, parseInt(m[4]) - 1, parseInt(m[3]), 23, 59, 59, 999)
-  if (e < s) e.setFullYear(e.getFullYear() + 1)
-  return { s, e }
-}
-
-const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
-
-// Infer a date range from the period name when dateRange is empty.
-// Handles: Foodland Thai Buddhist names "1-31/1/2569", Villa "Monthly1-Monthly12", Homepro "Jan"-"Dec"
-function inferPeriodDate(p) {
-  const name = (p?.name || '').trim()
-  // Foodland Thai Buddhist: "1-31/1/2569" or "1-30 /4/2569"
-  const th = name.match(/^(\d+)[–-]\s*(\d+)\s*\/(\d+)\/(\d{4})$/)
-  if (th) {
-    const rawYr = parseInt(th[4])
-    const yr = rawYr > 2500 ? rawYr - 543 : rawYr
-    const mo = parseInt(th[3]) - 1
-    const day1 = parseInt(th[1]), day2 = parseInt(th[2])
-    if (mo >= 0 && mo < 12 && day1 >= 1 && day2 >= day1)
-      return { s: new Date(yr, mo, day1), e: new Date(yr, mo, day2, 23, 59, 59, 999) }
-  }
-  // Monthly numbered: "Monthly1" ... "Monthly12" (Villa)
-  const mn = name.match(/^[Mm]onthly(\d+)$/i)
-  if (mn) {
-    const mo = parseInt(mn[1]) - 1
-    if (mo >= 0 && mo < 12)
-      return { s: new Date(TODAY.getFullYear(), mo, 1), e: new Date(TODAY.getFullYear(), mo + 1, 0, 23, 59, 59, 999) }
-  }
-  // Short month name exact match: "Jan", "Feb" ... (Homepro)
-  const mi = MONTH_NAMES.findIndex(m => m.toLowerCase() === name.toLowerCase())
-  if (mi >= 0)
-    return { s: new Date(TODAY.getFullYear(), mi, 1), e: new Date(TODAY.getFullYear(), mi + 1, 0, 23, 59, 59, 999) }
-  return null
-}
 
 function periodIsCurrent(p) {
   const r = parseDR(p.dateRange) || inferPeriodDate(p)
