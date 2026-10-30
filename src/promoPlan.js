@@ -97,3 +97,40 @@ export function buildPlan(periods, today = new Date()) {
   const has = st => cols.some(c => c.status === st)
   return { cols, hasNow: has('now'), hasFuture: has('future'), hasUnknown: has('unknown') }
 }
+
+// ── period selector ───────────────────────────────────────────────────────────
+// Pick = { lvl: 'q'|'m'|'p'|'u', y?, q? (0-3), m? (0-11), name? }
+const endOfDay = (y, m, d) => new Date(y, m, d, 23, 59, 59, 999)
+export const quarterSpan = (y, q) => [new Date(y, q * 3, 1), endOfDay(y, q * 3 + 3, 0)]
+export const monthSpan = (y, m) => [new Date(y, m, 1), endOfDay(y, m + 1, 0)]
+export const colsInSpan = (cols, [a, b]) => cols.filter(c => c.r && c.r.s <= b && c.r.e >= a)
+
+const monthPick = d => ({ lvl: 'm', y: d.getFullYear(), q: Math.floor(d.getMonth() / 3), m: d.getMonth() })
+
+export function defaultPick(cols, today = new Date()) {
+  if (cols.some(c => c.status === 'now')) return monthPick(today)
+  const fut = cols.find(c => c.status === 'future')
+  if (fut) return monthPick(fut.r.s)
+  const dated = cols.filter(c => c.r)
+  if (dated.length) return monthPick(dated[dated.length - 1].r.s)
+  return cols.length ? { lvl: 'u' } : null
+}
+
+export function colsForPick(cols, pick) {
+  if (!pick) return []
+  if (pick.lvl === 'q') return colsInSpan(cols, quarterSpan(pick.y, pick.q))
+  if (pick.lvl === 'm') return colsInSpan(cols, monthSpan(pick.y, pick.m))
+  if (pick.lvl === 'p') return cols.filter(c => c.name === pick.name)
+  return cols.filter(c => !c.r)
+}
+
+export function pickLabel(pick) {
+  if (!pick) return 'No periods'
+  if (pick.lvl === 'q') return `Q${pick.q + 1} ${pick.y}`
+  if (pick.lvl === 'm') return `${MONTH_NAMES[pick.m]} ${pick.y}`
+  if (pick.lvl === 'p') return pick.y != null ? `${pick.name} (${MONTH_NAMES[pick.m]} ${pick.y})` : pick.name
+  return 'Undated periods'
+}
+
+export const pickYears = cols =>
+  [...new Set(cols.flatMap(c => c.r ? [c.r.s.getFullYear(), c.r.e.getFullYear()] : []))].sort((a, b) => a - b)

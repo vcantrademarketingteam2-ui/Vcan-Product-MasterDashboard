@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseDR, periodRange, periodStatus, buildPlan } from '../src/promoPlan.js';
+import { parseDR, periodRange, periodStatus, buildPlan, quarterSpan, monthSpan, colsInSpan, defaultPick, colsForPick, pickLabel, pickYears } from '../src/promoPlan.js';
 
 const T = new Date(2026, 9, 30);
 const ymd = d => [d.getFullYear(), d.getMonth() + 1, d.getDate()];
@@ -63,4 +63,46 @@ test('buildPlan keeps source order when any period is undated', () => {
 test('buildPlan all past', () => {
   const p = buildPlan([{ name: 'a', dateRange: '1/01-14/01/23' }, { name: 'b', dateRange: '15/01-28/01/23' }], T);
   assert.deepEqual([p.hasNow, p.hasFuture, p.hasUnknown], [false, false, false]);
+});
+
+const tops = buildPlan([
+  { name: '2641/42', dateRange: '30/09-13/10/26' }, { name: '2643/44', dateRange: '14/10-27/10/26' },
+  { name: '2645/46', dateRange: '28/10-10/11/26' }, { name: '2647/48', dateRange: '11/11-24/11/26' },
+  { name: '2701/02', dateRange: '23/12-5/01/27' }], T).cols;
+const names = cs => cs.map(c => c.name);
+
+test("defaultPick is today's month when something is live", () => {
+  assert.deepEqual(defaultPick(tops, T), { lvl: 'm', y: 2026, q: 3, m: 9 });
+});
+test('colsForPick month / quarter / period', () => {
+  assert.deepEqual(names(colsForPick(tops, { lvl: 'm', y: 2026, q: 3, m: 9 })), ['2641/42', '2643/44', '2645/46']);
+  assert.equal(colsForPick(tops, { lvl: 'q', y: 2026, q: 3 }).length, 5);
+  assert.deepEqual(names(colsForPick(tops, { lvl: 'p', name: '2647/48' })), ['2647/48']);
+  assert.deepEqual(colsForPick(tops, null), []);
+});
+test('spans end at the last day 23:59:59.999', () => {
+  const [qs, qe] = quarterSpan(2026, 3);
+  assert.deepEqual([ymd(qs), ymd(qe)], [[2026, 10, 1], [2026, 12, 31]]);
+  assert.equal(monthSpan(2026, 1)[1].getDate(), 28);
+  assert.equal(colsInSpan(tops, monthSpan(2026, 10)).length, 2);
+});
+test('defaultPick all past -> month of last dated col', () => {
+  const big = buildPlan([{ name: 'a', dateRange: '1/01-14/01/23' }, { name: 'b', dateRange: '15/03-28/03/23' }], T).cols;
+  assert.deepEqual(defaultPick(big, T), { lvl: 'm', y: 2023, q: 0, m: 2 });
+});
+test('defaultPick future, undated and empty', () => {
+  const fut = buildPlan([{ name: 'a', dateRange: '1/12-14/12/26' }], T).cols;
+  assert.deepEqual(defaultPick(fut, T), { lvl: 'm', y: 2026, q: 3, m: 11 });
+  const und = buildPlan([{ name: '2603/04', dateRange: '' }], T).cols;
+  assert.deepEqual(defaultPick(und, T), { lvl: 'u' });
+  assert.equal(defaultPick([], T), null);
+  assert.deepEqual(names(colsForPick(und, { lvl: 'u' })), ['2603/04']);
+});
+test('pickLabel and pickYears', () => {
+  assert.equal(pickLabel({ lvl: 'q', y: 2026, q: 3 }), 'Q4 2026');
+  assert.equal(pickLabel({ lvl: 'm', y: 2026, q: 3, m: 9 }), 'Oct 2026');
+  assert.equal(pickLabel({ lvl: 'p', name: '2647/48', y: 2026, m: 10 }), '2647/48 (Nov 2026)');
+  assert.equal(pickLabel({ lvl: 'u' }), 'Undated periods');
+  assert.equal(pickLabel(null), 'No periods');
+  assert.deepEqual(pickYears(tops), [2026, 2027]);
 });
