@@ -502,7 +502,7 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
       <div key={c.name} style={{ ...cellBox, alignItems: 'center', color: mu, justifyContent: 'center' }}>
         {isDiscon && c.idx === di
           ? <span style={{ fontSize: 9, fontWeight: 800, color: disconClr, background: `${disconClr}1e`, border: `1px solid ${disconClr}44`, borderRadius: 5, padding: '2px 6px', whiteSpace: 'nowrap' }}>ยกเลิกขาย</span>
-          : <span style={{ opacity: .35 }}>–</span>}
+          : null}
       </div>
     )
     const selected = !!sel && sel.retailer === retailer && sel.barcode === it.barcode && sel.name === c.name
@@ -640,29 +640,34 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
         style={{ ...chip(on, !n), ...(pad ? { padding: '0 8px' } : {}) }}>{MONTH_NAMES[m]}{isCurM(selY, m) && !on && todayDot}</button>
     }
 
-    return (
-      <>
-        <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', flexWrap: 'wrap', alignItems: isMobile ? 'stretch' : 'center', gap: isMobile ? 8 : 12, padding: '12px 18px', borderBottom: `1px solid ${bdr}` }}>
+    const quarterBtn = q => {
+      const n = colsIn(quarterSpan(selY, q)).length
+      const on = pk?.lvl === 'q' && selQ === q
+      return <button key={q} disabled={!n} onClick={() => choose({ lvl: 'q', y: selY, q })}
+        style={{ ...chip(on, !n), ...(isMobile ? {} : { fontWeight: 800, color: on ? '#fff' : mu }) }}>Q{q + 1}{isMobile && years.length < 2 ? ` ${selY}` : ''}{isCurQ(selY, q) && !on && todayDot}</button>
+    }
+    // slot always reserved (visibility, not unmount) so the row never reflows when it appears
+    const backBtn = (extra) => (
+      <button onClick={() => choose(null)} disabled={atNow} aria-hidden={atNow} tabIndex={atNow ? -1 : 0}
+        style={{ ...chip(false, false), color: accentTx, textDecoration: 'underline', textUnderlineOffset: 3, visibility: atNow ? 'hidden' : 'visible', ...extra }}>Back to now</button>
+    )
+
+    function PeriodSelector() {
+      return (
+        <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', flexWrap: 'wrap', alignItems: isMobile ? 'stretch' : 'center', gap: isMobile ? 8 : 12, padding: '12px 18px', borderBottom: `1px solid ${bdr}`, minWidth: 0, maxWidth: '100%' }}>
           {!isMobile && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, flex: '0 0 auto', maxWidth: '100%' }}>
               {years.length > 1 && <div style={seg}>{yearBtns}</div>}
-              <div style={{ display: 'flex', gap: 6 }}>
-                {[0, 1, 2, 3].map(q => {
-                  const nq = colsIn(quarterSpan(selY, q)).length
-                  const qOn = pk?.lvl === 'q' && selQ === q
-                  return (
-                    <div key={q} style={seg}>
-                      <button disabled={!nq} onClick={() => choose({ lvl: 'q', y: selY, q })}
-                        style={{ ...chip(qOn, !nq), fontWeight: 800, color: qOn ? '#fff' : mu }}>Q{q + 1}{isCurQ(selY, q) && !qOn && todayDot}</button>
-                      {[0, 1, 2].map(i => monthBtn(q * 3 + i, q, true))}
-                    </div>
-                  )
-                })}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {[0, 1, 2, 3].map(q => (
+                  <div key={q} style={seg}>
+                    {quarterBtn(q)}
+                    {[0, 1, 2].map(i => monthBtn(q * 3 + i, q, true))}
+                  </div>
+                ))}
               </div>
               {undatedBtn}
-              {/* slot always reserved so the row never shifts when it appears */}
-              <button onClick={() => choose(null)} disabled={atNow} aria-hidden={atNow} tabIndex={atNow ? -1 : 0}
-                style={{ ...chip(false, false), color: accentTx, textDecoration: 'underline', textUnderlineOffset: 3, visibility: atNow ? 'hidden' : 'visible' }}>Back to now</button>
+              {backBtn()}
             </div>
           )}
           {isMobile && (<>
@@ -670,14 +675,9 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
               {rowLbl('QUARTER')}
               {yearBtns}
               {years.length > 1 && <span style={{ width: 1, height: 22, background: bdr, margin: '0 4px' }} />}
-              {[0, 1, 2, 3].map(q => {
-                const n = colsIn(quarterSpan(selY, q)).length
-                const on = pk?.lvl === 'q' && selQ === q
-                return <button key={q} disabled={!n} onClick={() => choose({ lvl: 'q', y: selY, q })}
-                  style={chip(on, !n)}>Q{q + 1}{years.length < 2 ? ` ${selY}` : ''}{isCurQ(selY, q) && !on && todayDot}</button>
-              })}
+              {[0, 1, 2, 3].map(quarterBtn)}
               {undatedBtn}
-              {!atNow && <button onClick={() => choose(null)} style={{ ...chip(false, false), marginLeft: 'auto', color: accentTx, textDecoration: 'underline', textUnderlineOffset: 3 }}>Back to now</button>}
+              {backBtn({ marginLeft: 'auto' })}
             </div>
             {selQ >= 0 && (
               <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
@@ -686,20 +686,20 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
               </div>
             )}
           </>)}
-          {/* period strip: ALWAYS lists every period of the store on one fixed-height scrolling line —
-              quarter/month picks only tint the in-range periods (no reflow, no row-height jumps) */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, ...(isMobile ? {} : { flex: '1 1 0', paddingLeft: 12, borderLeft: `1px solid ${bdr}` }) }}>
+          {/* period strip: ALWAYS lists every period of the store on one scrolling line — quarter/month picks
+              only tint the in-range periods. Desktop: shares the row when >=320px is free, else wraps to its own full-width line. */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, maxWidth: '100%', ...(isMobile ? { width: '100%' } : { flex: '1 1 320px', paddingLeft: 12, borderLeft: `1px solid ${bdr}` }) }}>
             {rowLbl('PERIOD')}
             {planCols.length === 0 ? <span style={{ fontSize: 12.5, color: mu }}>No periods</span> : (
               <div className="ps-strip" key={retailer + JSON.stringify(pk)} ref={stripRef}
-                style={{ ...seg, flex: 1, minWidth: 0, flexWrap: 'nowrap', overflowX: 'auto' }}>
+                style={{ ...seg, flex: 1, minWidth: 0, maxWidth: '100%', flexWrap: 'nowrap', overflowX: 'auto' }}>
                 {planCols.map(c => {
                   const on = pk?.lvl === 'p' && pk.name === c.name
                   const inRange = !on && win.includes(c)
                   const d = c.r?.s
                   return (
                     <button key={c.name} title={datesOf(c)} data-first={win[0] === c ? '1' : undefined}
-                      onClick={() => choose(d ? { lvl: 'p', name: c.name, y: d.getFullYear(), q: Math.floor(d.getMonth() / 3), m: d.getMonth() } : { lvl: 'p', name: c.name, y: selY, q: -1, m: 0 })}
+                      onClick={() => choose(d ? { lvl: 'p', name: c.name, y: d.getFullYear(), q: Math.floor(d.getMonth() / 3), m: d.getMonth() } : { lvl: 'p', name: c.name })}
                       style={{ ...chip(on, false), flex: 'none',
                         background: on ? GOLD_GRAD : inRange ? `${GOLD_A}22` : 'none',
                         color: on ? '#fff' : inRange ? tx : mu, fontWeight: on || inRange ? 800 : 600 }}>
@@ -711,6 +711,12 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
             )}
           </div>
         </div>
+      )
+    }
+
+    return (
+      <div style={{ minWidth: 0, maxWidth: '100%' }}>
+        {PeriodSelector()}
 
         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10, padding: '10px 18px', borderBottom: `1px solid ${bdr}` }}>
           <span style={{ fontSize: 13.5, fontWeight: 800, color: tx }}>{pickLabel(pk)} <span style={{ fontWeight: 600, color: mu }}>· {plural(win.length, 'period')}</span></span>
@@ -774,7 +780,7 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
                           <div key={it.barcode} style={{ display: 'grid', gridTemplateColumns: gridCols }}>
                             <div style={{ position: 'sticky', left: 0, zIndex: 2, background: s, borderRight: `1px solid ${bdr}`, borderBottom: `1px solid ${dim}`, padding: isMobile ? '6px 8px' : '7px 14px', minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 2 }}>
                               <button onClick={() => openProductView(it.barcode)} title="See this product in every store"
-                                style={{ padding: 0, border: 0, background: 'none', color: tx, fontFamily: 'inherit', fontSize: isMobile ? 12 : 13, fontWeight: 700, textAlign: 'left', cursor: 'pointer', minHeight: isMobile ? 24 : 0,
+                                style={{ padding: 0, border: 0, background: 'none', color: tx, fontFamily: 'inherit', fontSize: isMobile ? 12 : 13, fontWeight: 700, textAlign: 'left', cursor: 'pointer', minHeight: isMobile ? 40 : 0,
                                   overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: isMobile ? 'normal' : 'nowrap', display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: isMobile ? 3 : 1 }}>
                                 {productIndex.get(it.barcode)?.name || it.product}
                               </button>
@@ -809,11 +815,11 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
         {hasSel && isMobile && createPortal(
           <div onClick={() => setSel(null)} style={{ position: 'fixed', inset: 0, zIndex: 3000, display: 'flex', alignItems: 'flex-end', background: 'rgba(4,6,12,.55)' }}>
             <aside aria-label="Selected promotion" onClick={e => e.stopPropagation()}
-              style={{ width: '100%', maxHeight: '95dvh', overflowY: 'auto', borderRadius: '16px 16px 0 0', padding: '18px 16px 28px', background: s, borderTop: `1px solid ${bdr}`, boxShadow: '0 -12px 40px rgba(0,0,0,.4)' }}>
+              style={{ width: '100%', maxHeight: '95dvh', overflowY: 'auto', borderRadius: '16px 16px 0 0', color: tx, fontSize: 14, fontFamily: 'inherit', padding: '18px 16px 28px', background: s, borderTop: `1px solid ${bdr}`, boxShadow: '0 -12px 40px rgba(0,0,0,.4)' }}>
               {DetailPanel()}
             </aside>
           </div>, document.body)}
-      </>
+      </div>
     )
   }
 

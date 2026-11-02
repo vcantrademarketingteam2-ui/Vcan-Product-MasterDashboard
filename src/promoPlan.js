@@ -128,7 +128,7 @@ export function pickLabel(pick) {
   if (!pick) return 'No periods'
   if (pick.lvl === 'q') return `Q${pick.q + 1} ${pick.y}`
   if (pick.lvl === 'm') return `${MONTH_NAMES[pick.m]} ${pick.y}`
-  if (pick.lvl === 'p') return pick.y != null ? `${pick.name} (${MONTH_NAMES[pick.m]} ${pick.y})` : pick.name
+  if (pick.lvl === 'p') return pick.y != null && pick.m != null ? `${pick.name} (${MONTH_NAMES[pick.m]} ${pick.y})` : pick.name
   return 'Undated periods'
 }
 

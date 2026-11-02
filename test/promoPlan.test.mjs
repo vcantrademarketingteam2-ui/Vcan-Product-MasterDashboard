@@ -103,6 +103,8 @@ test('pickLabel and pickYears', () => {
   assert.equal(pickLabel({ lvl: 'q', y: 2026, q: 3 }), 'Q4 2026');
   assert.equal(pickLabel({ lvl: 'm', y: 2026, q: 3, m: 9 }), 'Oct 2026');
   assert.equal(pickLabel({ lvl: 'p', name: '2647/48', y: 2026, m: 10 }), '2647/48 (Nov 2026)');
+  assert.equal(pickLabel({ lvl: 'p', name: '2603/04' }), '2603/04');
+  assert.equal(pickLabel({ lvl: 'p', name: '2603/04', y: 2026 }), '2603/04');
   assert.equal(pickLabel({ lvl: 'u' }), 'Undated periods');
   assert.equal(pickLabel(null), 'No periods');
   assert.deepEqual(pickYears(tops), [2026, 2027]);
