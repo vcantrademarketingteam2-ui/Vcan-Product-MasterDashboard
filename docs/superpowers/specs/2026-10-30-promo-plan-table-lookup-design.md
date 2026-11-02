@@ -213,12 +213,12 @@ paragraph marked historical/removed) and add the v3.15.0 history row.
 ## Verification
 
 - `npm run build` and `npm run lint` green.
-- Browser check (desktop 1440px + mobile 390px, dark + light): Tops opens on Oct 2026
-  (3 periods, 2645/46 NOW, bronze underline); Q4 → 7 periods, Mar → Mar's periods, a single
+- Browser check (desktop 1440px + mobile 390px, dark + light): Tops opens on the month containing today
+  (its periods, the current one marked NOW, bronze underline); Q4 → 7 periods, Mar → Mar's periods, a single
   period → 1 column, Back to now → default; **period strip position/width/height identical
   across all picks** (measured); 2701/02 reads 23 Dec – 5 Jan 2027; hide-empty count; collapse a brand; select a cell →
   panel; PIN locked vs unlocked (compensate/GP appear only when unlocked for that retailer);
   search "vnew" → suggestion → Product view → row click returns to that store; Big C shows
-  the stale-plan note; Watsons shows a table with undated columns; TWD/Foodland overlapping
+  the stale-plan note; Watsons shows `Undated (N)` from real data (22 as of 2026-11-02); TWD/Foodland overlapping
 periods render per the rule above; Spotlight still works.
 - Compare against `Prototype.dc.html` behaviour; list deviations.

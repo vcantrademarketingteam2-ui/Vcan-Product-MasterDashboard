@@ -71,13 +71,6 @@ function periodIsCurrent(p) {
   return false
 }
 
-// Derive a short display label for a period name
-function periodLabel(name) {
-  const th = name.match(/\/(\d{1,2})\/\d{4}$/)
-  if (th) return MONTH_NAMES[parseInt(th[1]) - 1] || name
-  return name
-}
-
 const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`
 const fmtDM = d => `${d.getDate()} ${MONTH_NAMES[d.getMonth()]}`
 const TAG_LABEL = { looks: 'LOOKS' }
@@ -116,11 +109,9 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
   const [retailer, setRetailer] = useState(CUSTOMERS[0] || '')
   const [brandFilter, setBrandFilter] = useState([])
   const [spotTab, setSpotTab] = useState('live')
-  const [barTip, setBarTip] = useState(null)
   const [unlocked, setUnlocked] = useState(null)
   const [pin, setPin] = useState('')
   const [pinErr, setPinErr] = useState(false)
-  const [openKey, setOpenKey] = useState(null)
   const [calcOpen, setCalcOpen] = useState(false)
   // Plan/Product redesign state
   const [mode, setMode] = useState('plan')       // 'plan' | 'spot'
@@ -132,7 +123,6 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
   const [sel, setSel] = useState(null)           // {retailer, barcode, name}
   const [hideEmpty, setHideEmpty] = useState(true)
   const [collapsed, setCollapsed] = useState({})
-  const canSeeGP = unlocked && canSeeRetailer(unlocked, retailer)
   const canSee = r => !!unlocked && canSeeRetailer(unlocked, r)
   // Watsons has no generated promo data yet — show the placeholder until it does
   const comingSoon = retailer === 'Watsons' && !PROMO_RETAILERS.includes('Watsons')
@@ -192,68 +182,6 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
     if (!brandFilter.length) return allItems
     return allItems.filter(i => brandFilter.includes(brandKey(i.brand, i.product)))
   }, [allItems, brandFilter])
-
-  const grouped = useMemo(() => {
-    const g = {}
-    items.forEach(i => { (g[i.brand] = g[i.brand] || []).push(i) })
-    return Object.entries(g)
-  }, [items])
-
-  // ── Calendar Pulse / Spotlight memos ─────────────────────────────────────────
-  // Plan-window month axis: one shared percentage coordinate system (start/end
-  // dates → 0–100%) reused for axis month columns, the NOW line and every bar's
-  // left/width. "Full year" spans the full available period range; "3 months"
-  // and "6 months" are a fixed window from the start of the current month.
-  const [planWindow, setPlanWindow] = useState('6m')
-
-  const fullRange = useMemo(() => {
-    const drs = periods.map(p => parseDR(p.dateRange) || inferPeriodDate(p)).filter(Boolean)
-    if (!drs.length) {
-      return { start: new Date(TODAY.getFullYear(), TODAY.getMonth(), 1), end: new Date(TODAY.getFullYear(), TODAY.getMonth() + 1, 0, 23, 59, 59, 999) }
-    }
-    const minS = new Date(Math.min(...drs.map(d => d.s.getTime())))
-    const maxE = new Date(Math.max(...drs.map(d => d.e.getTime())))
-    return { start: new Date(minS.getFullYear(), minS.getMonth(), 1), end: maxE }
-  }, [periods])
-
-  const pulseRange = useMemo(() => {
-    if (planWindow === 'full') return { ...fullRange, totalMs: fullRange.end.getTime() - fullRange.start.getTime() }
-    const months = planWindow === '3m' ? 3 : 6
-    const start = new Date(TODAY.getFullYear(), TODAY.getMonth(), 1)
-    const end = new Date(start.getFullYear(), start.getMonth() + months, 0, 23, 59, 59, 999)
-    return { start, end, totalMs: end.getTime() - start.getTime() }
-  }, [planWindow, fullRange])
-
-  // Month columns spanning the active window — each cell is `left/width: X%` of
-  // the same coordinate system pulseBarPos() below uses for the bars.
-  const pulseWeeks = useMemo(() => {
-    const { start, end, totalMs } = pulseRange
-    const cols = []
-    let cur = new Date(start.getFullYear(), start.getMonth(), 1)
-    let i = 0
-    while (cur <= end) {
-      const mStart = new Date(Math.max(cur.getTime(), start.getTime()))
-      const mEndRaw = new Date(cur.getFullYear(), cur.getMonth() + 1, 0, 23, 59, 59, 999)
-      const mEnd = new Date(Math.min(mEndRaw.getTime(), end.getTime()))
-      const left = (mStart.getTime() - start.getTime()) / totalMs * 100
-      const width = Math.max(0, (mEnd.getTime() - mStart.getTime()) / totalMs * 100)
-      const isNow = cur.getFullYear() === TODAY.getFullYear() && cur.getMonth() === TODAY.getMonth()
-      cols.push({
-        idx: i, start: mStart, end: mEnd, left, width, isNow,
-        label: MONTH_NAMES[cur.getMonth()],
-        dateLabel: String(cur.getFullYear()),
-      })
-      cur = new Date(cur.getFullYear(), cur.getMonth() + 1, 1)
-      i++
-    }
-    return cols
-  }, [pulseRange])
-
-  // NOW position as 0–100% across the active window
-  const nowPct = useMemo(() => {
-    const pct = (TODAY.getTime() - pulseRange.start.getTime()) / pulseRange.totalMs * 100
-    return Math.max(0, Math.min(100, pct))
-  }, [pulseRange])
 
   // Spotlight: products in current / next / past periods
   const spotLive = useMemo(() => {
@@ -348,23 +276,11 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
     return { name: p.name, dateRange: dateLabel, pct: Math.max(0, Math.min(100, pct)) }
   }, [periods, currentIdx])
 
-  // per-period activity dots (union across all items in that period)
-  const actsByPeriod = useMemo(() => {
-    const m = {}
-    items.forEach(it => {
-      Object.entries(it.periods || {}).forEach(([k, pd]) => {
-        if (pd.activities?.length) m[k] = [...new Set([...(m[k] || []), ...pd.activities])]
-      })
-    })
-    return m
-  }, [items])
-
   // ── helpers ─────────────────────────────────────────────────────────────────
   const neon = c => dark ? c : (NEON_DEEP[c] || c)
   const gpColor = gp => gp == null ? t.muted : gp >= 0.30 ? t.green : gp >= 0.20 ? t.yellow : t.red
   const coColor = c => c === 'Vcan' ? t.vcanClr : t.moolaClr
   const priceTxt = pd => pd.salePrice != null ? '฿' + pd.salePrice.toLocaleString('th-TH') : (pd.saleLabel || '')
-  const off = offPctOf
 
   // Bar color: driven by activity type, with clearance override.
   // No-activity promos get an ice-silver frosted-glass pill (txt = theme text),
@@ -385,19 +301,6 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
     }
   }
 
-  // Bar position clipped to the active plan window; uses inferPeriodDate for empty dateRange
-  const pulseBarPos = p => {
-    const dr = parseDR(p.dateRange) || inferPeriodDate(p)
-    if (!dr) return null
-    const { start, end, totalMs } = pulseRange
-    const barStart = Math.max(dr.s.getTime(), start.getTime())
-    const barEnd   = Math.min(dr.e.getTime(), end.getTime())
-    if (barEnd <= barStart) return null
-    const left  = (barStart - start.getTime()) / totalMs * 100
-    const width = (barEnd - barStart) / totalMs * 100
-    return { left: Math.max(0, left), width: Math.max(0.5, width) }
-  }
-
   // Open the product popup with the full master record (promo items lack the
   // retailers map / status fields the popup needs — passing them raw crashes it)
   const openProduct = it => {
@@ -413,7 +316,6 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
   }
 
   const toggleBrand = b => setBrandFilter(prev => prev.includes(b) ? prev.filter(x => x !== b) : [...prev, b])
-  const toggleChip = (key, e) => { e.stopPropagation(); setOpenKey(prev => prev === key ? null : key) }
 
   const submitPin = e => {
     e.preventDefault()
@@ -433,12 +335,6 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
   const disconIdxOf = it => it.disconFrom ? periods.findIndex(pp => pp.name === it.disconFrom) : -1
 
   // ── sub-components ───────────────────────────────────────────────────────────
-  function ActDots({ acts, size = 5 }) {
-    return acts.map(a => ACT[a] ? (
-      <i key={a} className="ps-chip-dot" title={ACT[a].label}
-        style={{ background: neon(ACT[a].color), boxShadow: `0 0 4px -1px ${neon(ACT[a].color)}`, width: size, height: size }} />
-    ) : null)
-  }
 
   // ── Plan view (store table + period selector + detail panel) ─────────────────
   const accentTx = dark ? GOLD_A : GOLD_B
@@ -940,288 +836,6 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
     )
   }
 
-  // Shared background layer for every Pulse track (the week axis strip AND each
-  // product lane) — week gridlines + alternating tint + the NOW line. Every
-  // position here is `left: X%` sourced from pulseWeeks / nowPct, the exact same
-  // numbers pulseBarPos() below uses to place the bars — one coordinate system,
-  // so the axis, the gridlines and the NOW line can never drift apart.
-  function PulseTrackBg() {
-    return (
-      <>
-        {pulseWeeks.map((w, i) => (
-          <div key={i} className="ps-sched-gridcol ps-pulse-week-col" style={{
-            left: `${w.left}%`, width: `${w.width}%`,
-            borderLeft: i === 0 ? 'none' : `1px solid ${dim}`,
-            background: w.isNow ? nowBg : (i % 2 === 1 ? (dark ? 'rgba(255,255,255,.03)' : 'rgba(0,0,0,.02)') : 'transparent'),
-          }} />
-        ))}
-        <div className="ps-sched-nowline" style={{ left: `${nowPct}%`, background: GOLD_A, boxShadow: `0 0 7px 1px ${GOLD_A}cc, 0 0 15px 2px ${GOLD_A}55` }} />
-      </>
-    )
-  }
-
-  // Grid view — unchanged period-column matrix
-  // eslint-disable-next-line no-unused-vars -- unrendered until deleted in Task 8
-  function Calendar() {
-    return (
-      <div className="ps-cal-scroll" style={{ scrollbarColor: `${bdr} transparent` }}>
-        <div className="ps-cal-inner" style={{ position: 'relative' }}>
-          {/* header */}
-          <div className="ps-cal-head" style={{
-            background: dark ? 'rgba(33,38,45,.72)' : 'rgba(251,248,243,.7)',
-            backdropFilter: 'blur(12px) saturate(1.4)', WebkitBackdropFilter: 'blur(12px) saturate(1.4)',
-            borderBottom: `1px solid ${bdr}` }}>
-            <div className="ps-cal-rh" style={{ background: s2, borderRight: `1px solid ${bdr}`, color: mu }}>Product</div>
-            {periods.map((p, i) => {
-              const isNow = i === currentIdx
-              const acts = actsByPeriod[p.name] || []
-              return (
-                <div key={p.name} className={`ps-cal-ph${isNow ? ' ps-now-ph' : ''}`}
-                  style={{ background: isNow ? nowBg : 'transparent', borderLeft: `1px solid ${dim}`,
-                    boxShadow: isNow ? `inset 2px 0 0 ${nowLine}, inset -2px 0 0 ${nowLine}, inset 0 2px 0 ${nowLine}` : 'none' }}>
-                  <div className="ps-cal-ph-code" style={{ color: isNow ? t.accent : tx }}>{periodLabel(p.name)}</div>
-                  {p.dateRange && <div className="ps-cal-ph-rng" style={{ color: mu }}>{p.dateRange}</div>}
-                  {isNow ? <div className="ps-now-tag" style={{ background: GOLD_GRAD, color: '#fff' }}>NOW</div>
-                    : (() => { const r = parseDR(p.dateRange) || inferPeriodDate(p); const d = r && Math.ceil((r.s - TODAY) / 86400000); return d > 0 ? <div style={{ fontSize: 9, color: GOLD_A, fontWeight: 700, marginTop: 2 }}>in {d}d</div> : <div className="ps-cal-ph-caps">{acts.map(a => ACT[a] && <i key={a} style={{ width: 6, height: 6, borderRadius: 99, background: neon(ACT[a].color), boxShadow: `0 0 4px -1px ${neon(ACT[a].color)}` }} />)}</div> })()}
-                </div>
-              )
-            })}
-          </div>
-
-          {/* rows */}
-          {grouped.map(([brand, list]) => (
-            <div key={brand}>
-              <div className="ps-cal-band" style={{ background: `color-mix(in srgb, ${coColor(list[0].company) || t.accent} 7%, ${s2})`, borderBottom: `1px solid ${bdr}`, borderTop: `1px solid ${bdr}` }}>
-                <MonogramTile brand={brand} company={list[0].company} t={t} size="s" />
-                <span className="ps-cal-band-name" style={{ color: coColor(list[0].company) || t.accent }}>{brand}</span>
-                <span className="ps-cal-band-count" style={{ color: mu }}>{list.length} SKU{list.length > 1 ? 's' : ''}</span>
-              </div>
-              {list.map(it => (
-                <div key={it.barcode} className="ps-cal-row" style={{ borderColor: dim, background: dark ? 'rgba(255,255,255,.015)' : 'rgba(255,255,255,.28)' }}>
-                  <div className="ps-cal-rail" style={{ background: s, borderRight: `1px solid ${bdr}` }} onClick={() => openProduct(it)}>
-                    <div className="ps-cal-rail-name" style={{ color: tx }}>{it.product}</div>
-                    <div className="ps-cal-rail-sub">
-                      <span className="ps-cal-rail-rsp" style={{ color: mu }}>RSP ฿{it.rspIncVat}</span>
-                      {canSeeGP && <span className="ps-cal-rail-gp" style={{ color: gpColor(it.gp) }}>GP {Math.round(it.gp * 100)}%</span>}
-                      {it.clearance && <span className="ps-cal-rail-tag" style={{ color: neon(CLEAR_COLOR), background: `${neon(CLEAR_COLOR)}22` }}>CLEAR</span>}
-                    </div>
-                  </div>
-                  {periods.map((p, i) => {
-                    const pd = it.periods?.[p.name]
-                    const isNow = i === currentIdx
-                    const prim = (pd?.activities || []).find(a => ACT[a])
-                    const mc = prim ? neon(ACT[prim].color) : it.clearance ? neon(CLEAR_COLOR) : t.accent
-                    const ckey = it.barcode + '|' + p.name
-                    const pctOff = off(it, pd)
-                    const nowEdge = isNow ? `inset 2px 0 0 ${nowLine}, inset -2px 0 0 ${nowLine}` : 'none'
-                    const di = disconIdxOf(it)
-                    const isDiscon = di >= 0 && i >= di
-                    if (!pd) return (
-                      <div key={p.name} className="ps-cal-cell ps-cal-cell-empty"
-                        style={{ borderLeft: `1px solid ${dim}`, background: isDiscon ? disconBg : (isNow ? nowBg : 'transparent'), boxShadow: nowEdge, color: mu }}>
-                        {isDiscon && i === di && (
-                          <span style={{ fontSize: 9, fontWeight: 800, color: disconClr, background: `${disconClr}1e`, border: `1px solid ${disconClr}44`, borderRadius: 5, padding: '2px 6px', whiteSpace: 'nowrap' }}>ยกเลิกขาย</span>
-                        )}
-                      </div>
-                    )
-                    return (
-                      <div key={p.name} className={`ps-cal-cell${isNow ? ' ps-now-cell' : ''}`}
-                        style={{ borderLeft: `1px solid ${dim}`, background: isDiscon ? disconBg : (isNow ? nowBg : 'transparent'),
-                          boxShadow: nowEdge }}>
-                        <span className="ps-chip" onClick={e => toggleChip(ckey, e)}
-                          style={{ background: (prim || it.clearance) ? `color-mix(in srgb, ${mc} ${dark ? 16 : 24}%, ${s2})`
-                              : pd.branchExclusive ? `color-mix(in srgb, ${branchClr} ${dark ? 14 : 20}%, ${s2})`
-                              : dark ? 'rgba(203,225,243,.10)' : 'rgba(255,255,255,.72)',
-                            border: `1px solid ${(prim || it.clearance) ? mc + '88' : pd.branchExclusive ? branchClr + '88' : (dark ? 'rgba(168,197,218,.4)' : 'rgba(143,169,189,.45)')}`,
-                            boxShadow: (prim || it.clearance) ? `0 0 8px -4px ${mc}` : 'none' }}>
-                          {pctOff != null && pctOff > 0 && <span className="ps-tip">−{pctOff}%</span>}
-                          <span className="ps-chip-pr" style={{ color: tx }}>{priceTxt(pd)}</span>
-                          {pd.branchExclusive && (
-                            <span title="เฉพาะสาขาเควิลเลจ (K.Village only)" style={{ fontSize: 8, fontWeight: 800, color: branchClr, background: `${branchClr}22`, border: `1px solid ${branchClr}55`, borderRadius: 4, padding: '1px 4px', letterSpacing: '.02em', lineHeight: 1.3 }}>K.Village</span>
-                          )}
-                          {openKey === ckey && pctOff != null && pctOff > 0 && <span className="ps-chip-off">−{pctOff}%</span>}
-                          {openKey === ckey && canSeeGP && pd.compensate != null && (
-                            <span style={{ fontSize: 9, fontFamily: 'monospace', color: t.blue || '#58a6ff', fontWeight: 700 }}>฿{pd.compensate.toFixed(2)}</span>
-                          )}
-                          {(pd.activities || []).length > 0 && <span className="ps-chip-dots"><ActDots acts={pd.activities} size={5} /></span>}
-                        </span>
-                      </div>
-                    )
-                  })}
-                </div>
-              ))}
-            </div>
-          ))}
-        </div>
-      </div>
-    )
-  }
-
-  // Calendar Pulse view — proportional bars over a fixed six-week window
-  // (this week + the five that follow). The axis strip AND every product
-  // lane render their gridlines/tint/NOW-line via the shared PulseTrackBg()
-  // using pulseWeeks / nowPct — the identical % numbers pulseBarPos() below
-  // uses to place the bars. Everything lives inside the same width:100%
-  // `.ps-sched-track` box (an axis variant included), so there is no
-  // cross-container DOM measurement anywhere in this view and nothing can
-  // drift out of alignment. Empty capacity is left as plain whitespace —
-  // no placeholder slots, no second grid.
-  // eslint-disable-next-line no-unused-vars -- unrendered until deleted in Task 8
-  function CalendarPulse() {
-    return (
-      <>
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 10, padding: '8px 18px',
-          borderBottom: `1px solid ${bdr}`, flexWrap: 'wrap',
-          background: dark ? 'rgba(255,255,255,.025)' : 'rgba(0,0,0,.02)',
-        }}>
-          <span style={{ fontSize: 10.5, fontWeight: 700, color: mu, textTransform: 'uppercase', letterSpacing: '.08em' }}>Calendar</span>
-          <div style={{ display: 'flex', gap: 4, background: s2, border: `1px solid ${bdr}`, borderRadius: 8, padding: 2 }}>
-            {[['3m', '3 months'], ['6m', '6 months'], ['full', 'Full year']].map(([k, l]) => (
-              <button key={k} onClick={() => setPlanWindow(k)} className={`ps-glow${planWindow === k ? ' ps-glow-on' : ''}`} style={{
-                '--g': GOLD_A,
-                fontSize: 10.5, fontWeight: 700, padding: '4px 10px', borderRadius: 6, fontFamily: 'inherit',
-                background: planWindow === k ? `${GOLD_A}22` : 'none',
-                color: planWindow === k ? (dark ? GOLD_A : GOLD_B) : mu,
-                border: planWindow === k ? `1px solid ${GOLD_A}66` : '1px solid transparent',
-                cursor: 'pointer', whiteSpace: 'nowrap',
-              }}>{l}</button>
-            ))}
-          </div>
-          <span style={{ marginLeft: 'auto', fontSize: 10, color: mu, fontStyle: 'italic' }}>hover bars for details</span>
-        </div>
-        <div className="ps-sched-scroll" style={{ scrollbarColor: `${bdr} transparent`, overflow: 'auto', maxHeight: '70vh' }}
-          onMouseLeave={() => setBarTip(null)}>
-          <div className="ps-sched-inner" style={{ minWidth: planWindow === 'full' ? Math.max(900, periods.length * 62 + 252) : planWindow === '6m' ? 1100 : 900 }}>
-
-            {/* Week axis — frosted glass over scrolling rows. Gridlines, week tint
-                and the NOW line/tag are all painted by PulseTrackBg — same math as
-                every row's track below it, so the axis can never drift from the rows. */}
-            <div className="ps-sched-axis" style={{
-              background: dark ? 'rgba(33,38,45,.72)' : 'rgba(251,248,243,.7)',
-              backdropFilter: 'blur(12px) saturate(1.4)', WebkitBackdropFilter: 'blur(12px) saturate(1.4)',
-              borderBottom: `1px solid ${bdr}` }}>
-              <div className="ps-sched-axis-lead" style={{ background: s2, borderRight: `1px solid ${bdr}` }}>
-                <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.1em', color: mu }}>Product</span>
-              </div>
-              <div className="ps-sched-months ps-pulse-weeks">
-                <div className="ps-sched-track ps-sched-track--axis ps-pulse-track">
-                  <PulseTrackBg />
-                  {pulseWeeks.map((w, i) => (
-                    <div key={i} className={`ps-sched-month-lbl ps-pulse-week-lbl${w.isNow ? ' ps-pulse-week-lbl--live' : ''}`} style={{ left: `${w.left}%`, width: `${w.width}%` }}>
-                      <b style={{ color: w.isNow ? t.accent : tx }}>{w.label}</b>
-                      <small style={{ color: w.isNow ? t.accent + 'bb' : mu }}>{w.dateLabel}</small>
-                    </div>
-                  ))}
-                  <div className="ps-sched-now-tag" style={{ left: `${nowPct}%`, background: GOLD_GRAD }}>TODAY</div>
-                </div>
-              </div>
-            </div>
-
-            {/* Brand + product rows */}
-            {grouped.map(([brand, list]) => (
-              <div key={brand}>
-                {/* Brand header */}
-                <div className="ps-sched-brand-hdr" style={{
-                  borderLeft: `3px solid ${coColor(list[0].company) || t.accent}`,
-                  background: dark ? 'rgba(255,255,255,.03)' : 'rgba(0,0,0,.02)',
-                  borderBottom: `1px solid ${dim}`, borderTop: `1px solid ${bdr}`,
-                }}>
-                  <MonogramTile brand={brand} company={list[0].company} t={t} size="s" />
-                  <span style={{ fontSize: 11.5, fontWeight: 800, letterSpacing: '.07em', textTransform: 'uppercase', color: coColor(list[0].company) || t.accent }}>{brand}</span>
-                  <span style={{ fontSize: 10.5, color: mu }}>{list.length} SKU{list.length > 1 ? 's' : ''}</span>
-                  <span style={{ fontSize: 10, color: mu, marginLeft: 4 }}>{list[0].company}</span>
-                </div>
-
-                {/* Product rows */}
-                {list.map(it => {
-                  const discontinued = disconIdxOf(it) >= 0
-                  return (
-                  <div key={it.barcode} className="ps-sched-row" style={{ borderColor: dim, background: dark ? 'rgba(255,255,255,.015)' : 'rgba(255,255,255,.28)' }}>
-                    {/* Left sticky panel */}
-                    <div className="ps-sched-lead" style={{ background: s, borderRight: `1px solid ${bdr}` }}
-                      onClick={() => openProduct(it)}>
-                      <div style={{ fontSize: 12.5, fontWeight: 600, color: tx, lineHeight: 1.35, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.product}</div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
-                        <span style={{ fontSize: 13, fontFamily: 'ui-monospace,monospace', fontWeight: 800, color: dark ? GOLD_A : GOLD_B, background: `${GOLD_A}18`, borderRadius: 4, padding: '2px 5px' }}>RSP ฿{it.rspIncVat}</span>
-                        {canSeeGP && <span style={{ fontSize: 10, fontFamily: 'ui-monospace,monospace', fontWeight: 700, color: gpColor(it.gp) }}>GP {Math.round(it.gp * 100)}%</span>}
-                        {it.clearance && <span style={{ fontSize: 8.5, fontWeight: 800, color: neon(CLEAR_COLOR), background: `${neon(CLEAR_COLOR)}22`, borderRadius: 4, padding: '1px 5px', letterSpacing: '.04em' }}>CLEAR</span>}
-                        {discontinued && <span className="ps-pulse-attention ps-pulse-lead-tag" style={{ fontSize: 8.5, fontWeight: 800, letterSpacing: '.04em' }}>ยกเลิกขาย</span>}
-                      </div>
-                    </div>
-
-                    {/* Proportional Pulse lane — empty capacity is plain whitespace */}
-                    <div className="ps-sched-lane">
-                      <div className="ps-sched-track" onMouseLeave={() => setBarTip(null)}>
-                        <PulseTrackBg />
-                        {periods.map(p => {
-                          const pd = it.periods?.[p.name]
-                          if (!pd) return null
-                          const pos = pulseBarPos(p)
-                          if (!pos) return null
-                          const bs = getBarStyle(pd.activities, it.clearance, pd.branchExclusive)
-                          const offPct = offPctOf(it, pd)
-                          const dr = parseDR(p.dateRange) || inferPeriodDate(p)
-                          const dateDisplay = p.dateRange || (dr ? `${MONTH_NAMES[dr.s.getMonth()]} ${dr.s.getFullYear()}` : '')
-                          const multiAct = (pd.activities || []).length > 1
-                          const isLive = !!p.isCurrent
-                          const daysLeft = dr ? Math.ceil((dr.e.getTime() - TODAY.getTime()) / 86400000) : null
-                          const isAttention = isLive && daysLeft != null && daysLeft <= 3
-                          const isUnassigned = !!bs.ice
-                          const statusCls = `${isLive ? ' ps-pulse-live' : ''}${isAttention ? ' ps-pulse-attention' : ''}${isUnassigned ? ' ps-pulse-unassigned' : ''}`
-                          return (
-                            <div key={p.name} className={`ps-sched-bar${statusCls}`}
-                              style={{ left: `${pos.left}%`, width: `${pos.width}%`, background: bs.bg,
-                                border: `1px solid ${bs.clr}${bs.ice ? '66' : '55'}`,
-                                boxShadow: `inset 0 1px 0 rgba(255,255,255,.3), 0 0 7px ${bs.clr}66, 0 0 16px -3px ${bs.clr}` }}
-                              onMouseEnter={e => setBarTip({
-                                x: e.clientX, y: e.clientY,
-                                brand: it.brand, product: it.product,
-                                period: p.name, dates: dateDisplay,
-                                price: priceTxt(pd), rsp: `฿${it.rspIncVat}`,
-                                offPct, color: bs.clr,
-                                activities: pd.activities || [],
-                                clearance: it.clearance,
-                                branch: pd.branchExclusive,
-                                unassigned: isUnassigned,
-                                live: isLive,
-                                attention: isAttention,
-                              })}
-                              onMouseLeave={e => { e.stopPropagation(); setBarTip(null) }}
-                              onMouseMove={e => setBarTip(prev => prev ? { ...prev, x: e.clientX, y: e.clientY } : prev)}
-                            >
-                              {/* min-width on .ps-sched-bar guarantees room, so the price
-                                  always shows — bars stay identifiable as compact blocks even
-                                  on the widest (Full year) window. Unassigned status is conveyed
-                                  by the ice-pill styling, legend and hover tooltip, not bar text. */}
-                              <span className="ps-sched-bar-txt"
-                                style={bs.ice ? { color: bs.txt, textShadow: 'none' } : undefined}>{priceTxt(pd)}</span>
-                              {pos.width >= 3 && offPct != null && offPct > 0 && (
-                                <span className="ps-sched-bar-off" style={bs.ice ? { color: bs.txt } : undefined}>−{offPct}%</span>
-                              )}
-                              {multiAct && pos.width >= 4 && (
-                                <span className="ps-sched-bar-dots"><ActDots acts={pd.activities} size={4.5} /></span>
-                              )}
-                              {pd.branchExclusive && pos.width >= 3 && (
-                                <span style={{ fontSize: 8.5, fontWeight: 800, color: '#fff', background: 'rgba(0,0,0,.28)', borderRadius: 4, padding: '0 4px', marginLeft: 2, whiteSpace: 'nowrap' }}>K.Village</span>
-                              )}
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                  )
-                })}
-              </div>
-            ))}
-
-          </div>
-        </div>
-      </>
-    )
-  }
-
   // Reusable feed card for Spotlight (compact, brand shown in parent header).
   // `ended` = past promo: use a more opaque card + full-contrast text so the
   // history stays clearly legible instead of fading into the background.
@@ -1546,67 +1160,6 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
           : view === 'product' ? ProductView() : PlanView()
         }
       </div>
-      )}
-
-      {/* Bar hover popup — fixed overlay, follows mouse */}
-      {barTip && (
-        <div style={{
-          position: 'fixed', zIndex: 9999, pointerEvents: 'none',
-          left: barTip.x + 18, top: Math.max(8, barTip.y - 30),
-          background: dark ? 'rgba(18,22,42,.82)' : 'rgba(255,255,255,.78)',
-          backdropFilter: 'blur(16px) saturate(1.5)', WebkitBackdropFilter: 'blur(16px) saturate(1.5)',
-          border: `1px solid ${barTip.color}44`,
-          borderRadius: 12, padding: '13px 15px', minWidth: 210, maxWidth: 250,
-          boxShadow: `0 20px 50px rgba(0,0,0,${dark ? .65 : .15}), 0 0 0 1px ${barTip.color}18`,
-        }}>
-          <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: barTip.color, marginBottom: 2 }}>{barTip.brand}</div>
-          <div style={{ fontSize: 12.5, fontWeight: 700, color: tx, lineHeight: 1.35, marginBottom: 6 }}>{barTip.product}</div>
-          {(barTip.live || barTip.attention) && (
-            <div style={{ display: 'flex', gap: 5, marginBottom: 5 }}>
-              {barTip.live && <span className="ps-pulse-badge ps-pulse-badge--live">Live</span>}
-              {barTip.attention && <span className="ps-pulse-badge ps-pulse-badge--attention">Attention</span>}
-            </div>
-          )}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 3 }}>
-            <span style={{ fontSize: 11, fontWeight: 700, color: t.accent, letterSpacing: '.04em' }}>{barTip.period}</span>
-            <span style={{ fontSize: 10.5, color: mu }}>{barTip.dates}</span>
-          </div>
-          <div style={{ height: 1, background: bdr, margin: '8px 0' }} />
-          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10 }}>
-            <div style={{ fontSize: 22, fontWeight: 800, fontFamily: 'ui-monospace,monospace', color: barTip.color, lineHeight: 1 }}>{barTip.price}</div>
-            <div>
-              <div style={{ fontSize: 11, color: mu, textDecoration: 'line-through' }}>{barTip.rsp}</div>
-              {barTip.offPct != null && barTip.offPct > 0 && (
-                <div style={{ fontSize: 12, fontWeight: 800, color: barTip.color }}>−{barTip.offPct}%</div>
-              )}
-            </div>
-          </div>
-          {(barTip.activities.length > 0 || barTip.clearance || barTip.branch) && (
-            <>
-              <div style={{ height: 1, background: bdr, margin: '9px 0 7px' }} />
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-                {barTip.branch && (
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 5, background: `${branchClr}18`, color: branchClr, border: `1px solid ${branchClr}33` }}>
-                    <i style={{ width: 5, height: 5, borderRadius: 99, background: branchClr, display: 'inline-block' }} />
-                    เฉพาะสาขาเควิลเลจ
-                  </span>
-                )}
-                {barTip.activities.map(a => ACT[a] ? (
-                  <span key={a} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 5, background: `${neon(ACT[a].color)}18`, color: neon(ACT[a].color), border: `1px solid ${neon(ACT[a].color)}33` }}>
-                    <i style={{ width: 5, height: 5, borderRadius: 99, background: neon(ACT[a].color), display: 'inline-block' }} />
-                    {ACT[a].label}
-                  </span>
-                ) : null)}
-                {barTip.clearance && (
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 5, background: `${neon(CLEAR_COLOR)}18`, color: neon(CLEAR_COLOR), border: `1px solid ${neon(CLEAR_COLOR)}33` }}>
-                    <i style={{ width: 5, height: 5, borderRadius: 99, background: neon(CLEAR_COLOR), display: 'inline-block' }} />
-                    เคลียร์สินค้า
-                  </span>
-                )}
-              </div>
-            </>
-          )}
-        </div>
       )}
 
       {/* calculator modal */}
