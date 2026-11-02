@@ -9,7 +9,7 @@
 
 import { useState, useMemo } from 'react'
 import promoData, { PROMO_META, PROMO_ACTIVITY, PROMO_RETAILERS } from './promo_data.js'
-import { MONTH_NAMES, parseDR, inferPeriodDate } from './promoPlan.js'
+import { MONTH_NAMES, parseDR, inferPeriodDate, buildPlan } from './promoPlan.js'
 import { DEPT_PINS, canSeeRetailer, logPricingAccess } from './deptPins.js'
 import './PromoSection.css'
 import { brandKey } from './brandCategory.js'
@@ -102,8 +102,6 @@ function enrich(items, rawData) {
 export default function PromoSection({ rawData, t, dark, isMobile, onSelect, RetailerLogo, MonogramTile, BrandCategoryFilter }) {
   const [retailer, setRetailer] = useState(CUSTOMERS[0] || '')
   const [brandFilter, setBrandFilter] = useState([])
-  const [layout, setLayout] = useState('timeline')
-  const [tlView, setTlView] = useState('pulse')
   const [spotTab, setSpotTab] = useState('live')
   const [barTip, setBarTip] = useState(null)
   const [unlocked, setUnlocked] = useState(null)
@@ -111,7 +109,20 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
   const [pinErr, setPinErr] = useState(false)
   const [openKey, setOpenKey] = useState(null)
   const [calcOpen, setCalcOpen] = useState(false)
+  /* eslint-disable no-unused-vars -- consumed by PlanView/ProductView in Tasks 6-7 */
+  // Plan/Product redesign state
+  const [mode, setMode] = useState('plan')       // 'plan' | 'spot'
+  const [view, setView] = useState('store')      // 'store' | 'product'
+  const [pb, setPb] = useState(null)             // product-view barcode
+  const [q, setQ] = useState('')
+  const [sugOpen, setSugOpen] = useState(false)
+  const [pick, setPick] = useState(null)
+  const [sel, setSel] = useState(null)           // {retailer, barcode, name}
+  const [hideEmpty, setHideEmpty] = useState(true)
+  const [collapsed, setCollapsed] = useState({})
   const canSeeGP = unlocked && canSeeRetailer(unlocked, retailer)
+  const canSee = r => !!unlocked && canSeeRetailer(unlocked, r)
+  /* eslint-enable no-unused-vars */
   // Watsons has no generated promo data yet — show the placeholder until it does
   const comingSoon = retailer === 'Watsons' && !PROMO_RETAILERS.includes('Watsons')
 
@@ -122,10 +133,36 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
 
   const currentIdx = useMemo(() => periods.findIndex(p => p.isCurrent), [periods])
 
-  const allItems = useMemo(() => {
-    const raw = promoData.filter(p => p.retailer === retailer)
-    return enrich(raw, rawData)
-  }, [retailer, rawData])
+  // Enriched once for every retailer (Product view spans all stores); per-store lists derive from it
+  const allEnriched = useMemo(() => enrich(promoData, rawData), [rawData])
+  const itemsByRetailer = useMemo(() => {
+    const m = {}
+    allEnriched.forEach(it => { (m[it.retailer] = m[it.retailer] || []).push(it) })
+    return m
+  }, [allEnriched])
+  const allItems = useMemo(() => itemsByRetailer[retailer] || [], [itemsByRetailer, retailer])
+  // eslint-disable-next-line no-unused-vars -- used by Tasks 6-7
+  const plans = useMemo(() => Object.fromEntries(CUSTOMERS.map(r => [r, buildPlan(PROMO_META[r]?.periods || [], TODAY)])), [])
+  // Product identity = barcode. name = master name, falling back to the first promo name.
+  const productIndex = useMemo(() => {
+    const master = new Map((rawData || []).map(r => [r.barcode, r]))
+    const m = new Map()
+    allEnriched.forEach(it => {
+      let e = m.get(it.barcode)
+      if (!e) { e = { name: master.get(it.barcode)?.product || it.product, brand: it.brand, names: [], stores: [] }; m.set(it.barcode, e) }
+      e.names.push(it.product)
+      if (!e.stores.includes(it.retailer)) e.stores.push(it.retailer)
+    })
+    m.forEach((e, bc) => { e.hay = [e.name, ...e.names, e.brand, bc].join(' ').toLowerCase(); delete e.names })
+    return m
+  }, [allEnriched, rawData])
+  const qn = q.trim().toLowerCase()
+  const sugs = useMemo(() => {
+    if (qn.length < 2) return []
+    const out = []
+    for (const [bc, e] of productIndex) { if (e.hay.includes(qn)) { out.push({ bc, ...e }); if (out.length >= 8) break } }
+    return out
+  }, [qn, productIndex])
 
   const brandList = useMemo(() => [...new Set(allItems.map(i => brandKey(i.brand, i.product)))].filter(Boolean).sort(), [allItems])
 
@@ -358,6 +395,17 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
     onSelect?.(m || { retailers: {}, status: '', rsp: it.rspIncVat ?? null, packSize: '', ...it })
   }
 
+  const pickStore = r => { setRetailer(r); setPick(null); setSel(null); setBrandFilter([]); setView('store') }
+  const openProductView = bc => { setPb(bc); setView('product'); setMode('plan'); setSel(null) }
+  // eslint-disable-next-line no-unused-vars -- used by Tasks 6-7
+  const openStorePlan = (r, barcode, liveCol) => {
+    setRetailer(r); setBrandFilter([]); setPick(null); setQ(''); setView('store'); setMode('plan')
+    setSel(liveCol ? { retailer: r, barcode, name: liveCol.name } : null)
+  }
+  // Tasks 6-7 replace these stubs
+  function PlanView() { return null }
+  function ProductView() { return null }
+
   const toggleBrand = b => setBrandFilter(prev => prev.includes(b) ? prev.filter(x => x !== b) : [...prev, b])
   const toggleChip = (key, e) => { e.stopPropagation(); setOpenKey(prev => prev === key ? null : key) }
 
@@ -407,6 +455,7 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
   }
 
   // Grid view — unchanged period-column matrix
+  // eslint-disable-next-line no-unused-vars -- unrendered until deleted in Task 8
   function Calendar() {
     return (
       <div className="ps-cal-scroll" style={{ scrollbarColor: `${bdr} transparent` }}>
@@ -511,6 +560,7 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
   // cross-container DOM measurement anywhere in this view and nothing can
   // drift out of alignment. Empty capacity is left as plain whitespace —
   // no placeholder slots, no second grid.
+  // eslint-disable-next-line no-unused-vars -- unrendered until deleted in Task 8
   function CalendarPulse() {
     return (
       <>
@@ -864,7 +914,7 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
       <div className="ps-pills">
         <span className="ps-label" style={{ color: mu }}>Customer</span>
         {CUSTOMERS.map(r => (
-          <button key={r} onClick={() => { setRetailer(r); setBrandFilter([]) }} title={r}
+          <button key={r} onClick={() => pickStore(r)} title={r}
             className={`ps-glow${retailer === r ? ' ps-glow-on' : ''}`} style={{
             '--g': GOLD_A,
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
@@ -892,62 +942,39 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
         </div>
       )}
 
-      {/* toolbar: layout toggle + sub-toggle + activity legend + tools */}
+      {/* toolbar: Plan|Spotlight switch + product search + tools */}
       {!comingSoon && (
       <div className="ps-toolbar">
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 8 }}>
-          {/* main view toggle */}
-          <div className="ps-seg" style={{ background: s2, border: `1px solid ${bdr}` }}>
-            {[['timeline', 'Timeline', IcoTimeline], ['grid', 'Grid', IcoGrid]].map(([k, l, Ico]) => (
-              <button key={k} className={`ps-glow${layout === k ? ' on ps-glow-on' : ''}`} onClick={() => setLayout(k)} style={{
-                '--g': GOLD_A,
-                background: layout === k ? GOLD_GRAD : 'none',
-                color: layout === k ? '#fff' : mu,
-              }}><Ico size={13} />{l}</button>
-            ))}
-          </div>
-          {/* sub-toggle — directly under main toggle when Timeline is selected */}
-          {layout === 'timeline' && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingLeft: 3 }}>
-              <span style={{ fontSize: 10.5, color: dim, fontWeight: 600 }}>view:</span>
-              <div className="ps-seg" style={{ background: s2, border: `1px solid ${bdr}`, padding: 2 }}>
-                {[['pulse','Calendar'], ['spotlight','Spotlight']].map(([k, l]) => (
-                  <button key={k} className={`ps-glow${tlView === k ? ' on ps-glow-on' : ''}`} onClick={() => setTlView(k)} style={{
-                    '--g': GOLD_A,
-                    fontSize: 11.5, padding: '5px 12px',
-                    background: tlView === k ? `${GOLD_A}22` : 'none',
-                    color: tlView === k ? (dark ? GOLD_A : GOLD_B) : mu,
-                    border: tlView === k ? `1px solid ${GOLD_A}66` : '1px solid transparent',
-                    borderRadius: 7,
-                  }}>{l}</button>
-                ))}
-              </div>
+        <div className="ps-seg" style={{ background: s2, border: `1px solid ${bdr}` }}>
+          {[['plan', 'Plan', IcoGrid], ['spot', 'Spotlight', IcoTimeline]].map(([k, l, Ico]) => (
+            <button key={k} className={`ps-glow${mode === k ? ' on ps-glow-on' : ''}`} onClick={() => setMode(k)} style={{
+              '--g': GOLD_A,
+              background: mode === k ? GOLD_GRAD : 'none',
+              color: mode === k ? '#fff' : mu,
+            }}><Ico size={13} />{l}</button>
+          ))}
+        </div>
+        <div style={{ position: 'relative', flex: isMobile ? '1 1 100%' : '1 1 280px', maxWidth: isMobile ? 'none' : 460, minWidth: 0 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 9, height: isMobile ? 44 : 40, padding: '0 12px', borderRadius: 10, border: `1px solid ${bdr}`, background: s2 }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={GOLD_A} strokeWidth="2.2" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>
+            <input type="search" value={q} aria-label="Search product, brand or barcode"
+              onChange={e => { setQ(e.target.value); setSugOpen(true) }}
+              onFocus={() => setSugOpen(true)} onBlur={() => setSugOpen(false)}
+              onKeyDown={e => { if (e.key === 'Escape') setSugOpen(false) }}
+              placeholder="Search product, brand or barcode"
+              style={{ flex: 1, minWidth: 0, background: 'none', border: 0, outline: 0, color: tx, fontFamily: 'inherit', fontSize: isMobile ? 16 : 13.5 }} />
+          </label>
+          {sugOpen && sugs.length > 0 && (
+            <div style={{ position: 'absolute', top: (isMobile ? 48 : 44), left: 0, right: 0, zIndex: 40, background: s, border: `1px solid ${GOLD_A}88`, borderRadius: 12, overflow: 'hidden', boxShadow: '0 18px 40px rgba(0,0,0,.35)' }}>
+              {sugs.map(e => (
+                <button key={e.bc} onMouseDown={ev => { ev.preventDefault(); setQ(''); setSugOpen(false); openProductView(e.bc) }}
+                  style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2, width: '100%', minHeight: 48, padding: '8px 14px', border: 0, borderBottom: `1px solid ${bdr}`, background: 'none', color: tx, fontFamily: 'inherit', textAlign: 'left', cursor: 'pointer' }}>
+                  <span style={{ fontSize: 13, fontWeight: 700 }}>{e.name} — {e.brand} · in {e.stores.length} store{e.stores.length === 1 ? '' : 's'}</span>
+                  <span style={{ fontSize: 11.5, color: mu }}>{e.bc}</span>
+                </button>
+              ))}
             </div>
           )}
-        </div>
-        <div style={{ display: 'flex', gap: 13, alignItems: 'center', flexWrap: 'wrap' }}>
-          {Object.entries(ACT).filter(([k]) => k !== 'looks' || retailer === 'Tops').map(([k, a]) => (
-            <span key={k} className="ps-actleg" style={{ color: mu }}>
-              <span className="ps-actleg-dot" style={{ background: neon(a.color), boxShadow: `0 0 5px -1px ${neon(a.color)}` }} />
-              {a.label}
-            </span>
-          ))}
-          <span className="ps-actleg" style={{ color: mu }}>
-            <span className="ps-actleg-dot" style={{ background: neon(CLEAR_COLOR), boxShadow: `0 0 5px -1px ${neon(CLEAR_COLOR)}` }} />
-            เคลียร์สินค้า
-          </span>
-          <span className="ps-actleg" style={{ color: mu }}>
-            <span className="ps-actleg-dot" style={{ background: dark ? '#1c2630' : '#fbf9f5', border: `1px solid ${dark ? '#a8c5da' : '#8fa9bd'}` }} />
-            Promotion unassigned
-          </span>
-          <span className="ps-actleg ps-pulse-legend--live" style={{ color: mu }}>
-            <span className="ps-actleg-dot ps-pulse-status-dot ps-pulse-status-dot--live" />
-            Live / Active
-          </span>
-          <span className="ps-actleg ps-pulse-legend--attention" style={{ color: mu }}>
-            <span className="ps-actleg-dot ps-pulse-status-dot ps-pulse-status-dot--attention" />
-            Attention
-          </span>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginLeft: 'auto' }}>
           <button onClick={() => setCalcOpen(true)} className="ps-glow" style={{
@@ -1006,11 +1033,11 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
         {/* views are invoked as functions (not JSX components) — they are re-defined on
             every render, and rendering them as <Component /> would remount the whole
             subtree on each state change, resetting scroll position and hover state */}
-        {items.length === 0
-          ? <div style={{ padding: '56px 0', textAlign: 'center', color: mu }}>ไม่พบข้อมูลที่ตรงกับ filter</div>
-          : layout === 'grid' ? Calendar()
-          : tlView === 'pulse' ? CalendarPulse()
-          : Spotlight()
+        {mode === 'spot'
+          ? (items.length === 0
+              ? <div style={{ padding: '56px 0', textAlign: 'center', color: mu }}>ไม่พบข้อมูลที่ตรงกับ filter</div>
+              : Spotlight())
+          : view === 'product' ? ProductView() : PlanView()
         }
       </div>
       )}
