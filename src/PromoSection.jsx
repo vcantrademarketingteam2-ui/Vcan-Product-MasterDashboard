@@ -933,15 +933,6 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
         ))}
       </div>
 
-      {/* brand filter — shared category navigator (passed from App.jsx) */}
-      {!comingSoon && brandList.length > 0 && BrandCategoryFilter && (
-        <div style={{ marginBottom: 12 }}>
-          <BrandCategoryFilter idPrefix="ps-promo" brandList={brandList}
-            selectedBrands={brandFilter} onToggle={toggleBrand} onClear={() => setBrandFilter([])}
-            brandCompany={brandCompany} brandCounts={brandCounts} t={t} isMobile={isMobile} />
-        </div>
-      )}
-
       {/* toolbar: Plan|Spotlight switch + product search + tools */}
       {!comingSoon && (
       <div className="ps-toolbar">
@@ -999,6 +990,15 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
           )}
         </div>
       </div>
+      )}
+
+      {/* brand filter — shared category navigator (passed from App.jsx) */}
+      {!comingSoon && brandList.length > 0 && BrandCategoryFilter && (
+        <div style={{ marginBottom: 12 }}>
+          <BrandCategoryFilter idPrefix="ps-promo" brandList={brandList}
+            selectedBrands={brandFilter} onToggle={toggleBrand} onClear={() => setBrandFilter([])}
+            brandCompany={brandCompany} brandCounts={brandCounts} t={t} isMobile={isMobile} />
+        </div>
       )}
 
       {/* main card */}
