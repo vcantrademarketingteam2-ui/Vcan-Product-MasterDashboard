@@ -384,3 +384,6 @@
 .ps-strip[data-l="1"]{--fl:transparent}
 .ps-strip[data-r="1"]{--fr:transparent}
 .ps-strip::-webkit-scrollbar{display:none}
+
+.ps-prow:hover { background: rgba(212,168,106,.10); }
+.ps-prow:focus-visible { outline: 2px solid #d4a86a; outline-offset: -2px; background: rgba(212,168,106,.10); }

@@ -61,6 +61,7 @@ const IcoCalc = ({ size = 14 }) => (
 const GOLD_GRAD = `linear-gradient(135deg,${GOLD_A},${GOLD_B})`
 // Appended only when absent, so this collapses to the untouched array once promo data carries Watsons.
 const CUSTOMERS = PROMO_RETAILERS.includes('Watsons') ? PROMO_RETAILERS : [...PROMO_RETAILERS, 'Watsons']
+const PV_COLS = '180px 1.2fr 1fr 1fr'
 const TODAY = new Date()
 const TODAY_ISO = `${TODAY.getFullYear()}-${String(TODAY.getMonth() + 1).padStart(2, '0')}-${String(TODAY.getDate()).padStart(2, '0')}`
 
@@ -508,7 +509,7 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
       </div>
     )
     const boxes = x => [
-      ['NOW', t.green, nowBox(x)],
+      ['NOW', accentTx, nowBox(x)],
       ['NEXT PERIOD', blue, boxView(x, x.next, x.nextCol, 'No next period')],
       ['UPCOMING', mu, boxView(x, x.upcoming, x.upcoming?.col, 'Nothing planned')],
     ]
@@ -517,12 +518,12 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
         {RetailerLogo
           ? <RetailerLogo name={x.retailer} h={28} maxW={74} dark={dark} fallbackStyle={{ fontSize: 13, fontWeight: 800, color: tx }} />
           : <b style={{ color: tx }}>{x.retailer}</b>}
-        <span style={{ fontSize: 12, color: mu }}>RSP ฿{x.item.rspIncVat}</span>
+        <span style={{ fontSize: 12, color: mu }}>RSP {x.item.rspIncVat != null ? `฿${x.item.rspIncVat}` : '—'}</span>
         {canSee(x.retailer) && x.item.gp != null && <span style={{ fontSize: 11.5, fontWeight: 700, color: gpColor(x.item.gp) }}>GP {Math.round(x.item.gp * 100)}%</span>}
       </div>
     )
     const go = x => openStorePlan(x.retailer, pb, x.now?.col)
-    const rowProps = x => ({ role: 'button', tabIndex: 0, onClick: () => go(x), onKeyDown: ev => { if (ev.key === 'Enter') go(x) }, title: `Open ${x.retailer} plan` })
+    const rowProps = x => ({ role: 'button', tabIndex: 0, onClick: () => go(x), onKeyDown: ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); go(x) } }, 'aria-label': `Open ${x.retailer} plan` })
     const colHead = (label, c) => <div style={{ fontSize: 11.5, fontWeight: 800, letterSpacing: '.08em', color: c, padding: '12px 14px', borderBottom: `1px solid ${bdr}` }}>{label}</div>
 
     return (
@@ -558,10 +559,12 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
           </div>
         ) : (
           <div style={{ ...card, overflowX: 'auto' }}>
-            <div style={{ minWidth: 800, display: 'grid', gridTemplateColumns: '180px 1.2fr 1fr 1fr' }}>
-              {colHead('STORE', mu)}{colHead('NOW', t.green)}{colHead('NEXT PERIOD', blue)}{colHead('UPCOMING', mu)}
+            <div style={{ minWidth: 800 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: PV_COLS }}>
+              {colHead('STORE', mu)}{colHead('NOW', accentTx)}{colHead('NEXT PERIOD', blue)}{colHead('UPCOMING', mu)}
+              </div>
               {rows.map(x => (
-                <div key={x.retailer} {...rowProps(x)} className="ps-glow" style={{ '--g': GOLD_A, display: 'contents', cursor: 'pointer' }}>
+                <div key={x.retailer} {...rowProps(x)} className="ps-prow" style={{ display: 'grid', gridTemplateColumns: PV_COLS, cursor: 'pointer' }}>
                   {[storeCell(x), ...boxes(x).map(b => b[2])].map((node, k) => (
                     <div key={k} style={{ padding: '12px 14px', borderBottom: `1px solid ${dim}`, cursor: 'pointer' }}>{node}</div>
                   ))}
