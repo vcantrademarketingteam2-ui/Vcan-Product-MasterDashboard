@@ -1,5 +1,5 @@
 // Department PINs — values come from .env (VITE_ prefix = compiled into bundle)
-// Shared by App.jsx (Product Popup pricing + import) and PromoSection.jsx (Calendar/Timeline GP).
+// Shared by App.jsx (Product Popup pricing + import) and PromoSection.jsx (Plan/Product views GP).
 export const DEPT_PINS = {
   [import.meta.env.VITE_PIN_SALES          ?? '2745']: 'Sales/Trade Marketing',
   [import.meta.env.VITE_PIN_DATA           ?? '4343']: 'Data',

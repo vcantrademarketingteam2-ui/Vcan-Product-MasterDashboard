@@ -1,16 +1,17 @@
 /**
- * PromoSection.jsx — Drop-in redesigned Promotion Plan for the Vcan dashboard.
+ * PromoSection.jsx — Promotion Plan tab.
  *
- * Fixes applied vs. original drop-in:
- *   - ACT.field color overridden to #f97316 (orange) to stay distinct from clearance cyan.
+ *   - Plan:      one store's table, Year/Quarter/Month/Period selector, detail panel
+ *   - Product:   one product (barcode) across every store, reached from search or a Plan row
+ *   - Spotlight: live / next / ended feed for the selected store
  *   - Customer selector uses the RetailerLogo component (passed as prop) instead of plain text.
- *   - v2.15.0: Timeline redesign — Schedule (proportional Gantt) + Spotlight (live feed) views.
+ *   - ACT.field color overridden to #f97316 (orange) to stay distinct from clearance.
  */
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import promoData, { PROMO_META, PROMO_ACTIVITY, PROMO_RETAILERS } from './promo_data.js'
-import { MONTH_NAMES, parseDR, inferPeriodDate, buildPlan, defaultPick, colsForPick, quarterSpan, monthSpan, colsInSpan, pickLabel, pickYears, dayDiff, productRows, bestNow } from './promoPlan.js'
+import { MONTH_NAMES, parseDR, inferPeriodDate, buildPlan, defaultPick, colsForPick, quarterSpan, monthSpan, colsInSpan, pickLabel, pickYears, dayDiff, periodRange, productRows, bestNow } from './promoPlan.js'
 import { DEPT_PINS, canSeeRetailer, logPricingAccess } from './deptPins.js'
 import './PromoSection.css'
 import { brandKey } from './brandCategory.js'
@@ -66,9 +67,8 @@ const TODAY = new Date()
 const TODAY_ISO = `${TODAY.getFullYear()}-${String(TODAY.getMonth() + 1).padStart(2, '0')}-${String(TODAY.getDate()).padStart(2, '0')}`
 
 function periodIsCurrent(p) {
-  const r = parseDR(p.dateRange) || inferPeriodDate(p)
-  if (r) return TODAY >= r.s && TODAY <= r.e
-  return false
+  const r = periodRange(p, TODAY)   // null for undated / over-long (mis-keyed) ranges
+  return !!r && TODAY >= r.s && TODAY <= r.e
 }
 
 const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`
@@ -123,8 +123,14 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
   const [sel, setSel] = useState(null)           // {retailer, barcode, name}
   const [hideEmpty, setHideEmpty] = useState(true)
   const [collapsed, setCollapsed] = useState({})
+  // TODAY is frozen at import: reload when an open tab wakes on a different day
+  useEffect(() => {
+    const f = () => { const d = new Date(), iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; if (document.visibilityState === 'visible' && iso !== TODAY_ISO) location.reload() }
+    document.addEventListener('visibilitychange', f)
+    return () => document.removeEventListener('visibilitychange', f)
+  }, [])
   const canSee = r => !!unlocked && canSeeRetailer(unlocked, r)
-  // Watsons has no generated promo data yet — show the placeholder until it does
+  // Placeholder for a customer with no generated promo data (normally false; Watsons has data now)
   const comingSoon = retailer === 'Watsons' && !PROMO_RETAILERS.includes('Watsons')
 
   // ── derived data ────────────────────────────────────────────────────────────
@@ -199,7 +205,7 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
   const nextIdx = useMemo(() => {
     if (currentIdx >= 0) return currentIdx + 1 < periods.length ? currentIdx + 1 : -1
     return periods.findIndex(p => {
-      const r = parseDR(p.dateRange) || inferPeriodDate(p)
+      const r = periodRange(p, TODAY)
       return r && r.s > TODAY
     })
   }, [periods, currentIdx])
@@ -269,7 +275,7 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
     if (currentIdx < 0) return null
     const p = periods[currentIdx]
     if (!p) return null
-    const dr = parseDR(p.dateRange) || inferPeriodDate(p)
+    const dr = periodRange(p, TODAY)
     if (!dr) return null
     const pct = (TODAY.getTime() - dr.s.getTime()) / (dr.e.getTime() - dr.s.getTime()) * 100
     const dateLabel = p.dateRange || (dr ? `${MONTH_NAMES[dr.s.getMonth()]} ${dr.s.getFullYear()}` : '')
@@ -282,23 +288,13 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
   const coColor = c => c === 'Vcan' ? t.vcanClr : t.moolaClr
   const priceTxt = pd => pd.salePrice != null ? '฿' + pd.salePrice.toLocaleString('th-TH') : (pd.saleLabel || '')
 
-  // Bar color: driven by activity type, with clearance override.
-  // No-activity promos get an ice-silver frosted-glass pill (txt = theme text),
-  // not the old gold gradient.
-  // Bar backgrounds are OPAQUE (alpha gradient layered over a solid base) so the
-  // NOW glowline can never bleed through the pill text.
-  const barBase = dark ? '#0d1117' : '#f4efe9'
+  // Spotlight card accent: driven by activity type, with clearance override. `clr` = accent colour;
+  // `ice` = no-activity promo (neutral ice-silver accent, price text uses the theme text colour).
   const getBarStyle = (activities, clearance, branch) => {
-    if (clearance) { const c = neon(CLEAR_COLOR); return { bg: `linear-gradient(135deg,${c}e8,${c}99), ${barBase}`, clr: c, txt: '#fff' } }
-    for (const a of (activities || [])) {
-      if (ACT[a]) { const c = neon(ACT[a].color); return { bg: `linear-gradient(135deg,${c}e8,${c}99), ${barBase}`, clr: c, txt: '#fff' } }
-    }
-    if (branch) { const c = branchClr; return { bg: `linear-gradient(135deg,${c}e0,${c}90), ${barBase}`, clr: c, txt: '#fff', branch: true } }
-    return {
-      bg: dark ? '#1c2630' : '#fbf9f5',
-      clr: dark ? '#a8c5da' : '#8fa9bd',
-      txt: t.text, ice: true,
-    }
+    if (clearance) return { clr: neon(CLEAR_COLOR) }
+    for (const a of (activities || [])) if (ACT[a]) return { clr: neon(ACT[a].color) }
+    if (branch) return { clr: branchClr, branch: true }
+    return { clr: dark ? '#a8c5da' : '#8fa9bd', ice: true }
   }
 
   // Open the product popup with the full master record (promo items lack the
@@ -310,6 +306,7 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
 
   const pickStore = r => { setRetailer(r); setPick(null); setSel(null); setBrandFilter([]); setView('store') }
   const openProductView = bc => { setPb(bc); setView('product'); setMode('plan'); setSel(null) }
+  const chooseSug = bc => { setQ(''); setSugOpen(false); openProductView(bc) }
   const openStorePlan = (r, barcode, liveCol) => {
     setRetailer(r); setBrandFilter([]); setPick(null); setQ(''); setView('store'); setMode('plan')
     setSel(liveCol ? { retailer: r, barcode, name: liveCol.name } : null)
@@ -370,7 +367,7 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
     const first = rows[0]?.item
     const best = bestNow(rows)
     const bestRow = best && rows.find(x => x.retailer === best.retailer)
-    const bestPct = bestRow ? offPctOf(bestRow.item, bestRow.now.pd) : null
+    const bestPct = bestRow ? offPctOf(bestRow.item, best.pd) : null
     const anyLocked = rows.some(x => !canSee(x.retailer))
     const blue = t.blue || '#58a6ff'
     const card = { background: s, border: `1px solid ${bdr}`, borderRadius: 14 }
@@ -415,6 +412,7 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
           ? <RetailerLogo name={x.retailer} h={28} maxW={74} dark={dark} fallbackStyle={{ fontSize: 13, fontWeight: 800, color: tx }} />
           : <b style={{ color: tx }}>{x.retailer}</b>}
         <span style={{ fontSize: 12, color: mu }}>RSP {x.item.rspIncVat != null ? `฿${x.item.rspIncVat}` : '—'}</span>
+        {x.item.disconFrom && <span style={{ fontSize: 9.5, fontWeight: 800, color: disconClr }}>ยกเลิกขาย from {x.item.disconFrom}</span>}
         {canSee(x.retailer) && x.item.gp != null && <span style={{ fontSize: 11.5, fontWeight: 700, color: gpColor(x.item.gp) }}>GP {Math.round(x.item.gp * 100)}%</span>}
       </div>
     )
@@ -692,12 +690,12 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
               {undatedBtn}
               {backBtn({ marginLeft: 'auto' })}
             </div>
-            {selQ >= 0 && (
-              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
-                {rowLbl('MONTH')}
-                {[0, 1, 2].map(i => monthBtn(selQ * 3 + i, selQ, false))}
-              </div>
-            )}
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
+              {rowLbl('MONTH')}
+              {selQ >= 0
+                ? [0, 1, 2].map(i => monthBtn(selQ * 3 + i, selQ, false))
+                : [0, 1, 2].map(i => { const m = Math.floor(TODAY.getMonth() / 3) * 3 + i; return <button key={m} disabled style={chip(false, true)}>{MONTH_NAMES[m]}</button> })}
+            </div>
           </>)}
           {/* period strip: ALWAYS lists every period of the store on one scrolling line — quarter/month picks
               only tint the in-range periods. Desktop: shares the row when >=320px is free, else wraps to its own full-width line. */}
@@ -798,7 +796,7 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
                                 {productIndex.get(it.barcode)?.name || it.product}
                               </button>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', fontSize: 11 }}>
-                                <span style={{ color: mu }}>RSP ฿{it.rspIncVat}</span>
+                                <span style={{ color: mu }}>RSP {it.rspIncVat != null ? `฿${it.rspIncVat}` : '—'}</span>
                                 {canSee(retailer) && it.gp != null && <span style={{ color: gpColor(it.gp), fontWeight: 700 }}>GP {Math.round(it.gp * 100)}%</span>}
                                 {it.clearance && <span style={{ fontSize: 9.5, fontWeight: 800, color: neon(CLEAR_COLOR), background: `${neon(CLEAR_COLOR)}22`, borderRadius: 4, padding: '0 5px' }}>เคลียร์สินค้า</span>}
                                 {it.disconFrom && <span style={{ fontSize: 9.5, fontWeight: 800, color: disconClr }}>ยกเลิกขาย from {it.disconFrom}</span>}
@@ -986,7 +984,7 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
               </div>
               {spotTab === 'live' && spotNext.length > 0 && (
                 <div style={{ marginTop: 12, padding: '8px 14px', border: `1px dashed ${dim}`, borderRadius: 9, display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11, color: mu }}>
-                  <span>↓ NEXT — {(nextIdx >= 0 && periods[nextIdx]?.dateRange) || 'coming soon'}{(() => { const np = nextIdx >= 0 ? periods[nextIdx] : null; const r = np && (parseDR(np.dateRange) || inferPeriodDate(np)); const d = r && Math.ceil((r.s - TODAY) / 86400000); return d > 0 ? <span style={{ color: GOLD_A, fontWeight: 700, marginLeft: 4 }}>· in {d}d</span> : null })()}</span>
+                  <span>↓ NEXT — {(nextIdx >= 0 && periods[nextIdx]?.dateRange) || 'coming soon'}{(() => { const np = nextIdx >= 0 ? periods[nextIdx] : null; const r = np && periodRange(np, TODAY); const d = r && Math.ceil((r.s - TODAY) / 86400000); return d > 0 ? <span style={{ color: GOLD_A, fontWeight: 700, marginLeft: 4 }}>· in {d}d</span> : null })()}</span>
                   <span style={{ color: dim }}>{[...new Set(spotNext.map(i => i.brand))].slice(0, 3).join(' · ')}</span>
                 </div>
               )}
@@ -1026,6 +1024,10 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
     )
   }
 
+  const onProductView = mode === 'plan' && view === 'product'
+  // Plan tab lights only on the store plan: in Product view it is the way back, not the current tab
+  const lit = k => mode === k && !(k === 'plan' && onProductView)
+
   // ── render ───────────────────────────────────────────────────────────────────
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -1058,10 +1060,10 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
       <div className="ps-toolbar">
         <div className="ps-seg" style={{ background: s2, border: `1px solid ${bdr}` }}>
           {[['plan', 'Plan', IcoGrid], ['spot', 'Spotlight', IcoTimeline]].map(([k, l, Ico]) => (
-            <button key={k} className={`ps-glow${mode === k ? ' on ps-glow-on' : ''}`} onClick={() => setMode(k)} style={{
+            <button key={k} className={`ps-glow${lit(k) ? ' on ps-glow-on' : ''}`} onClick={() => { setMode(k); if (k === 'plan') setView('store') }} style={{
               '--g': GOLD_A,
-              background: mode === k ? GOLD_GRAD : 'none',
-              color: mode === k ? '#fff' : mu,
+              background: lit(k) ? GOLD_GRAD : 'none',
+              color: lit(k) ? '#fff' : mu,
             }}><Ico size={13} />{l}</button>
           ))}
         </div>
@@ -1071,14 +1073,14 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
             <input type="search" value={q} aria-label="Search product, brand or barcode"
               onChange={e => { setQ(e.target.value); setSugOpen(true) }}
               onFocus={() => setSugOpen(true)} onBlur={() => setSugOpen(false)}
-              onKeyDown={e => { if (e.key === 'Escape') setSugOpen(false) }}
+              onKeyDown={e => { if (e.key === 'Escape') setSugOpen(false); else if (e.key === 'Enter' && sugOpen && sugs[0]) { e.preventDefault(); chooseSug(sugs[0].bc) } }}
               placeholder="Search product, brand or barcode"
               style={{ flex: 1, minWidth: 0, background: 'none', border: 0, outline: 0, color: tx, fontFamily: 'inherit', fontSize: isMobile ? 16 : 13.5 }} />
           </label>
           {sugOpen && sugs.length > 0 && (
             <div style={{ position: 'absolute', top: (isMobile ? 48 : 44), left: 0, right: 0, zIndex: 40, background: s, border: `1px solid ${GOLD_A}88`, borderRadius: 12, overflow: 'hidden', boxShadow: '0 18px 40px rgba(0,0,0,.35)' }}>
               {sugs.map(e => (
-                <button key={e.bc} onMouseDown={ev => { ev.preventDefault(); setQ(''); setSugOpen(false); openProductView(e.bc) }}
+                <button key={e.bc} onMouseDown={ev => { ev.preventDefault(); chooseSug(e.bc) }}
                   style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2, width: '100%', minHeight: 48, padding: '8px 14px', border: 0, borderBottom: `1px solid ${bdr}`, background: 'none', color: tx, fontFamily: 'inherit', textAlign: 'left', cursor: 'pointer' }}>
                   <span style={{ fontSize: 13, fontWeight: 700 }}>{e.name} — {e.brand} · in {e.stores.length} store{e.stores.length === 1 ? '' : 's'}</span>
                   <span style={{ fontSize: 11.5, color: mu }}>{e.bc}</span>
@@ -1113,7 +1115,7 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
       )}
 
       {/* brand filter — shared category navigator (passed from App.jsx) */}
-      {!comingSoon && brandList.length > 0 && BrandCategoryFilter && (
+      {!comingSoon && !onProductView && brandList.length > 0 && BrandCategoryFilter && (
         <div style={{ marginBottom: 12 }}>
           <BrandCategoryFilter idPrefix="ps-promo" brandList={brandList}
             selectedBrands={brandFilter} onToggle={toggleBrand} onClear={() => setBrandFilter([])}
@@ -1139,8 +1141,8 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
         borderRadius: 12, overflow: 'hidden',
         boxShadow: dark ? '0 8px 28px rgba(0,0,0,.35)' : '0 8px 28px rgba(82,62,40,.10), inset 0 1px 0 rgba(255,255,255,.7)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 20px', borderBottom: `1px solid ${bdr}`, background: dark ? 'rgba(255,255,255,.025)' : 'rgba(0,0,0,.02)' }}>
-          <span style={{ fontSize: 17, fontWeight: 700, letterSpacing: '-.02em', color: tx }}>{retailer}</span>
-          <span style={{ fontSize: 12, color: mu, fontWeight: 600 }}>{items.length} products · {periods.length} periods</span>
+          <span style={{ fontSize: 17, fontWeight: 700, letterSpacing: '-.02em', color: tx }}>{onProductView ? 'Product across stores' : retailer}</span>
+          {!onProductView && <span style={{ fontSize: 12, color: mu, fontWeight: 600 }}>{items.length} products · {periods.length} periods</span>}
           <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
             <div style={{ fontSize: 9.5, fontWeight: 800, color: mu, textTransform: 'uppercase', letterSpacing: '.12em' }}>Planning Date</div>
             <div style={{ fontSize: isMobile ? 14 : 17, fontWeight: 800, fontFamily: 'ui-monospace,monospace', whiteSpace: 'nowrap',

@@ -136,7 +136,7 @@ export const pickYears = cols =>
   [...new Set(cols.flatMap(c => c.r ? [c.r.s.getFullYear(), c.r.e.getFullYear()] : []))].sort((a, b) => a - b)
 
 // ── product across stores ─────────────────────────────────────────────────────
-// Row = { retailer, item, now:{col,pd}|null, nowCol, moreLive, next:{col,pd}|null, nextCol, upcoming:{col,pd}|null }
+// Row = { retailer, item, cols, live:[{col,pd}] (ending soonest first), now:{col,pd}|null, nowCol, moreLive, next:{col,pd}|null, nextCol, upcoming:{col,pd}|null }
 export function productRows(barcode, itemsByRetailer, plans, retailers) {
   const rows = [], notIn = []
   for (const retailer of retailers) {
@@ -150,17 +150,24 @@ export function productRows(barcode, itemsByRetailer, plans, retailers) {
     const nextCol = cols[nextIdx] || null
     const next = nextCol && item.periods?.[nextCol.name] ? { col: nextCol, pd: item.periods[nextCol.name] } : null
     const upcoming = nextIdx < 0 ? null : withPd.find(x => cols.indexOf(x.col) > nextIdx && x.col.status !== 'past') || null
-    rows.push({ retailer, item, now: live[0] || null, nowCol, moreLive: Math.max(live.length - 1, 0), next, nextCol, upcoming })
+    rows.push({ retailer, item, cols, live, now: live[0] || null, nowCol, moreLive: Math.max(live.length - 1, 0), next, nextCol, upcoming })
   }
   return { rows, notIn }
 }
 
-// Lowest numeric live sale price across stores; label-only promos (salePrice null) are ignored
+// Lowest numeric live sale price across stores and all their live promos; label-only promos
+// (salePrice null) are ignored, and so is any live period at or past the item's disconFrom.
 export function bestNow(rows) {
   let best = null
   for (const r of rows) {
-    const price = r.now?.pd?.salePrice
-    if (typeof price === 'number' && (!best || price < best.price)) best = { retailer: r.retailer, price, col: r.now.col }
+    const cols = r.cols || []
+    const dAt = r.item?.disconFrom ? cols.findIndex(c => c.name === r.item.disconFrom) : -1
+    for (const { col, pd } of r.live || []) {
+      const price = pd?.salePrice
+      if (!Number.isFinite(price) || !(price > 0)) continue
+      if (dAt >= 0 && cols.indexOf(col) >= dAt) continue
+      if (!best || price < best.price) best = { retailer: r.retailer, price, col, pd }
+    }
   }
   return best
 }

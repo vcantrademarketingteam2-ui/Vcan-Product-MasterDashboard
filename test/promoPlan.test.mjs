@@ -143,6 +143,32 @@ test('bestNow ignores label-only promos', () => {
   assert.equal(b.price, 89);
   assert.equal(bestNow(mk({ salePrice: null, saleLabel: 'x' }, { salePrice: null, saleLabel: 'y' })), null);
 });
+test('bestNow skips a store whose live period is at or past disconFrom', () => {
+  const rows = productRows('111', {
+    A: [{ ...item('111', 'n', { Oct: { salePrice: 50 }, 'Bro.11': { salePrice: 60 } }), disconFrom: 'Oct' }],
+    B: [item('111', 'n', { Oct: { salePrice: 99 } })] }, { A: twd, B: twd }, ['A', 'B']).rows;
+  const b = bestNow(rows);
+  assert.equal(b.retailer, 'B');
+  assert.equal(b.price, 99);
+});
+test('bestNow still ranks a live period before disconFrom', () => {
+  const rows = productRows('111', {
+    A: [{ ...item('111', 'n', { Oct: { salePrice: 70 }, 'Bro.11': { salePrice: 40 } }), disconFrom: 'Bro.11' }],
+    B: [item('111', 'n', { Oct: { salePrice: 99 } })] }, { A: twd, B: twd }, ['A', 'B']).rows;
+  const b = bestNow(rows);
+  assert.equal(b.retailer, 'A');
+  assert.equal(b.price, 70);
+  assert.equal(b.col.name, 'Oct');
+});
+test('bestNow considers every live promo, not only the soonest-ending', () => {
+  const { rows } = productRows('111', {
+    A: [item('111', 'n', { Oct: { salePrice: 90 }, 'Bro.11': { salePrice: 80 } })] }, { A: twd }, ['A']);
+  assert.equal(rows[0].now.col.name, 'Oct');
+  assert.deepEqual(rows[0].live.map(x => x.col.name), ['Oct', 'Bro.11']);
+  const b = bestNow(rows);
+  assert.equal(b.price, 80);
+  assert.equal(b.col.name, 'Bro.11');
+});
 test('next / upcoming skip past periods', () => {
   const { rows } = productRows('111', { A: [item('111', 'n', {
     'Bro.10': { salePrice: 70 }, Nov: { salePrice: 85 }, Jan: { salePrice: 75 } })] }, { A: twd }, ['A']);
