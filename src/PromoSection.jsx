@@ -10,7 +10,7 @@
 import { useState, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import promoData, { PROMO_META, PROMO_ACTIVITY, PROMO_RETAILERS } from './promo_data.js'
-import { MONTH_NAMES, parseDR, inferPeriodDate, buildPlan, defaultPick, colsForPick, quarterSpan, monthSpan, colsInSpan, pickLabel, pickYears, dayDiff } from './promoPlan.js'
+import { MONTH_NAMES, parseDR, inferPeriodDate, buildPlan, defaultPick, colsForPick, quarterSpan, monthSpan, colsInSpan, pickLabel, pickYears, dayDiff, productRows, bestNow } from './promoPlan.js'
 import { DEPT_PINS, canSeeRetailer, logPricingAccess } from './deptPins.js'
 import './PromoSection.css'
 import { brandKey } from './brandCategory.js'
@@ -124,7 +124,6 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
   // Plan/Product redesign state
   const [mode, setMode] = useState('plan')       // 'plan' | 'spot'
   const [view, setView] = useState('store')      // 'store' | 'product'
-  // eslint-disable-next-line no-unused-vars -- pb is read by ProductView in Task 7
   const [pb, setPb] = useState(null)             // product-view barcode
   const [q, setQ] = useState('')
   const [sugOpen, setSugOpen] = useState(false)
@@ -407,13 +406,10 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
 
   const pickStore = r => { setRetailer(r); setPick(null); setSel(null); setBrandFilter([]); setView('store') }
   const openProductView = bc => { setPb(bc); setView('product'); setMode('plan'); setSel(null) }
-  // eslint-disable-next-line no-unused-vars -- used by Task 7
   const openStorePlan = (r, barcode, liveCol) => {
     setRetailer(r); setBrandFilter([]); setPick(null); setQ(''); setView('store'); setMode('plan')
     setSel(liveCol ? { retailer: r, barcode, name: liveCol.name } : null)
   }
-  // Task 7 replaces this stub
-  function ProductView() { return null }
 
   const toggleBrand = b => setBrandFilter(prev => prev.includes(b) ? prev.filter(x => x !== b) : [...prev, b])
   const toggleChip = (key, e) => { e.stopPropagation(); setOpenKey(prev => prev === key ? null : key) }
@@ -468,6 +464,124 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
   const ghostBtn = {
     minHeight: 40, padding: '0 14px', borderRadius: 10, border: `1px solid ${bdr}`, background: s2, color: tx,
     fontFamily: 'inherit', fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+  }
+
+  // ── Product view (one product across every store) ────────────────────────────
+  function ProductView() {
+    const info = productIndex.get(pb)
+    const { rows, notIn } = productRows(pb, itemsByRetailer, plans, CUSTOMERS)
+    const first = rows[0]?.item
+    const best = bestNow(rows)
+    const bestRow = best && rows.find(x => x.retailer === best.retailer)
+    const bestPct = bestRow ? offPctOf(bestRow.item, bestRow.now.pd) : null
+    const anyLocked = rows.some(x => !canSee(x.retailer))
+    const blue = t.blue || '#58a6ff'
+    const card = { background: s, border: `1px solid ${bdr}`, borderRadius: 14 }
+    const colSub = (r, c) => c && `${c.name} · ${shortRange(c.r, PROMO_META[r]?.periods?.[c.idx]?.dateRange)}`
+
+    // b = {col, pd}|null; noCol = text when the store has no such period at all
+    const boxView = (x, b, col, noCol) => {
+      if (!col) return <div style={{ fontSize: 13, fontWeight: 600, color: mu }}>{noCol}</div>
+      if (!b) return (
+        <div><div style={{ fontSize: 13, fontWeight: 600, color: mu }}>No promo</div>
+          <div style={{ fontSize: 11.5, color: mu }}>{colSub(x.retailer, col)}</div></div>
+      )
+      const pct = offPctOf(x.item, b.pd)
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 15, fontWeight: 800, color: tx }}>{priceTxt(b.pd) || '•'}</span>
+            {pct != null && pct > 0 && <span style={{ fontSize: 12.5, fontWeight: 700, color: t.green }}>−{pct}%</span>}
+            {tagRow(tagsOf(b.pd))}
+          </div>
+          <div style={{ fontSize: 11.5, color: mu }}>{colSub(x.retailer, b.col)}</div>
+          {canSee(x.retailer) && b.pd.compensate != null && (
+            <div style={{ fontSize: 11.5, fontWeight: 700, color: blue, fontFamily: 'ui-monospace,monospace' }}>Comp ฿{b.pd.compensate.toFixed(2)}</div>
+          )}
+        </div>
+      )
+    }
+    const nowBox = x => (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+        {boxView(x, x.now, x.nowCol, 'No current period')}
+        {x.moreLive > 0 && <span style={{ fontSize: 11.5, fontWeight: 700, color: accentTx }}>+{x.moreLive} more live</span>}
+      </div>
+    )
+    const boxes = x => [
+      ['NOW', t.green, nowBox(x)],
+      ['NEXT PERIOD', blue, boxView(x, x.next, x.nextCol, 'No next period')],
+      ['UPCOMING', mu, boxView(x, x.upcoming, x.upcoming?.col, 'Nothing planned')],
+    ]
+    const storeCell = x => (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
+        {RetailerLogo
+          ? <RetailerLogo name={x.retailer} h={28} maxW={74} dark={dark} fallbackStyle={{ fontSize: 13, fontWeight: 800, color: tx }} />
+          : <b style={{ color: tx }}>{x.retailer}</b>}
+        <span style={{ fontSize: 12, color: mu }}>RSP ฿{x.item.rspIncVat}</span>
+        {canSee(x.retailer) && x.item.gp != null && <span style={{ fontSize: 11.5, fontWeight: 700, color: gpColor(x.item.gp) }}>GP {Math.round(x.item.gp * 100)}%</span>}
+      </div>
+    )
+    const go = x => openStorePlan(x.retailer, pb, x.now?.col)
+    const rowProps = x => ({ role: 'button', tabIndex: 0, onClick: () => go(x), onKeyDown: ev => { if (ev.key === 'Enter') go(x) }, title: `Open ${x.retailer} plan` })
+    const colHead = (label, c) => <div style={{ fontSize: 11.5, fontWeight: 800, letterSpacing: '.08em', color: c, padding: '12px 14px', borderBottom: `1px solid ${bdr}` }}>{label}</div>
+
+    return (
+      <div style={{ padding: isMobile ? '12px 12px 16px' : '16px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <button onClick={() => setView('store')} style={{ ...ghostBtn, alignSelf: 'flex-start', color: accentTx }}>← Back to {retailer}</button>
+        <div style={{ ...card, display: 'flex', flexWrap: 'wrap', gap: 14, alignItems: 'center', padding: isMobile ? 14 : '18px 20px' }}>
+          <div style={{ flex: '1 1 300px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <h2 style={{ margin: 0, fontSize: isMobile ? 17 : 20, fontWeight: 800, color: tx, lineHeight: 1.3 }}>{info?.name || first?.product || pb}</h2>
+            <span style={{ fontSize: 12.5, color: mu }}>{[first?.company, info?.brand || first?.brand, `barcode ${pb}`].filter(Boolean).join(' · ')}</span>
+            {first && <button onClick={() => openProduct(first)} style={{ ...ghostBtn, alignSelf: 'flex-start', marginTop: 6 }}>Product info</button>}
+          </div>
+          <div style={{ flex: '0 1 300px', borderRadius: 12, padding: '12px 16px', background: best ? `${t.green}1a` : s2, border: `1px solid ${best ? `${t.green}55` : bdr}`, display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {best ? (
+              <>
+                <span style={{ fontSize: 11.5, fontWeight: 800, letterSpacing: '.08em', color: t.green }}>BEST PRICE RIGHT NOW</span>
+                <span style={{ fontSize: 19, fontWeight: 800, color: tx }}>฿{best.price.toLocaleString('th-TH')} at {best.retailer} {bestPct != null && bestPct > 0 && <span style={{ fontSize: 14, color: t.green }}>−{bestPct}%</span>}</span>
+                <span style={{ fontSize: 12, color: mu }}>until {best.col.r ? fmtDM(best.col.r.e) : 'end of period'}</span>
+              </>
+            ) : <span style={{ fontSize: 13.5, color: mu }}>No price promo running right now at any store.</span>}
+          </div>
+        </div>
+
+        {isMobile ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {rows.map(x => (
+              <div key={x.retailer} {...rowProps(x)} style={{ ...card, padding: 12, display: 'flex', flexDirection: 'column', gap: 10, cursor: 'pointer', minHeight: 44 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>{storeCell(x)}<span style={{ color: accentTx, fontSize: 18 }}>→</span></div>
+                {boxes(x).map(([l, c, node]) => (
+                  <div key={l}><div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.08em', color: c, marginBottom: 3 }}>{l}</div>{node}</div>
+                ))}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div style={{ ...card, overflowX: 'auto' }}>
+            <div style={{ minWidth: 800, display: 'grid', gridTemplateColumns: '180px 1.2fr 1fr 1fr' }}>
+              {colHead('STORE', mu)}{colHead('NOW', t.green)}{colHead('NEXT PERIOD', blue)}{colHead('UPCOMING', mu)}
+              {rows.map(x => (
+                <div key={x.retailer} {...rowProps(x)} className="ps-glow" style={{ '--g': GOLD_A, display: 'contents', cursor: 'pointer' }}>
+                  {[storeCell(x), ...boxes(x).map(b => b[2])].map((node, k) => (
+                    <div key={k} style={{ padding: '12px 14px', borderBottom: `1px solid ${dim}`, cursor: 'pointer' }}>{node}</div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', fontSize: 13, color: mu }}>
+          {notIn.length > 0 && (
+            <>
+              <span>Not in:</span>
+              {notIn.map(n => <span key={n} style={{ padding: '4px 10px', borderRadius: 99, border: `1px dashed ${bdr}` }}>{n}</span>)}
+            </>
+          )}
+          {anyLocked && <span style={{ marginLeft: 'auto', fontSize: 12 }}>GP / compensate hidden — unlock with a PIN that covers the store</span>}
+        </div>
+      </div>
+    )
   }
 
   // Strip ref callback: runs on mount of the keyed strip (once per pick/store change).
