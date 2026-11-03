@@ -330,6 +330,11 @@ const RETAILER_DATA = {
       "costCase": 1093.4579,
       "gp": 0.25
     },
+    "Villa": {
+      "costUnit": 143.972,
+      "costCase": 1151.7757,
+      "gp": 0.21
+    },
     "The Mall": {
       "costUnit": 143.972,
       "costCase": 1151.7757,
@@ -352,6 +357,11 @@ const RETAILER_DATA = {
       "costCase": 1093.4579,
       "gp": 0.25
     },
+    "Villa": {
+      "costUnit": 143.972,
+      "costCase": 1151.7757,
+      "gp": 0.21
+    },
     "The Mall": {
       "costUnit": 143.972,
       "costCase": 1151.7757,
@@ -373,6 +383,11 @@ const RETAILER_DATA = {
       "costUnit": 136.6822,
       "costCase": 1093.4579,
       "gp": 0.25
+    },
+    "Villa": {
+      "costUnit": 143.972,
+      "costCase": 1151.7757,
+      "gp": 0.21
     },
     "The Mall": {
       "costUnit": 143.972,
@@ -1227,6 +1242,11 @@ const RETAILER_DATA = {
       "costUnit": 225.7009,
       "costCase": 1354.2056,
       "gp": 0.3
+    },
+    "Golden Place": {
+      "costUnit": 225.7009,
+      "costCase": 1354.2056,
+      "gp": 0.3
     }
   },
   "011111014121": {
@@ -1249,6 +1269,11 @@ const RETAILER_DATA = {
       "costUnit": 225.7009,
       "costCase": 1354.2056,
       "gp": 0.3
+    },
+    "Golden Place": {
+      "costUnit": 225.7009,
+      "costCase": 1354.2056,
+      "gp": 0.3
     }
   },
   "011111014138": {
@@ -1268,6 +1293,11 @@ const RETAILER_DATA = {
       "gp": 0.28
     },
     "Boots": {
+      "costUnit": 225.7009,
+      "costCase": 1354.2056,
+      "gp": 0.3
+    },
+    "Golden Place": {
       "costUnit": 225.7009,
       "costCase": 1354.2056,
       "gp": 0.3

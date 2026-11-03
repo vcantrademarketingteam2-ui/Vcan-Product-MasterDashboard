@@ -16,6 +16,7 @@ the dashboard shows the text label instead — nothing breaks.
   petnme.png       -> Pet'n me
   fuji.png         -> UFM Fuji Super
   Watsons.png      -> Watsons
+  golden-place.png -> Golden Place
 
 Recommended: square-ish or wordmark logos, ~200px tall, trimmed of extra whitespace.
 After adding files, just refresh the page (no rebuild needed in dev).

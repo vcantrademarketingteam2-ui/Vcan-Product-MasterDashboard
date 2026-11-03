@@ -331,6 +331,13 @@ CONFIG = {
         'header_row': 8,
         'cols': {'barcode': 1, 'product': 2, 'pack': 3, 'cost': 4, 'rsp': 5, 'gp': 6, 'period_start': 7},
     },
+    'Golden Place': {
+        'file': 'Gloden Place - Activity Promotion 2026.xlsx',  # file really is spelled "Gloden"
+        'sheets': None,
+        'header_row': 3,
+        # A=No, B=Barcode, C=Code, D=Product, E=Pack, F=Cost, G=RSP, H=GP%, I+=periods
+        'cols': {'barcode': 2, 'product': 4, 'pack': 5, 'cost': 6, 'rsp': 7, 'gp': 8, 'period_start': 9},
+    },
     # Central: add path when available
     # 'Central Department': {
     #     'file': 'Central - Activity Promotion 2026.xlsx',

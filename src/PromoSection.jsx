@@ -11,7 +11,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import promoData, { PROMO_META, PROMO_ACTIVITY, PROMO_RETAILERS } from './promo_data.js'
-import { MONTH_NAMES, parseDR, inferPeriodDate, buildPlan, defaultPick, colsForPick, quarterSpan, monthSpan, colsInSpan, pickLabel, pickYears, dayDiff, periodRange, productRows, bestNow } from './promoPlan.js'
+import { MONTH_NAMES, parseDR, inferPeriodDate, buildPlan, defaultPick, colsForPick, quarterSpan, monthSpan, colsInSpan, pickLabel, pickYears, quarterBands, quarterLabel, dayDiff, periodRange, productRows, bestNow } from './promoPlan.js'
 import { DEPT_PINS, canSeeRetailer, logPricingAccess } from './deptPins.js'
 import './PromoSection.css'
 import { brandKey } from './brandCategory.js'
@@ -121,7 +121,6 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
   const [sugOpen, setSugOpen] = useState(false)
   const [pick, setPick] = useState(null)
   const [sel, setSel] = useState(null)           // {retailer, barcode, name}
-  const [hideEmpty, setHideEmpty] = useState(true)
   const [collapsed, setCollapsed] = useState({})
   // TODAY is frozen at import: reload when an open tab wakes on a different day
   useEffect(() => {
@@ -481,28 +480,16 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
     )
   }
 
-  // Strip ref callback: runs on mount of the keyed strip (once per pick/store change).
-  // Guards keep listeners attached once per element.
-  function stripRef(el) {
-    if (!el) return
-    if (!el.__done) {
-      el.__done = true
-      // bring the first in-range chip into view — instant, a smooth scroll is cancelled by the re-tint re-render
-      const bring = () => {
-        const f = el.querySelector('[data-first]'); if (!f || !el.isConnected) return
-        const er = f.getBoundingClientRect(), br = el.getBoundingClientRect()
-        if (er.left < br.left + 28 || er.right > br.right - 28) el.scrollTo({ left: Math.max(0, el.scrollLeft + er.left - br.left - 28), behavior: 'instant' })
-      }
-      requestAnimationFrame(bring); setTimeout(bring, 120) // second pass once layout/fonts settle
-    }
-    if (!el.__wheel) {
-      el.__wheel = true
-      // native non-passive listener: vertical wheel scrolls the strip sideways without scrolling the page
-      el.addEventListener('wheel', e => { if (Math.abs(e.deltaY) > Math.abs(e.deltaX) && el.scrollWidth > el.clientWidth) { e.preventDefault(); el.scrollLeft += e.deltaY } }, { passive: false })
-      // fade only the edge(s) that hide more chips
-      const edges = () => { el.dataset.l = el.scrollLeft > 2 ? '1' : ''; el.dataset.r = el.scrollLeft + el.clientWidth < el.scrollWidth - 2 ? '1' : '' }
-      el.addEventListener('scroll', edges, { passive: true }); new ResizeObserver(edges).observe(el); edges()
-    }
+  // Table ref callback: on mount of the keyed scroller (once per pick/store change), bring the NOW column
+  // into view if it starts off-screen, just right of the sticky product column.
+  function tableRef(el) {
+    if (!el || el.__done) return
+    el.__done = true
+    requestAnimationFrame(() => {
+      const n = el.querySelector('[data-now]'); if (!n) return
+      const nr = n.getBoundingClientRect(), er = el.getBoundingClientRect()
+      if (nr.right > er.right) el.scrollLeft += nr.left - er.left - (isMobile ? 112 : 250)
+    })
   }
 
   function PlanCell(it, c, di) {
@@ -603,16 +590,16 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
   function PlanView() {
     const planCols = plan.cols
     const undatedCols = planCols.filter(c => !c.r)
-    const years = pickYears(planCols)
-    const pk = pick || defaultPick(planCols, TODAY)
+    const dp = defaultPick(planCols, TODAY)
+    const years = [...new Set([...pickYears(planCols), ...(dp?.y != null ? [dp.y] : [])])].sort((a, b) => a - b)
+    const pk = pick || dp
     const win = colsForPick(planCols, pk)
-    const atNow = !pick
+    const atNow = !pick || (pick.lvl === 'q' && dp?.lvl === 'q' && pick.y === dp.y && pick.q === dp.q)
     const choose = p => { setPick(p); setSel(null) }
     const colsIn = span => colsInSpan(planCols, span)
-    const firstQWith = y => [0, 1, 2, 3].find(q => colsIn(quarterSpan(y, q)).length) ?? 0
 
     const planBase = qn.length >= 2 ? items.filter(it => productIndex.get(it.barcode)?.hay.includes(qn)) : items
-    const planShown = hideEmpty ? planBase.filter(it => win.some(c => it.periods?.[c.name])) : planBase
+    const planShown = planBase.filter(it => win.some(c => it.periods?.[c.name]))
     const hiddenN = planBase.length - planShown.length
     const planGroups = Object.entries(planShown.reduce((g, i) => { (g[i.brand] = g[i.brand] || []).push(i); return g }, {}))
 
@@ -623,12 +610,12 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
     const stale = planCols.length > 0 && !plan.hasNow && !plan.hasFuture && !plan.hasUnknown
     const hasSel = !!sel && sel.retailer === retailer && allItems.some(i => i.barcode === sel.barcode && i.periods?.[sel.name])
 
-    // ONE meaning per signal: solid bronze fill = what you picked (one at a time);
+    // ONE meaning per signal: soft bronze tint + outline = what you picked (one at a time);
     // small dot = contains today; NOW tag = live period. Chips are borderless inside a segment box.
     const chip = (on, dis) => ({
       position: 'relative', minHeight: isMobile ? 40 : 32, padding: '0 11px', borderRadius: 7, border: 0, fontFamily: 'inherit', fontSize: 12.5, fontWeight: on ? 800 : 600,
       cursor: dis ? 'default' : 'pointer', opacity: dis ? .3 : 1, whiteSpace: 'nowrap',
-      background: on ? GOLD_GRAD : 'none', color: on ? '#fff' : tx, boxShadow: on ? `0 2px 8px -3px ${GOLD_A}` : 'none',
+      background: on ? `${GOLD_A}22` : 'none', color: on ? accentTx : tx, boxShadow: on ? `inset 0 0 0 1px ${GOLD_A}88` : 'none',
     })
     const seg = { display: 'flex', alignItems: 'center', gap: 2, padding: 3, borderRadius: 10, background: s2, border: `1px solid ${bdr}` }
     const todayDot = <span aria-label="contains today" style={{ position: 'absolute', left: '50%', bottom: 3, width: 4, height: 4, marginLeft: -2, borderRadius: 99, background: accentTx }} />
@@ -638,38 +625,65 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
     const selQ = pk && pk.lvl !== 'u' && pk.q >= 0 ? pk.q : -1
     const isCurQ = (y, q) => y === TODAY.getFullYear() && q === Math.floor(TODAY.getMonth() / 3)
     const isCurM = (y, m) => y === TODAY.getFullYear() && m === TODAY.getMonth()
-    const yearBtns = years.length > 1 && years.map(y => (
-      <button key={y} onClick={() => choose({ lvl: 'q', y, q: firstQWith(y) })} style={yearChip(selY === y && pk?.lvl !== 'u')}>{y}</button>
+    // year chips only switch year (grey context); the whole year is its own labelled button so people find it
+    const pickYear = y => choose(pk?.lvl === 'y' ? { lvl: 'y', y } : { lvl: 'q', y, q: [0, 1, 2, 3].find(q => colsIn(quarterSpan(y, q)).length) ?? 0 })
+    const yearBtns = years.map(y => (
+      <button key={y} onClick={() => pickYear(y)} style={yearChip(selY === y && pk?.lvl !== 'u')}>{y}</button>
     ))
-    const undatedBtn = undatedCols.length > 0 && (
-      <button onClick={() => choose({ lvl: 'u' })} style={chip(pk?.lvl === 'u', false)}>Undated ({undatedCols.length})</button>
+    const yearHasCols = colsIn([new Date(selY, 0, 1), new Date(selY, 11, 31, 23, 59, 59, 999)]).length > 0
+    const fullYearOn = pk?.lvl === 'y'
+    const fullYearBtn = (
+      <button disabled={!yearHasCols} onClick={() => choose({ lvl: 'y', y: selY })}
+        style={{ ...chip(fullYearOn, !yearHasCols), flex: 'none', minHeight: isMobile ? 40 : 38, fontWeight: 800, color: accentTx,
+          boxShadow: `inset 0 0 0 1px ${GOLD_A}${fullYearOn ? '88' : '55'}` }}>Full year</button>
     )
     const monthBtn = (m, q, pad) => {
       const on = pk?.lvl === 'm' && pk.m === m
       const n = colsIn(monthSpan(selY, m)).length
       return <button key={m} disabled={!n} onClick={() => choose({ lvl: 'm', y: selY, q, m })}
-        style={{ ...chip(on, !n), ...(pad ? { padding: '0 8px' } : {}) }}>{MONTH_NAMES[m]}{isCurM(selY, m) && !on && todayDot}</button>
+        style={{ ...chip(on, !n), ...(pad ? { padding: '0 6px' } : {}) }}>{MONTH_NAMES[m]}{isCurM(selY, m) && !on && todayDot}</button>
     }
 
     const quarterBtn = q => {
       const n = colsIn(quarterSpan(selY, q)).length
       const on = pk?.lvl === 'q' && selQ === q
       return <button key={q} disabled={!n} onClick={() => choose({ lvl: 'q', y: selY, q })}
-        style={{ ...chip(on, !n), ...(isMobile ? {} : { fontWeight: 800, color: on ? '#fff' : mu }) }}>Q{q + 1}{isMobile && years.length < 2 ? ` ${selY}` : ''}{isCurQ(selY, q) && !on && todayDot}</button>
+        style={{ ...chip(on, !n), ...(isMobile ? {} : { padding: '0 8px', fontWeight: 800, color: on ? accentTx : mu }) }}>Q{q + 1}{isCurQ(selY, q) && !on && todayDot}</button>
     }
     // slot always reserved (visibility, not unmount) so the row never reflows when it appears
-    const backBtn = (extra) => (
+    const backBtn = (
       <button onClick={() => choose(null)} disabled={atNow} aria-hidden={atNow} tabIndex={atNow ? -1 : 0}
-        style={{ ...chip(false, false), color: accentTx, textDecoration: 'underline', textUnderlineOffset: 3, visibility: atNow ? 'hidden' : 'visible', ...extra }}>Back to now</button>
+        style={{ ...chip(false, false), color: accentTx, textDecoration: 'underline', textUnderlineOffset: 3, visibility: atNow ? 'hidden' : 'visible' }}>Back to now</button>
     )
+
+    // dropdown state: one option per period, plus an "all" entry that follows the current pick
+    const periodGroups = [...planCols.filter(c => c.r).reduce((g, c) => {
+      const k = quarterLabel(c); g.set(k, [...(g.get(k) || []), c]); return g
+    }, new Map())]
+    const singlePeriod = pk?.lvl === 'p'
+    const periodOn = singlePeriod || pk?.lvl === 'u'
+    const periodValue = singlePeriod ? `p:${pk.name}` : pk?.lvl === 'u' ? 'u' : 'all'
+    const allOption = singlePeriod && pk.q != null ? `All in Q${pk.q + 1} ${pk.y}`
+      : periodOn ? (dp?.lvl === 'u' ? null : 'Current quarter')
+      : win.length ? `All ${plural(win.length, 'period')}` : 'None here'
+    const periodLabel = singlePeriod
+      ? pk.name + (planCols.find(c => c.name === pk.name)?.status === 'now' ? ' NOW' : '')
+      : pk?.lvl === 'u' ? `All undated (${undatedCols.length})` : allOption
+    const pickPeriod = v => {
+      if (v === 'u') return choose({ lvl: 'u' })
+      if (v === 'all') return choose(singlePeriod && pk.q != null ? { lvl: 'q', y: pk.y, q: pk.q } : periodOn ? null : pk)
+      const name = v.slice(2), d = planCols.find(c => c.name === name)?.r?.s
+      choose(d ? { lvl: 'p', name, y: d.getFullYear(), q: Math.floor(d.getMonth() / 3), m: d.getMonth() } : { lvl: 'p', name })
+    }
 
     function PeriodSelector() {
       return (
-        <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', flexWrap: 'wrap', alignItems: isMobile ? 'stretch' : 'center', gap: isMobile ? 8 : 12, padding: '12px 18px', borderBottom: `1px solid ${bdr}`, minWidth: 0, maxWidth: '100%' }}>
+        <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', flexWrap: 'wrap', alignItems: isMobile ? 'stretch' : 'center', gap: 8, padding: '12px 18px', borderBottom: `1px solid ${bdr}`, minWidth: 0, maxWidth: '100%' }}>
           {!isMobile && (
-            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, flex: '0 0 auto', maxWidth: '100%' }}>
-              {years.length > 1 && <div style={seg}>{yearBtns}</div>}
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, flex: '0 0 auto', maxWidth: '100%' }}>
+              {years.length > 0 && <div style={seg}>{yearBtns}</div>}
+              {years.length > 0 && fullYearBtn}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                 {[0, 1, 2, 3].map(q => (
                   <div key={q} style={seg}>
                     {quarterBtn(q)}
@@ -677,18 +691,15 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
                   </div>
                 ))}
               </div>
-              {undatedBtn}
-              {backBtn()}
             </div>
           )}
           {isMobile && (<>
             <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
               {rowLbl('QUARTER')}
               {yearBtns}
-              {years.length > 1 && <span style={{ width: 1, height: 22, background: bdr, margin: '0 4px' }} />}
+              {years.length > 0 && <span style={{ width: 1, height: 22, background: bdr, margin: '0 4px' }} />}
               {[0, 1, 2, 3].map(quarterBtn)}
-              {undatedBtn}
-              {backBtn({ marginLeft: 'auto' })}
+              {years.length > 0 && fullYearBtn}
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
               {rowLbl('MONTH')}
@@ -697,28 +708,33 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
                 : [0, 1, 2].map(i => { const m = Math.floor(TODAY.getMonth() / 3) * 3 + i; return <button key={m} disabled style={chip(false, true)}>{MONTH_NAMES[m]}</button> })}
             </div>
           </>)}
-          {/* period strip: ALWAYS lists every period of the store on one scrolling line — quarter/month picks
-              only tint the in-range periods. Desktop: shares the row when >=320px is free, else wraps to its own full-width line. */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, maxWidth: '100%', ...(isMobile ? { width: '100%' } : { flex: '1 1 320px', paddingLeft: 12, borderLeft: `1px solid ${bdr}` }) }}>
-            {rowLbl('PERIOD')}
+          {/* Period dropdown: a native select laid invisibly over a compact label, so the closed control
+              keeps one fixed width while the open list still shows full dates. */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, ...(isMobile ? { width: '100%' } : { flex: '0 0 auto' }) }}>
+            {isMobile && rowLbl('PERIOD')}
             {planCols.length === 0 ? <span style={{ fontSize: 12.5, color: mu }}>No periods</span> : (
-              <div className="ps-strip" key={retailer + JSON.stringify(pk)} ref={stripRef}
-                style={{ ...seg, flex: 1, minWidth: 0, maxWidth: '100%', flexWrap: 'nowrap', overflowX: 'auto' }}>
-                {planCols.map(c => {
-                  const on = pk?.lvl === 'p' && pk.name === c.name
-                  const inRange = !on && win.includes(c)
-                  const d = c.r?.s
-                  return (
-                    <button key={c.name} title={datesOf(c)} data-first={win[0] === c ? '1' : undefined}
-                      onClick={() => choose(d ? { lvl: 'p', name: c.name, y: d.getFullYear(), q: Math.floor(d.getMonth() / 3), m: d.getMonth() } : { lvl: 'p', name: c.name })}
-                      style={{ ...chip(on, false), flex: 'none',
-                        background: on ? GOLD_GRAD : inRange ? `${GOLD_A}22` : 'none',
-                        color: on ? '#fff' : inRange ? tx : mu, fontWeight: on || inRange ? 800 : 600 }}>
-                      {c.name}{c.status === 'now' && <span style={{ marginLeft: 6 }}>{nowTag}</span>}
-                    </button>
-                  )
-                })}
-              </div>
+              <label className="ps-period" style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, boxSizing: 'border-box',
+                width: isMobile ? 'auto' : 200, flex: isMobile ? 1 : 'none', minWidth: 0, minHeight: isMobile ? 44 : 40, padding: '0 11px', borderRadius: 10, fontSize: 12.5, fontWeight: 800, cursor: 'pointer',
+                border: `1px solid ${periodOn ? `${GOLD_A}88` : bdr}`, background: periodOn ? `${GOLD_A}22` : s2, color: periodOn ? accentTx : tx }}>
+                {!isMobile && <span style={{ flex: 'none', fontSize: 10.5, letterSpacing: '.1em', color: mu }}>PERIOD</span>}
+                <span data-period-label style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{periodLabel}</span>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden="true" style={{ flex: 'none' }}><path d="M5 9l7 7 7-7" /></svg>
+                <select aria-label="Period" value={periodValue} onChange={e => pickPeriod(e.target.value)}
+                  style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer', fontSize: 16, colorScheme: dark ? 'dark' : 'light' }}>
+                  {allOption && <option value="all">{allOption}</option>}
+                  {periodGroups.map(([label, cols]) => (
+                    <optgroup key={label} label={label}>
+                      {cols.map(c => <option key={c.name} value={`p:${c.name}`}>{[c.name, datesOf(c), c.status === 'now' && 'NOW'].filter(Boolean).join(' · ')}</option>)}
+                    </optgroup>
+                  ))}
+                  {undatedCols.length > 0 && (
+                    <optgroup label="Undated">
+                      <option value="u">All undated ({undatedCols.length})</option>
+                      {undatedCols.map(c => <option key={c.name} value={`p:${c.name}`}>{c.name}</option>)}
+                    </optgroup>
+                  )}
+                </select>
+              </label>
             )}
           </div>
         </div>
@@ -729,14 +745,11 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
       <div style={{ minWidth: 0, maxWidth: '100%' }}>
         {PeriodSelector()}
 
-        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10, padding: '10px 18px', borderBottom: `1px solid ${bdr}` }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10, padding: '4px 18px', borderBottom: `1px solid ${bdr}` }}>
           <span style={{ fontSize: 13.5, fontWeight: 800, color: tx }}>{pickLabel(pk)} <span style={{ fontWeight: 600, color: mu }}>· {plural(win.length, 'period')}</span></span>
-          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, minHeight: 40, fontSize: 13, color: mu, cursor: 'pointer' }}>
-            <input type="checkbox" checked={hideEmpty} onChange={() => setHideEmpty(v => !v)} style={{ width: 18, height: 18, accentColor: GOLD_A }} />
-            Hide SKUs with no promo in view
-          </label>
+          {backBtn}
           <span style={{ marginLeft: 'auto', fontSize: 12.5, color: mu }}>
-            {planShown.length} of {items.length} SKUs{hideEmpty && hiddenN > 0 && <span> · {hiddenN} hidden (no promo in view)</span>}
+            {planShown.length} of {items.length} SKUs{hiddenN > 0 && <span> · {hiddenN} hidden</span>}
           </span>
         </div>
 
@@ -747,18 +760,24 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
         )}
 
         <div style={{ display: 'flex', alignItems: 'flex-start' }}>
-          <div style={{ flex: 1, minWidth: 0, overflow: 'auto', maxHeight: isMobile ? '66vh' : '70vh', scrollbarColor: `${bdr} transparent`, WebkitOverflowScrolling: 'touch' }}>
+          <div key={retailer + JSON.stringify(pk)} ref={pk?.lvl === 'y' ? undefined : tableRef} style={{ flex: 1, minWidth: 0, overflow: 'auto', maxHeight: isMobile ? '66vh' : '70vh', scrollbarColor: `${bdr} transparent`, WebkitOverflowScrolling: 'touch' }}>
             {planGroups.length === 0 ? (
               <div style={{ padding: '48px 20px', textAlign: 'center', color: mu, fontSize: 14 }}>
-                No SKUs match. Clear the search or brand filter, or untick "Hide SKUs with no promo in view".
+                No promos in this view. Clear the search or brand filter, or pick another period.
               </div>
             ) : (
               <div style={{ minWidth: minW }}>
                 {/* header row */}
                 <div style={{ display: 'grid', gridTemplateColumns: gridCols, position: 'sticky', top: 0, zIndex: 4, background: s2, borderBottom: `1px solid ${bdr}` }}>
-                  <div style={{ position: 'sticky', left: 0, zIndex: 5, background: s2, borderRight: `1px solid ${bdr}`, padding: '12px 14px', fontSize: 11, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: mu }}>Product</div>
+                  <div style={{ gridRow: 'span 2', position: 'sticky', left: 0, zIndex: 5, background: s2, borderRight: `1px solid ${bdr}`, padding: '12px 14px', fontSize: 11, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: mu }}>Product</div>
+                  {quarterBands(win).map((b, i) => (
+                    <div key={i} style={{ gridColumn: `span ${b.span}`, padding: '5px 10px', minHeight: 26, boxSizing: 'border-box', borderLeft: `1px solid ${bdr}`, borderBottom: `1px solid ${dim}`, minWidth: 0 }}>
+                      {/* sticky so the label stays readable while a long quarter scrolls under the product column */}
+                      <span style={{ position: 'sticky', left: leadW + 10, fontSize: 11, fontWeight: 800, letterSpacing: '.08em', color: mu, whiteSpace: 'nowrap' }}>{b.label}</span>
+                    </div>
+                  ))}
                   {win.map(c => (
-                    <div key={c.name} style={{ padding: '9px 10px', borderLeft: `1px solid ${dim}`, borderBottom: `2px solid ${c.status === 'now' ? nowLine : 'transparent'}`,
+                    <div key={c.name} data-now={c.status === 'now' ? '1' : undefined} style={{ padding: '9px 10px', borderLeft: `1px solid ${dim}`, borderBottom: `2px solid ${c.status === 'now' ? nowLine : 'transparent'}`,
                       background: c.status === 'now' ? `color-mix(in srgb, ${GOLD_A} 12%, ${s2})` : s2, minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         <span style={{ fontSize: 13.5, fontWeight: 800, color: c.status === 'now' ? accentTx : tx, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</span>
@@ -1055,18 +1074,9 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
         ))}
       </div>
 
-      {/* toolbar: Plan|Spotlight switch + product search + tools */}
+      {/* toolbar: product search + tools */}
       {!comingSoon && (
       <div className="ps-toolbar">
-        <div className="ps-seg" style={{ background: s2, border: `1px solid ${bdr}` }}>
-          {[['plan', 'Plan', IcoGrid], ['spot', 'Spotlight', IcoTimeline]].map(([k, l, Ico]) => (
-            <button key={k} className={`ps-glow${lit(k) ? ' on ps-glow-on' : ''}`} onClick={() => { setMode(k); if (k === 'plan') setView('store') }} style={{
-              '--g': GOLD_A,
-              background: lit(k) ? GOLD_GRAD : 'none',
-              color: lit(k) ? '#fff' : mu,
-            }}><Ico size={13} />{l}</button>
-          ))}
-        </div>
         <div style={{ position: 'relative', flex: isMobile ? '1 1 100%' : '1 1 280px', maxWidth: isMobile ? 'none' : 460, minWidth: 0 }}>
           <label style={{ display: 'flex', alignItems: 'center', gap: 9, height: isMobile ? 44 : 40, padding: '0 12px', borderRadius: 10, border: `1px solid ${bdr}`, background: s2 }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={GOLD_A} strokeWidth="2.2" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>
@@ -1140,16 +1150,21 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
         border: `1px solid ${dark ? bdr : 'rgba(255,255,255,.65)'}`,
         borderRadius: 12, overflow: 'hidden',
         boxShadow: dark ? '0 8px 28px rgba(0,0,0,.35)' : '0 8px 28px rgba(82,62,40,.10), inset 0 1px 0 rgba(255,255,255,.7)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 20px', borderBottom: `1px solid ${bdr}`, background: dark ? 'rgba(255,255,255,.025)' : 'rgba(0,0,0,.02)' }}>
-          <span style={{ fontSize: 17, fontWeight: 700, letterSpacing: '-.02em', color: tx }}>{onProductView ? 'Product across stores' : retailer}</span>
-          {!onProductView && <span style={{ fontSize: 12, color: mu, fontWeight: 600 }}>{items.length} products · {periods.length} periods</span>}
-          <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
-            <div style={{ fontSize: 9.5, fontWeight: 800, color: mu, textTransform: 'uppercase', letterSpacing: '.12em' }}>Planning Date</div>
-            <div style={{ fontSize: isMobile ? 14 : 17, fontWeight: 800, fontFamily: 'ui-monospace,monospace', whiteSpace: 'nowrap',
-              color: dark ? GOLD_A : GOLD_B,
-              textShadow: `0 0 10px ${GOLD_A}aa, 0 0 24px ${GOLD_A}55` }}>
-              {TODAY_ISO}
-            </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px 14px', padding: '8px 14px', borderBottom: `1px solid ${bdr}`, background: dark ? 'rgba(255,255,255,.025)' : 'rgba(0,0,0,.02)' }}>
+          <div className="ps-seg" style={{ background: s2, border: `1px solid ${bdr}` }}>
+          {[['plan', 'Plan', IcoGrid], ['spot', 'Spotlight', IcoTimeline]].map(([k, l, Ico]) => (
+            <button key={k} className={`ps-glow${lit(k) ? ' on' : ''}`} onClick={() => { setMode(k); if (k === 'plan') setView('store') }} style={{
+              '--g': GOLD_A,
+              background: lit(k) ? `${GOLD_A}22` : 'none',
+              color: lit(k) ? accentTx : mu,
+              boxShadow: lit(k) ? `inset 0 0 0 1px ${GOLD_A}88` : 'none',
+            }}><Ico size={13} />{l}</button>
+          ))}
+          </div>
+          <span style={{ fontSize: 16, fontWeight: 700, letterSpacing: '-.02em', color: tx }}>{onProductView ? 'Product across stores' : retailer}</span>
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'baseline', gap: 8, whiteSpace: 'nowrap' }}>
+            {!isMobile && <span style={{ fontSize: 9.5, fontWeight: 800, color: mu, textTransform: 'uppercase', letterSpacing: '.12em' }}>Planning date</span>}
+            <span style={{ fontSize: 14, fontWeight: 800, fontFamily: 'ui-monospace,monospace', color: dark ? GOLD_A : GOLD_B }}>{TODAY_ISO}</span>
           </div>
         </div>
         {/* views are invoked as functions (not JSX components) — they are re-defined on

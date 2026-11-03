@@ -70,36 +70,28 @@ The activity legend row is removed; activities appear as **text tags** inside ce
   `inferPeriodDate` helpers (with the fixes under "Date parsing") — no new date parser.
 - **Period selector** (replaces the ‹ › stepper — user rejected left/right stepping,
   2026-10-30). One bar under the card header; picks ONE of quarter, month or single period:
-  - **Desktop — one row**: `[year segment] [Q1 Jan Feb Mar] [Q2 Apr May Jun] [Q3 …] [Q4 …]
-    [Undated (N)] [Back to now] | PERIOD [strip]`. Each quarter is a segment box holding its
-    quarter chip + three month chips, so all 12 months are always visible. The year segment
-    shows only when the store's dated periods span more than one year; clicking a year picks
-    that year's first quarter that has periods.
+  - **Desktop — one row** (redesigned 2026-11-03; the sideways-scrolling period strip is gone, users
+    didn't realise it scrolled): `[year segment] [Q1 Jan Feb Mar] [Q2 …] [Q3 …] [Q4 …] [Period dropdown]`.
+    All 12 months are always visible. Year chips show for every store with dated periods.
   - **Phone — stacked rows**: QUARTER (year chips + Q1–Q4), MONTH (three months of the selected
-    quarter), PERIOD (strip). Same rules otherwise.
+    quarter), PERIOD (dropdown, full width).
   - **Quarter** → columns = all periods overlapping that quarter. **Month** → all periods
-    overlapping that month. **Period** → just that period. **Undated (N)** (only when the store
-    has undated periods, e.g. Watsons) → the undated periods.
+    overlapping that month. **Period** → just that period.
   - Quarters/months with no periods are disabled (dimmed).
-  - **Period strip is static**: it ALWAYS lists every period of the store in display order, on
-    one fixed-height line that scrolls horizontally. Picking a quarter/month never replaces or
-    reflows the strip — it only tints the in-range periods and scrolls the first of them into
-    view. (User: changing the list made "the UI shrink and expand", confusing.)
-    **No visible scrollbar** (user found the scrollbar "weird"): hide it; fade only the edge(s)
-    that hide more chips (mask gradient, toggled by scroll position); the vertical mouse wheel
-    scrolls the strip sideways (non-passive listener, page does not scroll); trackpad/touch
-    swipe works natively. The jump to the first in-range chip happens only when the pick or
-    store changes (instant, not smooth — a smooth scroll is cancelled by the re-tint
-    re-render), so a manual scroll is not undone by unrelated re-renders like selecting a cell.
-  - **Colour signals — one meaning each** (user found mixed bronze outlines confusing):
-    solid bronze fill = the one thing picked (only one chip filled at a time); soft bronze tint
-    + bold = periods in the picked quarter/month; small bronze dot under a quarter/month = it
-    contains today; NOW tag = live period. Year segment uses a neutral grey "on" state (context,
-    not a pick). Chips are borderless inside grey segment boxes.
-  - **Default** on tab open / store change = the month containing today if the store has a
-    live period, else the month of its first future period, else of its last dated period,
-    else Undated. **"Back to now"** (bronze underlined link) returns to the default; its slot
-    is always reserved (hidden when already at default) so the row never shifts.
+  - **Period dropdown**: a native select laid invisibly over a fixed-width label. The list holds every
+    period of the store grouped by start quarter, with dates and NOW; undated periods sit in an
+    "Undated" group led by "All undated (N)". The first option follows the pick ("All 7 periods",
+    or "All in Q4 2026" from a single period, which returns to that quarter).
+  - **"Back to now"** sits beside the summary line, with its slot always reserved.
+  - **Colour signals — one meaning each**: soft bronze tint + thin outline = the one thing picked
+    (softened 2026-11-03, solid bronze read too bright); small bronze dot under a quarter/month =
+    contains today; NOW tag = live period. Year segment uses a neutral grey "on" state unless the
+    full year itself is picked.
+  - **Full year** (own labelled button since 2026-11-03, users didn't find it on the year chip): shows
+    every period of the selected year. Year chips only switch year: they keep a full-year view,
+    otherwise go to that year's first quarter with periods.
+  - **Default** on tab open / store change = the current quarter for every store with any dated period,
+    even when that quarter is empty (Big C, 2023 dates only; user's call 2026-11-03), else Undated.
   - A summary line above the table reads "Oct 2026 · 3 periods" / "Q4 2026 · 7 periods" /
     "2647/48 (Nov 2026) · 1 period". Changing the pick clears the selected cell.
   - A quarter can be 7+ columns (Tops Q4): the table scrolls horizontally (sticky product
@@ -117,7 +109,7 @@ The activity legend row is removed; activities appear as **text tags** inside ce
 - **Promo cell**: price (or sale label for mechanic promos, e.g. "1 แถม 1"), discount
   `−N%` via existing `offPctOf`, activity text tags. Empty = blank. Click selects the cell
   (bronze ring) and opens the detail panel.
-- **Hide empty rows** toggle (default ON): hides SKUs with no promo in the visible window;
+- **Empty rows always hidden** (toggle removed 2026-11-02 at user's request): hides SKUs with no promo in the visible window;
   header shows "· N hidden (no promo in view)".
 - **Stale-plan note**: if every period of a store is dated AND in the past (Big C; not
   Watsons, which has undated periods), show one line:

@@ -99,25 +99,24 @@ export function buildPlan(periods, today = new Date()) {
 }
 
 // ── period selector ───────────────────────────────────────────────────────────
-// Pick = { lvl: 'q'|'m'|'p'|'u', y?, q? (0-3), m? (0-11), name? }
+// Pick = { lvl: 'y'|'q'|'m'|'p'|'u', y?, q? (0-3), m? (0-11), name? }
 const endOfDay = (y, m, d) => new Date(y, m, d, 23, 59, 59, 999)
 export const quarterSpan = (y, q) => [new Date(y, q * 3, 1), endOfDay(y, q * 3 + 3, 0)]
 export const monthSpan = (y, m) => [new Date(y, m, 1), endOfDay(y, m + 1, 0)]
 export const colsInSpan = (cols, [a, b]) => cols.filter(c => c.r && c.r.s <= b && c.r.e >= a)
 
-const monthPick = d => ({ lvl: 'm', y: d.getFullYear(), q: Math.floor(d.getMonth() / 3), m: d.getMonth() })
+const quarterPick = d => ({ lvl: 'q', y: d.getFullYear(), q: Math.floor(d.getMonth() / 3) })
 
+// Always today's quarter once a store has any dated period, even if that quarter is empty (user's call):
+// every store opens on the same view. Only an all-undated store falls back to Undated.
 export function defaultPick(cols, today = new Date()) {
-  if (cols.some(c => c.status === 'now')) return monthPick(today)
-  const fut = cols.find(c => c.status === 'future')
-  if (fut) return monthPick(fut.r.s)
-  const dated = cols.filter(c => c.r)
-  if (dated.length) return monthPick(dated[dated.length - 1].r.s)
+  if (cols.some(c => c.r)) return quarterPick(today)
   return cols.length ? { lvl: 'u' } : null
 }
 
 export function colsForPick(cols, pick) {
   if (!pick) return []
+  if (pick.lvl === 'y') return colsInSpan(cols, [new Date(pick.y, 0, 1), endOfDay(pick.y, 11, 31)])
   if (pick.lvl === 'q') return colsInSpan(cols, quarterSpan(pick.y, pick.q))
   if (pick.lvl === 'm') return colsInSpan(cols, monthSpan(pick.y, pick.m))
   if (pick.lvl === 'p') return cols.filter(c => c.name === pick.name)
@@ -126,10 +125,25 @@ export function colsForPick(cols, pick) {
 
 export function pickLabel(pick) {
   if (!pick) return 'No periods'
+  if (pick.lvl === 'y') return `Full year ${pick.y}`
   if (pick.lvl === 'q') return `Q${pick.q + 1} ${pick.y}`
   if (pick.lvl === 'm') return `${MONTH_NAMES[pick.m]} ${pick.y}`
   if (pick.lvl === 'p') return pick.y != null && pick.m != null ? `${pick.name} (${MONTH_NAMES[pick.m]} ${pick.y})` : pick.name
   return 'Undated periods'
+}
+
+export const quarterLabel = c => c.r ? `Q${Math.floor(c.r.s.getMonth() / 3) + 1} ${c.r.s.getFullYear()}` : ''
+
+// Table band: adjacent columns grouped by the quarter their period STARTS in; undated columns get label ''.
+export function quarterBands(cols) {
+  const bands = []
+  for (const c of cols) {
+    const label = quarterLabel(c)
+    const last = bands[bands.length - 1]
+    if (last && last.label === label) last.span++
+    else bands.push({ label, span: 1 })
+  }
+  return bands
 }
 
 export const pickYears = cols =>

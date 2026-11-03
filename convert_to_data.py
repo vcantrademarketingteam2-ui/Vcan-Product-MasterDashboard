@@ -33,6 +33,9 @@ RETAILERS = [
     'Tops', 'Villa', 'The Mall', 'Lotus', 'Homepro', 'Big C',
     'TWD', 'Boots', 'Foodland', 'Central Department', "Pet'n me", 'Fuji', 'Watsons'
 ]
+# Retailers with their own sheet but no MASTER column: coverage comes from COVERAGE_BACKFILL only.
+# ponytail: when MASTER gains the column, move the name into RETAILERS (same order as the sheet).
+SHEET_ONLY_RETAILERS = ['Golden Place']
 
 # sheet tab name -> dashboard retailer name
 SHEET_MAP = {
@@ -49,6 +52,7 @@ SHEET_MAP = {
     'central WMF' : 'Central Department',
     "Pet'n me"    : "Pet'n me",
     'Watsons'     : 'Watsons',
+    'Gloden Place': 'Golden Place',  # sheet tab really is spelled "Gloden"
 }
 
 # Some retailers carry WMF through a dedicated sheet that the MASTER coverage grid
@@ -56,6 +60,7 @@ SHEET_MAP = {
 # active coverage for that retailer, but only when MASTER didn't already fill it.
 COVERAGE_BACKFILL = {
     'HomePro WMF' : 'Homepro',
+    'Gloden Place': 'Golden Place',
 }
 
 
@@ -156,6 +161,8 @@ def parse_master(ws):
         for j, r in enumerate(RETAILERS):
             idx = roff + j
             retailers[r] = row[idx] if idx < len(row) else ''
+        for r in SHEET_ONLY_RETAILERS:
+            retailers[r] = ''
 
         try:
             rsp_val = float(re.sub(r'[^\d.]', '', rsp_raw)) if rsp_raw else 0

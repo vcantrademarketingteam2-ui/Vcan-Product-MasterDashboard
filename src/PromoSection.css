@@ -39,10 +39,9 @@
 .ps-pulse { animation: ps-pulse 1.6s ease-in-out infinite; }
 
 /* period strip: no scrollbar, edges fade so a half-visible chip reads as "more this way" */
-.ps-strip{scrollbar-width:none;--fl:#000;--fr:#000;-webkit-mask-image:linear-gradient(90deg,var(--fl) 0,#000 26px,#000 calc(100% - 26px),var(--fr) 100%);mask-image:linear-gradient(90deg,var(--fl) 0,#000 26px,#000 calc(100% - 26px),var(--fr) 100%)}
-.ps-strip[data-l="1"]{--fl:transparent}
-.ps-strip[data-r="1"]{--fr:transparent}
-.ps-strip::-webkit-scrollbar{display:none}
 
 .ps-prow:hover { background: rgba(212,168,106,.10); }
 .ps-prow:focus-visible { outline: 2px solid #d4a86a; outline-offset: -2px; background: rgba(212,168,106,.10); }
+
+/* period dropdown: the native select is invisible, so show keyboard focus on its label */
+.ps-period:focus-within { outline: 2px solid currentColor; outline-offset: 2px; }

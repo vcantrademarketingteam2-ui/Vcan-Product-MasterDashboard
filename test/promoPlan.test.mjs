@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseDR, periodRange, periodStatus, buildPlan, quarterSpan, monthSpan, colsInSpan, defaultPick, colsForPick, pickLabel, pickYears } from '../src/promoPlan.js';
+import { parseDR, periodRange, periodStatus, buildPlan, quarterSpan, monthSpan, colsInSpan, defaultPick, colsForPick, pickLabel, pickYears, quarterBands } from '../src/promoPlan.js';
 import { productRows, bestNow } from '../src/promoPlan.js';
 
 const T = new Date(2026, 9, 30);
@@ -72,8 +72,15 @@ const tops = buildPlan([
   { name: '2701/02', dateRange: '23/12-5/01/27' }], T).cols;
 const names = cs => cs.map(c => c.name);
 
-test("defaultPick is today's month when something is live", () => {
-  assert.deepEqual(defaultPick(tops, T), { lvl: 'm', y: 2026, q: 3, m: 9 });
+test("defaultPick is today's quarter when something is live", () => {
+  const pk = defaultPick(tops, T);
+  assert.deepEqual(pk, { lvl: 'q', y: 2026, q: 3 });
+  assert.equal(pickLabel(pk), 'Q4 2026');
+  assert.equal(colsForPick(tops, pk).length, 5);
+});
+test('defaultPick stays on today\'s quarter with no live period', () => {
+  const gap = buildPlan([{ name: 'a', dateRange: '1/10-14/10/26' }, { name: 'b', dateRange: '1/01-14/01/27' }], T).cols;
+  assert.deepEqual(defaultPick(gap, T), { lvl: 'q', y: 2026, q: 3 });
 });
 test('colsForPick month / quarter / period', () => {
   assert.deepEqual(names(colsForPick(tops, { lvl: 'm', y: 2026, q: 3, m: 9 })), ['2641/42', '2643/44', '2645/46']);
@@ -81,19 +88,31 @@ test('colsForPick month / quarter / period', () => {
   assert.deepEqual(names(colsForPick(tops, { lvl: 'p', name: '2647/48' })), ['2647/48']);
   assert.deepEqual(colsForPick(tops, null), []);
 });
+test('full year pick spans every period touching that year', () => {
+  assert.deepEqual(names(colsForPick(tops, { lvl: 'y', y: 2027 })), ['2701/02']);
+  assert.equal(colsForPick(tops, { lvl: 'y', y: 2026 }).length, 5);
+  assert.equal(pickLabel({ lvl: 'y', y: 2026 }), 'Full year 2026');
+});
+test('quarterBands groups adjacent columns by start quarter', () => {
+  assert.deepEqual(quarterBands(tops), [{ label: 'Q3 2026', span: 1 }, { label: 'Q4 2026', span: 4 }]);
+  const und = buildPlan([{ name: 'a', dateRange: '1/12-14/12/26' }, { name: 'b', dateRange: '' }], T).cols;
+  assert.deepEqual(quarterBands(und), [{ label: 'Q4 2026', span: 1 }, { label: '', span: 1 }]);
+  assert.deepEqual(quarterBands([]), []);
+});
 test('spans end at the last day 23:59:59.999', () => {
   const [qs, qe] = quarterSpan(2026, 3);
   assert.deepEqual([ymd(qs), ymd(qe)], [[2026, 10, 1], [2026, 12, 31]]);
   assert.equal(monthSpan(2026, 1)[1].getDate(), 28);
   assert.equal(colsInSpan(tops, monthSpan(2026, 10)).length, 2);
 });
-test('defaultPick all past -> month of last dated col', () => {
+test('defaultPick all past still opens on today\'s quarter', () => {
   const big = buildPlan([{ name: 'a', dateRange: '1/01-14/01/23' }, { name: 'b', dateRange: '15/03-28/03/23' }], T).cols;
-  assert.deepEqual(defaultPick(big, T), { lvl: 'm', y: 2023, q: 0, m: 2 });
+  assert.deepEqual(defaultPick(big, T), { lvl: 'q', y: 2026, q: 3 });
+  assert.deepEqual(colsForPick(big, defaultPick(big, T)), []);
 });
 test('defaultPick future, undated and empty', () => {
-  const fut = buildPlan([{ name: 'a', dateRange: '1/12-14/12/26' }], T).cols;
-  assert.deepEqual(defaultPick(fut, T), { lvl: 'm', y: 2026, q: 3, m: 11 });
+  const fut = buildPlan([{ name: 'a', dateRange: '1/03-14/03/27' }], T).cols;
+  assert.deepEqual(defaultPick(fut, T), { lvl: 'q', y: 2026, q: 3 });
   const und = buildPlan([{ name: '2603/04', dateRange: '' }], T).cols;
   assert.deepEqual(defaultPick(und, T), { lvl: 'u' });
   assert.equal(defaultPick([], T), null);
