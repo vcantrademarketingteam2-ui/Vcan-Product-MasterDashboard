@@ -281,8 +281,6 @@ function CountUp({ v, dec = 0 }) {
 }
 
 const RETAILERS = ['Tops', 'Villa', 'The Mall', 'Lotus', 'Homepro', 'Big C', 'TWD', 'Boots', 'Foodland', 'Central Department', "Pet'n me", 'Fuji', 'Watsons', 'Golden Place']
-// No column in the MASTER sheet yet: a CSV import must not read the next column (Remark) as its status.
-const SHEET_ONLY_RETAILERS = new Set(['Golden Place'])
 
 const fmtTs = (d) => {
   const dt = new Date(d)
@@ -439,7 +437,7 @@ function parseCSV(text) {
     if (!barcode || !product || product.trim().toLowerCase() === 'total') continue
     if (!isBarcode(barcode)) continue
     const retailerStatus = {}
-    RETAILERS.forEach((r, j) => { retailerStatus[r] = SHEET_ONLY_RETAILERS.has(r) ? '' : row[retailerOffset + j] || '' })
+    RETAILERS.forEach((r, j) => { retailerStatus[r] = row[retailerOffset + j] || '' })
     const brandFinal = (currentBrand !== 'Dove Men' && /dove.?men/i.test(product)) ? 'Dove Men' : currentBrand
     rows.push({ company: currentCompany, brand: brandFinal, barcode, product, packSize, rsp: rsp ? parseFloat(rsp) : 0, status, retailers: retailerStatus })
   }
@@ -1581,7 +1579,7 @@ export default function App() {
             <div style={{ fontWeight: 800, fontSize: isMobile ? 14 : 17, color: t.text, letterSpacing: 0.2, whiteSpace: 'nowrap', flexShrink: 0 }}>
               Product Master
             </div>
-              <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v3.16.0</span>
+              <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v3.16.1</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: isMobile ? 11 : 13, background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, padding: isMobile ? '3px 8px' : '5px 12px', overflow: 'hidden', minWidth: 0, flexShrink: 1 }}>
               <span style={{ width: isMobile ? 6 : 7, height: isMobile ? 6 : 7, borderRadius: '50%', flexShrink: 0, background: dataSource === 'csv' ? t.blue : t.green }} />
               <span style={{ fontWeight: 800, color: dataSource === 'csv' ? t.blue : t.green, flexShrink: 0 }}>
