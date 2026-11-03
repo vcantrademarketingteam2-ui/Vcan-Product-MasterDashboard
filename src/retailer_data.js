@@ -330,6 +330,11 @@ const RETAILER_DATA = {
       "costCase": 1093.4579,
       "gp": 0.25
     },
+    "Villa": {
+      "costUnit": 143.972,
+      "costCase": 1151.7757,
+      "gp": 0.21
+    },
     "The Mall": {
       "costUnit": 143.972,
       "costCase": 1151.7757,
@@ -352,6 +357,11 @@ const RETAILER_DATA = {
       "costCase": 1093.4579,
       "gp": 0.25
     },
+    "Villa": {
+      "costUnit": 143.972,
+      "costCase": 1151.7757,
+      "gp": 0.21
+    },
     "The Mall": {
       "costUnit": 143.972,
       "costCase": 1151.7757,
@@ -373,6 +383,11 @@ const RETAILER_DATA = {
       "costUnit": 136.6822,
       "costCase": 1093.4579,
       "gp": 0.25
+    },
+    "Villa": {
+      "costUnit": 143.972,
+      "costCase": 1151.7757,
+      "gp": 0.21
     },
     "The Mall": {
       "costUnit": 143.972,
