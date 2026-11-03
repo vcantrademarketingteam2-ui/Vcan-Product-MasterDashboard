@@ -1242,6 +1242,11 @@ const RETAILER_DATA = {
       "costUnit": 225.7009,
       "costCase": 1354.2056,
       "gp": 0.3
+    },
+    "Golden Place": {
+      "costUnit": 225.7009,
+      "costCase": 1354.2056,
+      "gp": 0.3
     }
   },
   "011111014121": {
@@ -1264,6 +1269,11 @@ const RETAILER_DATA = {
       "costUnit": 225.7009,
       "costCase": 1354.2056,
       "gp": 0.3
+    },
+    "Golden Place": {
+      "costUnit": 225.7009,
+      "costCase": 1354.2056,
+      "gp": 0.3
     }
   },
   "011111014138": {
@@ -1283,6 +1293,11 @@ const RETAILER_DATA = {
       "gp": 0.28
     },
     "Boots": {
+      "costUnit": 225.7009,
+      "costCase": 1354.2056,
+      "gp": 0.3
+    },
+    "Golden Place": {
       "costUnit": 225.7009,
       "costCase": 1354.2056,
       "gp": 0.3
@@ -2198,6 +2213,42 @@ const RETAILER_DATA = {
       "costUnit": 88.785,
       "costCase": 1065.4206,
       "gp": 0.24
+    }
+  },
+  "9358131001832": {
+    "Tops": {
+      "costUnit": 287.9439,
+      "costCase": 3455.3271,
+      "gp": 0.22
+    },
+    "Watsons": {
+      "costUnit": 258.4117,
+      "costCase": 3100.94,
+      "gp": 0.3
+    }
+  },
+  "9358131001849": {
+    "Tops": {
+      "costUnit": 287.9439,
+      "costCase": 3455.3271,
+      "gp": 0.22
+    },
+    "Watsons": {
+      "costUnit": 258.4117,
+      "costCase": 3100.94,
+      "gp": 0.3
+    }
+  },
+  "9358131001856": {
+    "Tops": {
+      "costUnit": 287.9439,
+      "costCase": 3455.3271,
+      "gp": 0.22
+    },
+    "Watsons": {
+      "costUnit": 258.4117,
+      "costCase": 3100.94,
+      "gp": 0.3
     }
   },
   "4008239288158": {
@@ -5668,27 +5719,6 @@ const RETAILER_DATA = {
       "costUnit": 318.93,
       "costCase": 1913.58,
       "gp": 0.35
-    }
-  },
-  "9358131001832": {
-    "Watsons": {
-      "costUnit": 258.4117,
-      "costCase": 3100.94,
-      "gp": 0.3
-    }
-  },
-  "9358131001849": {
-    "Watsons": {
-      "costUnit": 258.4117,
-      "costCase": 3100.94,
-      "gp": 0.3
-    }
-  },
-  "9358131001856": {
-    "Watsons": {
-      "costUnit": 258.4117,
-      "costCase": 3100.94,
-      "gp": 0.3
     }
   }
 }

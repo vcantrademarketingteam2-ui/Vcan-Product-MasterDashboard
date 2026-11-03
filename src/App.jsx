@@ -280,7 +280,9 @@ function CountUp({ v, dec = 0 }) {
   return dec ? n.toFixed(dec) : Math.round(n).toLocaleString()
 }
 
-const RETAILERS = ['Tops', 'Villa', 'The Mall', 'Lotus', 'Homepro', 'Big C', 'TWD', 'Boots', 'Foodland', 'Central Department', "Pet'n me", 'Fuji', 'Watsons']
+const RETAILERS = ['Tops', 'Villa', 'The Mall', 'Lotus', 'Homepro', 'Big C', 'TWD', 'Boots', 'Foodland', 'Central Department', "Pet'n me", 'Fuji', 'Watsons', 'Golden Place']
+// No column in the MASTER sheet yet: a CSV import must not read the next column (Remark) as its status.
+const SHEET_ONLY_RETAILERS = new Set(['Golden Place'])
 
 const fmtTs = (d) => {
   const dt = new Date(d)
@@ -290,7 +292,7 @@ const fmtTs = (d) => {
 const RETAILER_SHORT = {
   'Tops': 'TOPS', 'Villa': 'VILLA', 'The Mall': 'THE MALL', 'Lotus': 'LOTUS',
   'Homepro': 'HOMEPRO', 'Big C': 'BIG C', 'TWD': 'TWD', 'Boots': 'BOOTS',
-  'Foodland': 'FOODLAND', 'Central Department': 'CENTRAL', "Pet'n me": "PET'N ME", 'Fuji': 'FUJI', 'Watsons': 'WATSONS'
+  'Foodland': 'FOODLAND', 'Central Department': 'CENTRAL', "Pet'n me": "PET'N ME", 'Fuji': 'FUJI', 'Watsons': 'WATSONS', 'Golden Place': 'GOLDEN PLACE'
 }
 // Drop logo files into public/retailers/ with these exact names to replace the text labels.
 const RETAILER_LOGOS = {
@@ -307,6 +309,7 @@ const RETAILER_LOGOS = {
   "Pet'n me": '/retailers/petnme.png',
   'Fuji': '/retailers/fuji.png',
   'Watsons': '/retailers/Watsons.png',
+  'Golden Place': '/retailers/golden-place.png',
 }
 // Tops/Villa/Lotus/Homepro/BigC/TWD/Boots/Central/Pet'n me ship as solid brand-color
 // tiles (no alpha) — render bare, no wrapper background, or a second white box doubles
@@ -317,7 +320,7 @@ const RETAILER_LOGOS = {
 // in dark mode only (both pass >5:1 on light unaided). Foodland/Fuji white ink is
 // 1.14:1 against light bg #f4efe9 → need a plate in light mode only (18.9:1 on dark
 // unaided). No retailer needs a plate in both themes.
-const RETAILER_DARK_PLATE = new Set(['Villa', 'The Mall'])
+const RETAILER_DARK_PLATE = new Set(['Villa', 'The Mall', 'Golden Place'])  // Golden Place green ink 2.6:1 on dark, 6.3:1 on light
 const RETAILER_LIGHT_PLATE = new Set(['Foodland', 'Fuji'])
 // Ambient neon glow behind each retailer tile (docs/superpowers/specs/2026-07-13-retailer-glow-codex-brief.md).
 // Always-on decoration, not a selection state — kept separate from the .ps-glow ring
@@ -327,7 +330,7 @@ const RETAILER_GLOW = {
   'Tops': '#ff3c1c', 'Villa': '#3aa0ff', 'The Mall': '#ed1c24', 'Lotus': '#00beb5',
   'Homepro': '#1867b2', 'Big C': '#a0c515', 'TWD': '#9b1c20', 'Boots': '#05054b',
   'Foodland': '#ec2029', 'Central Department': '#e23b3b', "Pet'n me": '#ffc502', 'Fuji': '#e4151b',
-  'Watsons': '#00a04a',
+  'Watsons': '#00a04a', 'Golden Place': '#06652c',
 }
 
 // Activity badge colors for Promotion Plan — defined here (not imported) so colors are
@@ -436,7 +439,7 @@ function parseCSV(text) {
     if (!barcode || !product || product.trim().toLowerCase() === 'total') continue
     if (!isBarcode(barcode)) continue
     const retailerStatus = {}
-    RETAILERS.forEach((r, j) => { retailerStatus[r] = row[retailerOffset + j] || '' })
+    RETAILERS.forEach((r, j) => { retailerStatus[r] = SHEET_ONLY_RETAILERS.has(r) ? '' : row[retailerOffset + j] || '' })
     const brandFinal = (currentBrand !== 'Dove Men' && /dove.?men/i.test(product)) ? 'Dove Men' : currentBrand
     rows.push({ company: currentCompany, brand: brandFinal, barcode, product, packSize, rsp: rsp ? parseFloat(rsp) : 0, status, retailers: retailerStatus })
   }
@@ -1578,7 +1581,7 @@ export default function App() {
             <div style={{ fontWeight: 800, fontSize: isMobile ? 14 : 17, color: t.text, letterSpacing: 0.2, whiteSpace: 'nowrap', flexShrink: 0 }}>
               Product Master
             </div>
-              <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v3.14.4</span>
+              <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v3.16.0</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: isMobile ? 11 : 13, background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, padding: isMobile ? '3px 8px' : '5px 12px', overflow: 'hidden', minWidth: 0, flexShrink: 1 }}>
               <span style={{ width: isMobile ? 6 : 7, height: isMobile ? 6 : 7, borderRadius: '50%', flexShrink: 0, background: dataSource === 'csv' ? t.blue : t.green }} />
               <span style={{ fontWeight: 800, color: dataSource === 'csv' ? t.blue : t.green, flexShrink: 0 }}>
