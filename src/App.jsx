@@ -823,6 +823,15 @@ function ProductPopup({ product, onClose, t, dark, isMobile = false, pricing = {
     </div>
   )
 
+  // Info / Promos switch, shared by the photo-forward (desktop) and data-forward (phone) layouts
+  const popTabRow = (
+    <div style={{ display: 'flex', gap: 6 }}>
+      {[['info', 'Info'], ['promos', `Promos${myPromos.length ? ` (${myPromos.length})` : ''}`]].map(([key, label]) => (
+        <button key={key} onClick={() => setPopTab(key)} style={{ fontSize: 12, fontWeight: 700, padding: '4px 12px', borderRadius: 99, border: `1px solid ${popTab === key ? t.accent : t.border}`, background: popTab === key ? `${t.accent}22` : 'transparent', color: popTab === key ? t.accent : t.muted, cursor: 'pointer' }}>{label}</button>
+      ))}
+    </div>
+  )
+
   return (
     <>
       {/* ── Lightbox ── */}
@@ -902,23 +911,21 @@ function ProductPopup({ product, onClose, t, dark, isMobile = false, pricing = {
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               {imagePanel(true)}
               <div style={{ padding: '18px 24px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
-                {statsRow}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 22, alignItems: 'start' }}>
-                  {pricingBlock()}
-                  {coverageBlock('repeat(2, 1fr)')}
-                </div>
+                {popTabRow}
+                {popTab === 'info' ? <>
+                  {statsRow}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 22, alignItems: 'start' }}>
+                    {pricingBlock()}
+                    {coverageBlock('repeat(2, 1fr)')}
+                  </div>
+                </> : promoBlock}
               </div>
             </div>
           ) : (
             <div style={{ display: 'flex', gap: 0, flexDirection: isMobile ? 'column' : 'row', flexWrap: 'nowrap' }}>
               {imagePanel(false)}
               <div style={{ flex: 1, minWidth: 0, padding: isMobile ? '16px' : '20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
-                {/* tab pills */}
-                <div style={{ display: 'flex', gap: 6 }}>
-                  {[['info', 'Info'], ['promos', `Promos${myPromos.length ? ` (${myPromos.length})` : ''}`]].map(([key, label]) => (
-                    <button key={key} onClick={() => setPopTab(key)} style={{ fontSize: 12, fontWeight: 700, padding: '4px 12px', borderRadius: 99, border: `1px solid ${popTab === key ? t.accent : t.border}`, background: popTab === key ? `${t.accent}22` : 'transparent', color: popTab === key ? t.accent : t.muted, cursor: 'pointer' }}>{label}</button>
-                  ))}
-                </div>
+                {popTabRow}
                 {popTab === 'info' ? <>
                   {statsRow}
                   {pricingBlock()}
@@ -2644,7 +2651,7 @@ export default function App() {
           dark={dark}
           isMobile={isMobile}
           pricing={retailerData[selectedProduct.barcode] || {}}
-          variant={tab === 'packshot' ? 'packshot' : 'products'}
+          variant="packshot"
           promoItems={promoData}
           promoMeta={PROMO_META}
         />
