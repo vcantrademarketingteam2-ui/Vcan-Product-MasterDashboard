@@ -4,7 +4,7 @@ import { BRAND_CATEGORIES, brandCategory, keyBrand } from './brandCategory.js'
 import { RETAILERS, COVER_FIT_RETAILERS } from './storeConstants.js'
 import './ProductsPage.css'
 
-// Products one-stop page (v3.17.0): every product filter in a left panel, the list beside it
+// Products one-stop page (v4.0.0): every product filter in a left panel, the list beside it
 // as packshot cards or a table. All filter state and memos live in App; shared components
 // (RetailerLogo, RetailerDot, BrandPlaque, PackshotImg) come in as props, like PromoSection,
 // so there is no circular import. Everything here is module scope — never define a component
