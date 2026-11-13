@@ -254,7 +254,7 @@ function Sheet({ title, heading = true, onClose, t, dark, children }) {
     return () => document.removeEventListener('keydown', h)
   }, [onClose])
   return createPortal(
-    <div className="pp-sheet-bg" onClick={onClose} style={{ ...tokens(t, dark), color: t.text, fontFamily: "'Plus Jakarta Sans',sans-serif", fontSize: 14 }}>
+    <div className="pp-sheet-bg" onClick={onClose} style={{ ...tokens(t, dark), color: t.text, fontFamily: "'Plus Jakarta Sans',sans-serif", fontSize: 14, zoom: 1.05 }}>
       <div className="pp-sheet" role="dialog" aria-label={title} onClick={e => e.stopPropagation()}>
         {heading && <div className="pp-sheet-h"><span>{title}</span></div>}
         <div className="pp-sheet-b">{children}</div>

@@ -1218,8 +1218,10 @@ function CalcModal({ t, dark, items, retailer, onClose }) {
 
   const s = t.surface, s2 = t.surface2, bdr = t.border, tx = t.text, mu = t.muted
 
-  return (
-    <div className="ps-modal-backdrop" onClick={onClose} style={{ background: 'rgba(4,6,12,.55)' }}>
+  // Portalled: the page wrapper (.vc-fade) keeps a stacking context, so inside it this backdrop
+  // would paint under the phone tab bar. A portal loses inherited colour, font and zoom: set here.
+  return createPortal(
+    <div className="ps-modal-backdrop" onClick={onClose} style={{ background: 'rgba(4,6,12,.55)', color: tx, fontFamily: "'Plus Jakarta Sans',sans-serif", fontSize: 14, zoom: 1.05 }}>
       <div className="ps-modal" onClick={e => e.stopPropagation()} style={{
         background: dark ? 'rgba(22,27,34,.85)' : 'rgba(251,248,243,.85)',
         backdropFilter: 'blur(18px) saturate(1.5)', WebkitBackdropFilter: 'blur(18px) saturate(1.5)',
@@ -1267,5 +1269,5 @@ function CalcModal({ t, dark, items, retailer, onClose }) {
         </div>
       </div>
     </div>
-  )
+  , document.body)
 }
