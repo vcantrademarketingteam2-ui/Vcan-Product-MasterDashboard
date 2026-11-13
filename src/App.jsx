@@ -5,6 +5,7 @@ import retailerData from './retailer_data.js'
 import promoData, { PROMO_META } from './promo_data.js'
 import vcanLogo from './VCAN.png'
 import PromoSection from './PromoSection.jsx'
+import { knockOutWhite } from './cutout.js'
 import { upcomingWithin, bangkokToday, daysUntil } from './promoAlerts.js'
 import { DEPT_PINS, canSeeRetailer, canViewAccessLog, logPricingAccess, getAccessLog, clearAccessLog } from './deptPins.js'
 
@@ -516,7 +517,19 @@ function ProductPopup({ product, onClose, t, dark, isMobile = false, pricing = {
       const canvas = document.createElement('canvas'); canvas.width = boxW; canvas.height = boxH
       const ctx = canvas.getContext('2d')
       if (ext === 'jpg') { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, boxW, boxH) }
-      ctx.drawImage(img, dx, dy, dw, dh)
+      let source = img
+      if (ext === 'png') {
+        // Transparent PNG: knock the white studio background out at native size on its own
+        // canvas (never on the padded target), then composite. Falls back to the plain image.
+        try {
+          const nat = document.createElement('canvas'); nat.width = img.width; nat.height = img.height
+          const nctx = nat.getContext('2d')
+          nctx.drawImage(img, 0, 0)
+          const id = nctx.getImageData(0, 0, nat.width, nat.height)
+          if (knockOutWhite(id.data, nat.width, nat.height)) { nctx.putImageData(id, 0, 0); source = nat }
+        } catch { /* getImageData failed: export without cut-out */ }
+      }
+      ctx.drawImage(source, dx, dy, dw, dh)
       const mime = ext === 'jpg' ? 'image/jpeg' : ext === 'png' ? 'image/png' : 'image/webp'
       const q = ext === 'jpg' ? 0.92 : undefined
       canvas.toBlob(blob => {
