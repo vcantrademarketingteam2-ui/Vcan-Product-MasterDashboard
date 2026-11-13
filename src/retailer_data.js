@@ -1189,6 +1189,11 @@ const RETAILER_DATA = {
       "costUnit": 97.5701,
       "costCase": 585.4206,
       "gp": 0.28
+    },
+    "Villa": {
+      "costUnit": 108.4112,
+      "costCase": 650.4673,
+      "gp": 0.2
     }
   },
   "3450601100413": {
@@ -1196,6 +1201,11 @@ const RETAILER_DATA = {
       "costUnit": 97.5701,
       "costCase": 585.4206,
       "gp": 0.28
+    },
+    "Villa": {
+      "costUnit": 108.4112,
+      "costCase": 650.4673,
+      "gp": 0.2
     }
   },
   "3450601100420": {
@@ -1203,6 +1213,11 @@ const RETAILER_DATA = {
       "costUnit": 97.5701,
       "costCase": 585.4206,
       "gp": 0.28
+    },
+    "Villa": {
+      "costUnit": 108.4112,
+      "costCase": 650.4673,
+      "gp": 0.2
     }
   },
   "017000024103": {
