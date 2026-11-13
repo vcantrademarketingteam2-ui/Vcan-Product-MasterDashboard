@@ -1,10 +1,12 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { BRAND_CATEGORIES, brandCategory, brandKey, keyBrand } from './brandCategory.js'
+import { RETAILERS } from './storeConstants.js'
+import ProductsPage from './ProductsPage.jsx'
 import fallbackData, { GENERATED_AT } from './data.js'
 import retailerData from './retailer_data.js'
 import promoData, { PROMO_META } from './promo_data.js'
-import vcanLogo from './VCAN.png'
 import PromoSection from './PromoSection.jsx'
+import { knockOutWhite } from './cutout.js'
 import { upcomingWithin, bangkokToday, daysUntil } from './promoAlerts.js'
 import { DEPT_PINS, canSeeRetailer, canViewAccessLog, logPricingAccess, getAccessLog, clearAccessLog } from './deptPins.js'
 
@@ -87,12 +89,25 @@ const BP_DIMS = {
 function plaqueWidth(ar, h) {
   return Math.round(Math.min(Math.max(h, ar * h), h * 2.3))
 }
-function BrandPlaque({ brand, company, t, size = 'm' }) {
+// fixed = { w, h }: a constant-size white plate (Products filter tiles) — never resizes when
+// the logo loads, and the monogram fallback fills the same plate.
+function BrandPlaque({ brand, company, t, size = 'm', fixed = null }) {
   const clr = company === 'Vcan' ? t.vcanClr : t.moolaClr
   const d = BP_DIMS[size]
   const [err, setErr] = useState(false)
   const [ar, setAr] = useState(1)
   const src = BRAND_LOGOS[brand]
+  if (fixed) {
+    const box = { width: fixed.w, height: fixed.h, borderRadius: 7, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box' }
+    return src && !err ? (
+      <span style={{ ...box, background: '#fff', overflow: 'hidden', padding: '2px 6px' }}>
+        <img src={src} alt={brand} loading="lazy" decoding="async" onError={() => setErr(true)}
+          style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />
+      </span>
+    ) : (
+      <span style={{ ...box, fontSize: 12, fontWeight: 800, color: 'rgba(0,0,0,.78)', background: `linear-gradient(135deg, ${clr}, ${clr}99)` }}>{brandMonogram(brand)}</span>
+    )
+  }
   if (src && !err) {
     return (
       <span style={{
@@ -257,6 +272,25 @@ function effStatusFor(p, selectedRetailers) {
   return rank === 2 ? 'ขาย' : rank === 1 ? 'รอขาย' : rank === 0 ? 'ยกเลิกขาย' : null
 }
 
+// Same name / brand / barcode match the Products search has always used.
+function matchesSearch(p, search) {
+  if (!search) return true
+  const q = search.toLowerCase()
+  return p.product.toLowerCase().includes(q) || p.brand.toLowerCase().includes(q) || p.barcode.includes(q)
+}
+
+// "Most stores first" key: retailers where the product is active, ties broken by retailers
+// with any value at all.
+function storeReach(p) {
+  let active = 0, listed = 0
+  for (const r of RETAILERS) {
+    const v = p.retailers[r]
+    if (v) listed++
+    if (v === 'A') active++
+  }
+  return active * 100 + listed
+}
+
 // Count-up animation for KPI / bento numbers — respects prefers-reduced-motion.
 function useCountUp(target, dur = 1100) {
   const [v, setV] = useState(0)
@@ -279,8 +313,6 @@ function CountUp({ v, dec = 0 }) {
   const n = useCountUp(v)
   return dec ? n.toFixed(dec) : Math.round(n).toLocaleString()
 }
-
-const RETAILERS = ['Tops', 'Villa', 'The Mall', 'Lotus', 'Homepro', 'Big C', 'TWD', 'Boots', 'Foodland', 'Central Department', "Pet'n me", 'Fuji', 'Watsons', 'Golden Place']
 
 const fmtTs = (d) => {
   const dt = new Date(d)
@@ -348,12 +380,14 @@ const PROMO_ACTIVITY_DISPLAY = {
 // v3.8.0 "Bare Tile": plate shrinks to a whisper (1px/3px, radius 7) so it reads as
 // part of the logo, not a chip — chrome now lives at the call site (see the R1
 // selection/dim styling on the interactive filter-pill wrappers), not in here.
-function RetailerLogo({ name, h = 28, maxW = 76, dark, fallbackStyle = {} }) {
+// cover = fill the box with object-fit: cover (logos with wide empty margins); noGlow = drop the
+// ambient neon glow (Products tiles/cards sit on plain surfaces and read cleaner without it).
+function RetailerLogo({ name, h = 28, maxW = 76, dark, fallbackStyle = {}, cover = false, noGlow = false }) {
   const [err, setErr] = useState(false)
   const src = RETAILER_LOGOS[name]
   if (err || !src) return <span style={{ whiteSpace: 'nowrap', ...fallbackStyle }}>{RETAILER_SHORT[name] || name}</span>
   const needsPlate = (dark && RETAILER_DARK_PLATE.has(name)) || (!dark && RETAILER_LIGHT_PLATE.has(name))
-  const glow = RETAILER_GLOW[name]
+  const glow = noGlow ? null : RETAILER_GLOW[name]
   // Ambient, not hover/selection feedback — kept softer than .ps-glow's hover/selected
   // rings (which live one layer up, on the interactive filter-pill button) so the two
   // never compete when both are present.
@@ -374,7 +408,9 @@ function RetailerLogo({ name, h = 28, maxW = 76, dark, fallbackStyle = {} }) {
         alt={RETAILER_SHORT[name] || name}
         title={name}
         onError={() => setErr(true)}
-        style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', display: 'block', borderRadius: needsPlate ? 0 : 5 }}
+        style={cover
+          ? { width: '100%', height: '100%', objectFit: 'cover', display: 'block', borderRadius: needsPlate ? 0 : 5 }
+          : { maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', display: 'block', borderRadius: needsPlate ? 0 : 5 }}
       />
     </span>
   )
@@ -445,7 +481,8 @@ function parseCSV(text) {
 }
 
 // ── PackshotImg: tries jpg → png → webp → placeholder ─────────────────────
-function PackshotImg({ barcode, side = 'front', style = {}, placeholderSize = 40, onSrcChange }) {
+// placeholder = plain text shown instead of the emoji box when no file exists (product cards).
+function PackshotImg({ barcode, side = 'front', style = {}, placeholderSize = 40, onSrcChange, placeholder = null }) {
   const EXTS = ['webp', 'jpg', 'png']
   const [idx, setIdx] = useState(0)
   const [failed, setFailed] = useState(false)
@@ -454,6 +491,11 @@ function PackshotImg({ barcode, side = 'front', style = {}, placeholderSize = 40
   // cache-bust per data build — a stale CDN/browser cache can otherwise keep
   // serving an old image (or old 404) for an updated packshot on one device
   const src = `/packshots/${barcode}_${side}.${EXTS[idx]}?v=${encodeURIComponent(GENERATED_AT)}`
+  if (failed && placeholder) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', ...style }}>
+      <span style={{ fontSize: 12, fontWeight: 700, color: '#a39a8c' }}>{placeholder}</span>
+    </div>
+  )
   if (failed) return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(128,128,128,0.08)', borderRadius: 8, gap: 6, ...style }}>
       <span style={{ fontSize: placeholderSize * 0.9, opacity: 0.3 }}>📦</span>
@@ -464,6 +506,8 @@ function PackshotImg({ barcode, side = 'front', style = {}, placeholderSize = 40
     <img
       src={src}
       alt=""
+      loading="lazy"
+      decoding="async"
       onLoad={() => onSrcChange && onSrcChange(src)}
       onError={() => idx < EXTS.length - 1 ? setIdx(i => i + 1) : setFailed(true)}
       style={{ objectFit: 'contain', ...style }}
@@ -516,7 +560,19 @@ function ProductPopup({ product, onClose, t, dark, isMobile = false, pricing = {
       const canvas = document.createElement('canvas'); canvas.width = boxW; canvas.height = boxH
       const ctx = canvas.getContext('2d')
       if (ext === 'jpg') { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, boxW, boxH) }
-      ctx.drawImage(img, dx, dy, dw, dh)
+      let source = img
+      if (ext === 'png') {
+        // Transparent PNG: knock the white studio background out at native size on its own
+        // canvas (never on the padded target), then composite. Falls back to the plain image.
+        try {
+          const nat = document.createElement('canvas'); nat.width = img.width; nat.height = img.height
+          const nctx = nat.getContext('2d')
+          nctx.drawImage(img, 0, 0)
+          const id = nctx.getImageData(0, 0, nat.width, nat.height)
+          if (knockOutWhite(id.data, nat.width, nat.height)) { nctx.putImageData(id, 0, 0); source = nat }
+        } catch { /* getImageData failed: export without cut-out */ }
+      }
+      ctx.drawImage(source, dx, dy, dw, dh)
       const mime = ext === 'jpg' ? 'image/jpeg' : ext === 'png' ? 'image/png' : 'image/webp'
       const q = ext === 'jpg' ? 0.92 : undefined
       canvas.toBlob(blob => {
@@ -810,6 +866,15 @@ function ProductPopup({ product, onClose, t, dark, isMobile = false, pricing = {
     </div>
   )
 
+  // Info / Promos switch, shared by the photo-forward (desktop) and data-forward (phone) layouts
+  const popTabRow = (
+    <div style={{ display: 'flex', gap: 6 }}>
+      {[['info', 'Info'], ['promos', `Promos${myPromos.length ? ` (${myPromos.length})` : ''}`]].map(([key, label]) => (
+        <button key={key} onClick={() => setPopTab(key)} style={{ fontSize: 12, fontWeight: 700, padding: '4px 12px', borderRadius: 99, border: `1px solid ${popTab === key ? t.accent : t.border}`, background: popTab === key ? `${t.accent}22` : 'transparent', color: popTab === key ? t.accent : t.muted, cursor: 'pointer' }}>{label}</button>
+      ))}
+    </div>
+  )
+
   return (
     <>
       {/* ── Lightbox ── */}
@@ -889,23 +954,21 @@ function ProductPopup({ product, onClose, t, dark, isMobile = false, pricing = {
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               {imagePanel(true)}
               <div style={{ padding: '18px 24px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
-                {statsRow}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 22, alignItems: 'start' }}>
-                  {pricingBlock()}
-                  {coverageBlock('repeat(2, 1fr)')}
-                </div>
+                {popTabRow}
+                {popTab === 'info' ? <>
+                  {statsRow}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 22, alignItems: 'start' }}>
+                    {pricingBlock()}
+                    {coverageBlock('repeat(2, 1fr)')}
+                  </div>
+                </> : promoBlock}
               </div>
             </div>
           ) : (
             <div style={{ display: 'flex', gap: 0, flexDirection: isMobile ? 'column' : 'row', flexWrap: 'nowrap' }}>
               {imagePanel(false)}
               <div style={{ flex: 1, minWidth: 0, padding: isMobile ? '16px' : '20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
-                {/* tab pills */}
-                <div style={{ display: 'flex', gap: 6 }}>
-                  {[['info', 'Info'], ['promos', `Promos${myPromos.length ? ` (${myPromos.length})` : ''}`]].map(([key, label]) => (
-                    <button key={key} onClick={() => setPopTab(key)} style={{ fontSize: 12, fontWeight: 700, padding: '4px 12px', borderRadius: 99, border: `1px solid ${popTab === key ? t.accent : t.border}`, background: popTab === key ? `${t.accent}22` : 'transparent', color: popTab === key ? t.accent : t.muted, cursor: 'pointer' }}>{label}</button>
-                  ))}
-                </div>
+                {popTabRow}
                 {popTab === 'info' ? <>
                   {statsRow}
                   {pricingBlock()}
@@ -920,7 +983,25 @@ function ProductPopup({ product, onClose, t, dark, isMobile = false, pricing = {
   )
 }
 
-// Nav-tab icons — pure/stateless, hoisted to module scope so they're stable
+// One retailer-status dot (A active / รอขาย pending / On Process / ยกเลิกขาย discon / empty).
+// Module scope so the Products table can render it without remounting on every App render.
+function RetailerDot({ value, t }) {
+  if (value === 'A') return (
+    <div style={{ width: 10, height: 10, borderRadius: '50%', background: t.green, margin: 'auto', boxShadow: `0 0 7px 2px rgba(63,185,80,0.6)` }} />
+  )
+  if (value === 'รอขาย') return (
+    <div style={{ width: 10, height: 10, borderRadius: '50%', margin: 'auto', background: `linear-gradient(to left, ${t.yellow} 50%, transparent 50%)`, border: `1.5px solid ${t.yellow}`, boxShadow: `0 0 6px 2px rgba(210,153,34,0.5)` }} />
+  )
+  if (value === 'On Process') return (
+    <div style={{ width: 10, height: 10, borderRadius: '50%', margin: 'auto', background: `linear-gradient(to left, ${t.blue} 50%, transparent 50%)`, border: `1.5px solid ${t.blue}`, boxShadow: `0 0 6px 2px rgba(88,166,255,0.5)` }} />
+  )
+  if (value === 'ยกเลิกขาย') return (
+    <div style={{ width: 10, height: 10, borderRadius: '50%', background: t.red, margin: 'auto', boxShadow: `0 0 5px 1px rgba(248,81,73,0.5)` }} />
+  )
+  return <div style={{ width: 6, height: 1, background: t.dim, margin: 'auto' }} />
+}
+
+// Nav icons — pure/stateless, hoisted to module scope so they're stable
 // component references (defining them inside App() re-created them every render).
 function IconBarChart({ size = 15, color = 'currentColor' }) {
   return (
@@ -936,13 +1017,6 @@ function IconGrid({ size = 15 }) {
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/>
       <rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>
-    </svg>
-  )
-}
-function IconImage({ size = 15 }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="4" width="18" height="16" rx="2.5"/><circle cx="8.5" cy="9.5" r="1.6"/><path d="M21 16l-5-5L5 20"/>
     </svg>
   )
 }
@@ -999,13 +1073,8 @@ export default function App() {
   const [selectedBrands, setSelectedBrands] = useState([])
   const [selectedRetailers, setSelectedRetailers] = useState([])
   const [statusTab, setStatusTab] = useState('ALL')
-  const [sidebarOpen, setSidebarOpen] = useState(true)
   const [selectedProduct, setSelectedProduct] = useState(null)
-  const [psSearch, setPsSearch] = useState('')
-  const [psRetailers, setPsRetailers] = useState([])
-  const togglePsRetailer = (r) => setPsRetailers(prev => prev.includes(r) ? prev.filter(x => x !== r) : [...prev, r])
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768)
-  const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [sortCol, setSortCol] = useState(null)
   const [sortDir, setSortDir] = useState('asc')
   const [matrixPopover, setMatrixPopover] = useState(null)
@@ -1027,11 +1096,7 @@ export default function App() {
   const [anaVendor, setAnaVendor] = useState('ALL')   // Analytics page vendor scope: 'ALL' | 'Vcan' | 'Moola'
 
   useEffect(() => {
-    const onResize = () => {
-      const mobile = window.innerWidth < 768
-      setIsMobile(mobile)
-      if (!mobile) setMobileNavOpen(false)
-    }
+    const onResize = () => setIsMobile(window.innerWidth < 768)
     window.addEventListener('resize', onResize)
     return () => window.removeEventListener('resize', onResize)
   }, [])
@@ -1100,29 +1165,13 @@ export default function App() {
   const visibleBrands = VENDOR_BRANDS[vendorFilter] || VENDOR_BRANDS.ALL
   const handleVendorChange = (v) => { setVendorFilter(v); setSelectedBrands([]) }
   const toggleBrand = (b) => setSelectedBrands(prev => prev.includes(b) ? prev.filter(x => x !== b) : [...prev, b])
-  // brand → company (stable, for the monogram tile's vendor color) and brand → SKU count
-  // scoped by vendor/retailer/search (mirrors statsBase, minus the brand filter itself so
-  // picking a brand doesn't zero out its own count badge).
+  // brand → company (stable, for the monogram tile's vendor color)
   const brandCompany = useMemo(() => {
     const m = {}
     rawData.forEach(p => { const b = brandKey(p.brand, p.product); if (!(b in m)) m[b] = p.company })
     return m
   }, [rawData])
-  const brandCounts = useMemo(() => {
-    const scoped = rawData.filter(p => {
-      if (vendorFilter !== 'ALL' && p.company !== vendorFilter) return false
-      if (selectedRetailers.length > 0 && !selectedRetailers.some(r => p.retailers[r])) return false
-      if (search) {
-        const q = search.toLowerCase()
-        if (!p.product.toLowerCase().includes(q) && !p.brand.toLowerCase().includes(q) && !p.barcode.includes(q)) return false
-      }
-      return true
-    })
-    const m = {}
-    scoped.forEach(p => { const b = brandKey(p.brand, p.product); m[b] = (m[b] || 0) + 1 })
-    return m
-  }, [rawData, vendorFilter, selectedRetailers, search])
-  const clearAll = () => { setSearch(''); setSelectedBrands([]); setSelectedRetailers([]); setStatusTab('ALL'); setVendorFilter('ALL'); setSortCol(null); setSortDir('asc') }
+  const clearAll = () => { setSearch(''); setSelectedBrands([]); setSelectedRetailers([]); setStatusTab('ALL'); setVendorFilter('ALL') }
   const toggleRetailer = (r) => setSelectedRetailers(prev => prev.includes(r) ? prev.filter(x => x !== r) : [...prev, r])
   const toggleStatus = (k) => setStatusTab(s => (s === k ? 'ALL' : k))
   const handleSort = (col) => {
@@ -1131,8 +1180,8 @@ export default function App() {
       else { setSortCol(null); setSortDir('asc') }
     } else { setSortCol(col); setSortDir('asc') }
   }
-  const hasActiveFilters = search || selectedBrands.length > 0 || selectedRetailers.length > 0 || statusTab !== 'ALL' || vendorFilter !== 'ALL'
-  const visibleRetailers = selectedRetailers.length > 0 ? selectedRetailers : RETAILERS
+  const setSort = (col, dir) => { setSortCol(col); setSortDir(dir) }
+  const hasActiveFilters = !!search || selectedBrands.length > 0 || selectedRetailers.length > 0 || statusTab !== 'ALL' || vendorFilter !== 'ALL'
 
   // Scope = active filters EXCEPT status. The four summary cards ARE the status
   // breakdown, so they reflect this scope (retailer / vendor / brand / search) and
@@ -1160,10 +1209,35 @@ export default function App() {
     return { total: statsBase.length, active, pending, discon }
   }, [statsBase, selectedRetailers])
 
-  // Human label for what the cards are scoped to (reverts to "all products" when clear).
-  const scopeLabel = selectedRetailers.length > 0
-    ? `at ${selectedRetailers.join(' · ')}`
-    : (vendorFilter !== 'ALL' || selectedBrands.length > 0 || search) ? 'filtered subset' : 'all products'
+  // Customer-tile count for store R: products passing search + vendor + brand with a non-empty
+  // value at R and — when a status is picked — whose status AT R matches. "How many would I get
+  // from this store alone", so the customer filter itself is ignored.
+  const retailerTileCounts = useMemo(() => {
+    const base = rawData.filter(p =>
+      (vendorFilter === 'ALL' || p.company === vendorFilter) &&
+      (selectedBrands.length === 0 || selectedBrands.includes(brandKey(p.brand, p.product))) &&
+      matchesSearch(p, search))
+    const m = {}
+    RETAILERS.forEach(r => {
+      m[r] = base.filter(p => p.retailers[r] && (statusTab === 'ALL' || effStatusFor(p, [r]) === statusTab)).length
+    })
+    return m
+  }, [rawData, vendorFilter, selectedBrands, search, statusTab])
+
+  // Brand-tile count for brand B: products of B passing search + vendor + customer + status
+  // exactly as `filtered` applies them, ignoring the brand filter itself.
+  const brandTileCounts = useMemo(() => {
+    const m = {}
+    rawData.forEach(p => {
+      if (vendorFilter !== 'ALL' && p.company !== vendorFilter) return
+      if (selectedRetailers.length > 0 && !selectedRetailers.some(r => p.retailers[r])) return
+      if (!matchesSearch(p, search)) return
+      if (statusTab !== 'ALL' && effStatusFor(p, selectedRetailers) !== statusTab) return
+      const b = brandKey(p.brand, p.product)
+      m[b] = (m[b] || 0) + 1
+    })
+    return m
+  }, [rawData, vendorFilter, selectedRetailers, search, statusTab])
 
   // Table list = the same scope, then narrowed by the status filter.
   const filtered = useMemo(
@@ -1183,24 +1257,10 @@ export default function App() {
       else if (sortCol === 'brand') cmp = a.brand.localeCompare(b.brand, undefined, { sensitivity: 'base' })
       else if (sortCol === 'product') cmp = a.product.localeCompare(b.product, undefined, { sensitivity: 'base' })
       else if (sortCol === 'pack') cmp = (a.packSize || '').localeCompare(b.packSize || '', undefined, { numeric: true })
+      else if (sortCol === 'stores') cmp = storeReach(a) - storeReach(b)
       return sortDir === 'asc' ? cmp : -cmp
     })
   }, [filtered, sortCol, sortDir])
-
-  const psFiltered = useMemo(() => rawData.filter(p => {
-    if (vendorFilter !== 'ALL' && p.company !== vendorFilter) return false
-    if (selectedBrands.length > 0 && !selectedBrands.includes(brandKey(p.brand, p.product))) return false
-    if (statusTab !== 'ALL' && p.status !== statusTab) return false
-    if (psRetailers.length > 0) {
-      // keep product only if listed at ≥1 selected retailer (not discontinued/empty)
-      if (!psRetailers.some(r => { const v = p.retailers[r]; return v && v !== 'ยกเลิกขาย' })) return false
-    }
-    if (psSearch) {
-      const q = psSearch.toLowerCase()
-      return p.product.toLowerCase().includes(q) || p.brand.toLowerCase().includes(q) || p.barcode.includes(q)
-    }
-    return true
-  }), [rawData, vendorFilter, selectedBrands, statusTab, psSearch, psRetailers])
 
   // ── Market intelligence — actionable analytics (whitespace, GP, health, scorecard) ──
   const intel = useMemo(() => {
@@ -1310,22 +1370,6 @@ export default function App() {
   const maxRetailerActive = Math.max(...intel.retailers.map(r => r.active), 1)
   const gpTone = (g) => g == null ? t.muted : g >= 0.30 ? t.green : g >= 0.20 ? t.yellow : t.red
 
-  function RetailerDot({ value }) {
-    if (value === 'A') return (
-      <div style={{ width: 10, height: 10, borderRadius: '50%', background: t.green, margin: 'auto', boxShadow: `0 0 7px 2px rgba(63,185,80,0.6)` }} />
-    )
-    if (value === 'รอขาย') return (
-      <div style={{ width: 10, height: 10, borderRadius: '50%', margin: 'auto', background: `linear-gradient(to left, ${t.yellow} 50%, transparent 50%)`, border: `1.5px solid ${t.yellow}`, boxShadow: `0 0 6px 2px rgba(210,153,34,0.5)` }} />
-    )
-    if (value === 'On Process') return (
-      <div style={{ width: 10, height: 10, borderRadius: '50%', margin: 'auto', background: `linear-gradient(to left, ${t.blue} 50%, transparent 50%)`, border: `1.5px solid ${t.blue}`, boxShadow: `0 0 6px 2px rgba(88,166,255,0.5)` }} />
-    )
-    if (value === 'ยกเลิกขาย') return (
-      <div style={{ width: 10, height: 10, borderRadius: '50%', background: t.red, margin: 'auto', boxShadow: `0 0 5px 1px rgba(248,81,73,0.5)` }} />
-    )
-    return <div style={{ width: 6, height: 1, background: t.dim, margin: 'auto' }} />
-  }
-
   const BentoHead = ({ title, desc }) => (
     <div>
       <div style={{ fontWeight: 700, fontSize: 14.5, color: t.text, letterSpacing: '-0.01em' }}>{title}</div>
@@ -1333,49 +1377,18 @@ export default function App() {
     </div>
   )
 
-  function StatCard({ label, value, sub, color, active, onClick }) {
-    const ring = color || t.accent
-    return (
-      <div className="vc-rise vc-lift" onClick={onClick} role={onClick ? 'button' : undefined} title={onClick ? `Filter: ${label}` : undefined} style={{
-        ...glassPanel, borderRadius: 12, padding: isMobile ? '14px 16px' : '20px 24px',
-        cursor: onClick ? 'pointer' : 'default',
-        outline: active ? `2px solid ${ring}` : '2px solid transparent', outlineOffset: -2,
-        boxShadow: active ? `${glassPanel.boxShadow}, 0 0 0 4px ${ring}22` : glassPanel.boxShadow,
-      }}>
-        <div style={{ fontSize: 11, color: t.muted, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>{label}</div>
-        <div style={{ fontSize: isMobile ? 28 : 36, fontWeight: 800, color: color || t.text, lineHeight: 1, marginBottom: 4 }}>{value}</div>
-        {sub && <div style={{ fontSize: 11, color: t.muted }}>{sub}</div>}
-      </div>
-    )
-  }
-
   const NAV_ITEMS = [
-    { key: 'products', icon: <IconGrid />, label: 'Products' },
-    { key: 'analytics', icon: <IconBarChart size={15} />, label: 'Analytics' },
-    { key: 'packshot', icon: <IconImage />, label: 'Packshot' },
-    { key: 'promotion', icon: <IconCalendar />, label: 'Promotion Plan' },
+    { key: 'products', icon: <IconGrid size={20} />, label: 'Products', title: 'Products' },
+    { key: 'analytics', icon: <IconBarChart size={20} />, label: 'Analytics', title: 'Analytics' },
+    { key: 'promotion', icon: <IconCalendar size={20} />, label: 'Promo', title: 'Promotion Plan' },
   ]
 
-  const SIDEBAR_W = isMobile ? 0 : (sidebarOpen ? 244 : 164)
-
-  const TABLE_COLS = [
-    { label: 'No.', key: null,       align: 'center', w: 44 },
-    { label: 'Vendor', key: 'vendor', align: 'center', w: 64 },
-    { label: 'Brand',  key: 'brand',  align: 'left' },
-    { label: 'Barcode', key: 'barcode', align: 'left' },
-    { label: 'Product Name', key: 'product', align: 'left' },
-    { label: 'Pack',   key: 'pack',   align: 'center', w: 52 },
-    { label: 'RSP',    key: 'rsp',    align: 'center', w: 72 },
-    { label: 'Status', key: 'status', align: 'center', w: 84 },
-  ]
-  const SortIcon = ({ col }) => (
-    <span style={{ fontSize: 9, marginLeft: 3, opacity: sortCol === col ? 1 : 0.3, color: sortCol === col ? t.accent : 'inherit' }}>
-      {sortCol === col ? (sortDir === 'asc' ? '▲' : '▼') : '⇅'}
-    </span>
-  )
+  // Desktop Products tab = height-bounded two-column shell (filter panel + results scroll
+  // independently, the window does not). Height is divided by the root zoom (1.05) like the rail.
+  const boundedShell = tab === 'products' && !isMobile
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', color: t.text, fontSize: 14, zoom: 1.05,
+    <div style={{ display: 'flex', ...(boundedShell ? { height: 'calc(100vh / 1.05)', overflow: 'hidden' } : { minHeight: '100vh' }), color: t.text, fontSize: 14, zoom: 1.05,
       // Aurora glows behind everything so glass panels actually refract on every page.
       // Light = warm sage/coral porcelain; dark = subtle gold/blue over the deep base.
       // Slightly stronger so the new translucent glass has something to refract.
@@ -1395,8 +1408,6 @@ export default function App() {
         ::-webkit-scrollbar-track{background:transparent;}
         ::-webkit-scrollbar-thumb{background:${t.border};border-radius:3px;}
         .rhover:hover{background:${t.rowHover}!important;}
-        .bpill{transition:all 0.15s;cursor:pointer;}
-        .bpill:hover{background:${t.accent}!important;color:#000!important;border-color:${t.accent}!important;transform:translateY(-2px);box-shadow:0 4px 12px ${t.accent}55;}
         .nav-item{transition:all 0.15s;cursor:pointer;}
         .nav-item:hover{background:${t.surface2}!important;}
         .sb-btn{transition:background 0.15s;cursor:pointer;}
@@ -1408,13 +1419,6 @@ export default function App() {
         .clr-btn{transition:all 0.15s;cursor:pointer;}
         .clr-btn:hover{box-shadow:0 0 8px 3px rgba(248,81,73,0.4)!important;border-color:#f85149!important;color:#f85149!important;}
 
-        /* Retailer pill "Bare Tile" (v3.8.0) — chrome-free filter pill; selection
-           reads by glow ring + dimming siblings, never by a background box. */
-        .rp-btn{transition:opacity .15s ease,box-shadow .15s ease,transform .12s ease;}
-        .rp-btn:hover{transform:translateY(-1px);}
-        .rp-btn:hover:not(.rp-sel){box-shadow:0 0 0 1px ${t.border};}
-        .rp-sel{box-shadow:0 0 0 2px var(--g,${t.accent}),0 0 14px -2px var(--g,${t.accent});}
-        .rp-row:has(.rp-sel) .rp-btn:not(.rp-sel){opacity:.42;}
 
         /* ── universal motion system (v2.21.0) ── */
         @keyframes vcRise{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:none;}}
@@ -1433,128 +1437,67 @@ export default function App() {
         }
         @media(max-width:767px){
           .rhover:hover{background:unset!important;}
-          .bpill:hover{background:unset!important;color:unset!important;border-color:unset!important;}
-          .bpill:active{background:${t.accent}!important;color:#000!important;border-color:${t.accent}!important;}
           .vc-lift:hover{transform:none;}
         }
       `}</style>
 
-      {/* ── MOBILE BACKDROP ── */}
-      {isMobile && mobileNavOpen && (
-        <div onClick={() => setMobileNavOpen(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 150, backdropFilter: 'blur(2px)' }} />
-      )}
-
-      {/* ── SIDEBAR ── */}
-      {/* height divided by the root zoom (1.05) so the pinned credit isn't pushed off-screen */}
-      <aside style={{
-        width: isMobile ? 260 : SIDEBAR_W,
-        minHeight: 'calc(100vh / 1.05)',
-        background: dark ? 'rgba(1,4,9,.72)' : 'rgba(239,231,220,.72)',
-        backdropFilter: 'blur(18px) saturate(1.3)', WebkitBackdropFilter: 'blur(18px) saturate(1.3)',
-        borderRight: `1px solid ${t.border}`, display: 'flex', flexDirection: 'column',
-        position: isMobile ? 'fixed' : 'sticky',
-        top: 0, left: 0, height: 'calc(100vh / 1.05)', overflow: 'hidden',
-        transition: isMobile ? 'transform 0.28s cubic-bezier(0.4,0,0.2,1)' : 'width 0.25s ease',
-        transform: isMobile ? (mobileNavOpen ? 'translateX(0)' : 'translateX(-100%)') : 'none',
-        flexShrink: 0, zIndex: isMobile ? 200 : 100,
-      }}>
-        {/* Logo row */}
-        <div style={{
-          display: 'flex', alignItems: 'center', minHeight: 60, gap: 10,
-          padding: '0 12px 0 10px',
-          justifyContent: 'flex-start',
-          borderBottom: `1px solid ${t.border}`, flexShrink: 0,
+      {/* ── NAV: desktop icon rail / phone bottom tab bar ── */}
+      {/* rail height divided by the root zoom (1.05) so the pinned credit isn't pushed off-screen */}
+      {!isMobile && (
+        <aside style={{
+          width: 78, flexShrink: 0, position: 'sticky', top: 0, height: 'calc(100vh / 1.05)', zIndex: 100,
+          background: dark ? 'rgba(1,4,9,.72)' : 'rgba(239,231,220,.72)',
+          backdropFilter: 'blur(18px) saturate(1.3)', WebkitBackdropFilter: 'blur(18px) saturate(1.3)',
+          borderRight: `1px solid ${t.border}`, display: 'flex', flexDirection: 'column', alignItems: 'center',
+          gap: 4, padding: '12px 6px', overflow: 'hidden',
         }}>
-          {/* Hamburger always on left */}
-          <button onClick={() => isMobile ? setMobileNavOpen(false) : setSidebarOpen(o => !o)} className="sb-btn neon-ico" style={{
-            background: 'none', border: 'none', color: t.muted, padding: '7px',
-            borderRadius: 6, display: 'flex', flexDirection: 'column', gap: 4,
-            alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0,
-          }}>
-            <span style={{ display: 'block', width: 15, height: 1.5, background: t.muted, borderRadius: 2 }} />
-            <span style={{ display: 'block', width: 15, height: 1.5, background: t.muted, borderRadius: 2 }} />
-            <span style={{ display: 'block', width: 15, height: 1.5, background: t.muted, borderRadius: 2 }} />
-          </button>
-          {/* Logo — transparent PNG, always visible */}
-          <div style={{ flex: 1, minWidth: 0, overflow: 'hidden', display: 'flex', alignItems: 'center' }}>
-            <img src={vcanLogo} alt="VCAN" style={{ height: 30, objectFit: 'contain', display: 'block', maxWidth: '100%' }} />
+          <img src="/favicon.svg" alt="VCAN" style={{ width: 38, height: 38, display: 'block', margin: '2px 0 12px' }} />
+          <nav style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+            {NAV_ITEMS.map(({ key, icon, label, title }) => {
+              const active = tab === key
+              return (
+                <button key={key} onClick={() => setTab(key)} className="nav-item" title={title} aria-label={title} aria-current={active ? 'page' : undefined} style={{
+                  width: 66, padding: '9px 2px 7px', border: 'none', borderRadius: 10, display: 'flex', flexDirection: 'column',
+                  alignItems: 'center', gap: 5, fontSize: 10.5, fontWeight: 700, fontFamily: 'inherit',
+                  color: active ? t.text : t.muted,
+                  background: active ? `${t.accent}24` : 'none',
+                  boxShadow: active ? `inset 0 0 0 1px ${t.accent}8c` : 'none',
+                }}>
+                  <span className="neon-ico" style={{ display: 'inline-flex', lineHeight: 1 }}>{icon}</span>
+                  <span style={{ whiteSpace: 'nowrap' }}>{label}</span>
+                </button>
+              )
+            })}
+          </nav>
+          <div style={{ flex: 1 }} />
+          <div style={{ fontSize: 9.5, color: dark ? '#8d96a3' : t.muted, lineHeight: 1.5, textAlign: 'center', fontWeight: 500 }}>
+            Made by Meth<br />Trade Marketing
           </div>
-        </div>
-
-        {/* Nav items */}
-        <nav style={{ padding: '10px 8px', display: 'flex', flexDirection: 'column', gap: 1 }}>
-          {NAV_ITEMS.map(({ key, icon, label }) => {
+        </aside>
+      )}
+      {isMobile && (
+        <nav style={{
+          position: 'fixed', left: 0, right: 0, bottom: 0, height: 56, zIndex: 100, display: 'flex', alignItems: 'stretch',
+          background: t.surface, borderTop: `1px solid ${t.border}`, padding: 4, gap: 4,
+        }}>
+          {NAV_ITEMS.map(({ key, icon, label, title }) => {
             const active = tab === key
             return (
-              <button key={key} onClick={() => { setTab(key); if (isMobile) setMobileNavOpen(false) }} className="nav-item" style={{
-                background: active ? `${t.accent}18` : 'none', border: 'none',
-                color: active ? t.accent : t.text, display: 'flex', alignItems: 'center',
-                gap: 10, padding: '10px 12px',
-                justifyContent: 'flex-start',
-                fontWeight: active ? 700 : 400, fontSize: 13, width: '100%',
-                borderLeft: active ? `3px solid ${t.accent}` : '3px solid transparent',
-                borderRadius: '0 8px 8px 0',
-                opacity: active ? 1 : 0.7,
+              <button key={key} onClick={() => setTab(key)} title={title} aria-label={title} aria-current={active ? 'page' : undefined} style={{
+                flex: 1, minHeight: 48, border: 'none', borderRadius: 10, display: 'flex', flexDirection: 'column',
+                alignItems: 'center', justifyContent: 'center', gap: 3, fontSize: 10.5, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer',
+                color: active ? t.text : t.muted,
+                background: active ? `${t.accent}24` : 'none',
+                boxShadow: active ? `inset 0 0 0 1px ${t.accent}8c` : 'none',
               }}>
-                <span className="neon-ico" style={{ flexShrink: 0, width: 22, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}>{icon}</span>
-                <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</span>
+                <span style={{ display: 'inline-flex', lineHeight: 1 }}>{icon}</span>
+                <span>{label}</span>
               </button>
             )
           })}
         </nav>
+      )}
 
-        {/* Filters — show when sidebar open (desktop) or always on mobile */}
-        {(sidebarOpen || isMobile) && (
-          <div style={{ flex: 1, overflowY: 'auto', padding: '4px 12px 16px' }}>
-            <div style={{ height: 1, background: t.border, margin: '4px 0 12px' }} />
-
-            {/* Vendor */}
-            <div style={{ marginBottom: 16 }}>
-              <div style={{ fontSize: 10, color: t.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Vendor</div>
-              <div style={{ display: 'flex', gap: 4 }}>
-                {['ALL', 'Vcan', 'Moola'].map(v => (
-                  <button key={v} className="bpill" onClick={() => handleVendorChange(v)} style={{
-                    flex: 1, background: vendorFilter === v ? t.accent : t.surface2,
-                    color: vendorFilter === v ? '#000' : t.muted,
-                    border: `1px solid ${vendorFilter === v ? t.accent : t.border}`,
-                    borderRadius: 8, padding: '6px 4px', fontSize: 11, fontWeight: 700, cursor: 'pointer',
-                  }}>{v}</button>
-                ))}
-              </div>
-            </div>
-
-            {/* Status */}
-            <div>
-              <div style={{ fontSize: 10, color: t.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Status</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                {[
-                  { key: 'ALL', label: 'All Statuses' },
-                  { key: 'ขาย', label: 'Active', color: t.green },
-                  { key: 'รอขาย', label: 'Pending', color: t.yellow },
-                  { key: 'ยกเลิกขาย', label: 'Discontinued', color: t.red },
-                ].map(({ key, label, color }) => (
-                  <button key={key} onClick={() => setStatusTab(key)} className="nav-item" style={{
-                    background: statusTab === key ? `${(color || t.text)}18` : 'none', border: 'none',
-                    color: statusTab === key ? (color || t.text) : t.muted,
-                    display: 'flex', alignItems: 'center', gap: 8,
-                    padding: '7px 10px', fontWeight: statusTab === key ? 700 : 400,
-                    fontSize: 12, width: '100%', cursor: 'pointer',
-                  }}>
-                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: color || t.border, flexShrink: 0 }} />
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-        {/* Credit */}
-        <div style={{ padding: '12px 14px', borderTop: `1px solid ${t.border}`, flexShrink: 0 }}>
-          <div style={{ fontSize: 11, color: dark ? '#8d96a3' : t.muted, lineHeight: 1.6, textAlign: 'center', fontWeight: 500 }}>
-            Made by Meth<br />Trade Marketing
-          </div>
-        </div>
-      </aside>
 
       {/* ── MAIN ── */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
@@ -1566,20 +1509,12 @@ export default function App() {
           padding: isMobile ? '0 12px' : '0 24px', height: 56, display: 'flex', alignItems: 'center',
           gap: isMobile ? 8 : 10, position: 'sticky', top: 0, zIndex: 50,
         }}>
-          {/* Mobile hamburger */}
-          {isMobile && (
-            <button onClick={() => setMobileNavOpen(o => !o)} className="sb-btn neon-ico" style={{ background: 'none', border: 'none', color: t.muted, padding: '7px 6px', borderRadius: 6, display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
-              <span style={{ display: 'block', width: 16, height: 1.5, background: t.muted, borderRadius: 2 }} />
-              <span style={{ display: 'block', width: 16, height: 1.5, background: t.muted, borderRadius: 2 }} />
-              <span style={{ display: 'block', width: 16, height: 1.5, background: t.muted, borderRadius: 2 }} />
-            </button>
-          )}
           {/* Title + version + timestamp — shown on both mobile and desktop */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, minWidth: 0, overflow: 'hidden' }}>
             <div style={{ fontWeight: 800, fontSize: isMobile ? 14 : 17, color: t.text, letterSpacing: 0.2, whiteSpace: 'nowrap', flexShrink: 0 }}>
               Product Master
             </div>
-              <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v3.16.1</span>
+              <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v3.17.0</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: isMobile ? 11 : 13, background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, padding: isMobile ? '3px 8px' : '5px 12px', overflow: 'hidden', minWidth: 0, flexShrink: 1 }}>
               <span style={{ width: isMobile ? 6 : 7, height: isMobile ? 6 : 7, borderRadius: '50%', flexShrink: 0, background: dataSource === 'csv' ? t.blue : t.green }} />
               <span style={{ fontWeight: 800, color: dataSource === 'csv' ? t.blue : t.green, flexShrink: 0 }}>
@@ -1744,212 +1679,26 @@ export default function App() {
         </header>
 
         {/* Content */}
-        <main style={{ flex: 1, padding: isMobile ? '16px 12px' : '24px', overflowY: 'auto' }}>
+        <main style={boundedShell ? { flex: 1, minHeight: 0, overflow: 'hidden' } : { flex: 1, padding: isMobile ? '16px 12px 76px' : '24px', overflowY: 'auto' }}>
          {/* keyed by tab → re-mounts and fades on every page switch (vc-fade is opacity-only, safe for sticky children) */}
-         <div key={tab} className="vc-fade">
+         <div key={tab} className="vc-fade" style={boundedShell ? { height: '100%' } : undefined}>
 
-          {/* PRODUCTS */}
+          {/* PRODUCTS (one-stop page: filter panel + packshot cards / table — see ProductsPage.jsx) */}
           {tab === 'products' && (
-            <>
-              {/* Stat cards */}
-              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', gap: 12, marginBottom: 20 }}>
-                {StatCard({ label: 'Total SKUs', value: stats.total, sub: scopeLabel, color: scopeLabel === 'all products' ? undefined : t.accent })}
-                {StatCard({ label: 'Active', value: stats.active, sub: `${stats.total ? Math.round(stats.active / stats.total * 100) : 0}% of total`, color: t.green, active: statusTab === 'ขาย', onClick: () => toggleStatus('ขาย') })}
-                {StatCard({ label: 'Pending', value: stats.pending, sub: 'รอขาย', color: t.yellow, active: statusTab === 'รอขาย', onClick: () => toggleStatus('รอขาย') })}
-                {StatCard({ label: 'Discontinued', value: stats.discon, sub: 'ยกเลิกขาย', color: t.red, active: statusTab === 'ยกเลิกขาย', onClick: () => toggleStatus('ยกเลิกขาย') })}
-              </div>
-
-              {/* Sticky filter section */}
-              <div style={{ position: 'sticky', top: 0, zIndex: 10, background: t.bg, paddingBottom: 16, paddingTop: 4 }}>
-                {/* Search + Clear all */}
-                <div style={{
-                  ...glassPanel, borderRadius: 12, padding: '10px 14px', marginBottom: 10,
-                }}>
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <div style={{ flex: 1, position: 'relative' }}>
-                      <span style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', color: t.muted, fontSize: 15, pointerEvents: 'none' }}>⌕</span>
-                      <input value={search} onChange={e => setSearch(e.target.value)}
-                        placeholder="ค้นหา product, brand, barcode..."
-                        style={{
-                          width: '100%', background: t.surface2, border: `1px solid ${t.border}`,
-                          borderRadius: 8, color: t.text, padding: '8px 36px 8px 38px',
-                          fontSize: 13, outline: 'none',
-                        }} />
-                      {search && (
-                        <button onClick={() => setSearch('')} style={{
-                          position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
-                          background: 'none', border: 'none', color: t.muted, cursor: 'pointer', fontSize: 18, lineHeight: 1,
-                        }}>×</button>
-                      )}
-                    </div>
-                    {hasActiveFilters && (
-                      <button onClick={clearAll} className="vc-lift" style={{
-                        display: 'inline-flex', alignItems: 'center', gap: 6,
-                        background: t.accent, border: `1.5px solid ${t.accent}`, borderRadius: 8,
-                        color: '#000', fontSize: 12.5, fontWeight: 800, cursor: 'pointer',
-                        padding: '8px 16px', whiteSpace: 'nowrap', flexShrink: 0,
-                        boxShadow: `0 2px 10px ${t.accent}66`,
-                      }}>✕ Clear filters</button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Retailer logo pills — desktop only (mobile table has no retailer columns) */}
-                {!isMobile && <div style={{
-                  ...glassPanel, borderRadius: 12, padding: '10px 14px', marginBottom: 10,
-                }}>
-                  <div className="rp-row" style={{ display: 'flex', gap: 9, flexWrap: 'wrap', alignItems: 'center' }}>
-                    <span style={{ fontSize: 11, color: t.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, flexShrink: 0 }}>Customer</span>
-                    {RETAILERS.map(r => {
-                      const sel = selectedRetailers.includes(r)
-                      return (
-                        <button key={r} onClick={() => toggleRetailer(r)} title={r}
-                          className={`rp-btn${sel ? ' rp-sel' : ''}`}
-                          style={{
-                            '--g': t.accent, display: 'inline-flex', alignItems: 'center',
-                            background: 'transparent', border: 'none', borderRadius: 8,
-                            padding: 2, cursor: 'pointer',
-                          }}>
-                          <RetailerLogo name={r} h={32} maxW={80} dark={dark} fallbackStyle={{ fontSize: 11, fontWeight: 700, color: t.text }} />
-                        </button>
-                      )
-                    })}
-                    {selectedRetailers.length > 0 && (
-                      <button onClick={() => setSelectedRetailers([])} style={{ background: 'none', border: 'none', color: t.muted, fontSize: 11, fontWeight: 600, cursor: 'pointer', padding: '4px 6px', flexShrink: 0 }}>✕ Clear</button>
-                    )}
-                  </div>
-                </div>}
-
-                {/* Brand category navigator — card background for contrast */}
-                <div style={{ ...glassPanel, borderRadius: 12, padding: '12px 16px' }}>
-                  <BrandCategoryFilter idPrefix="pm-products" brandList={visibleBrands}
-                    selectedBrands={selectedBrands} onToggle={toggleBrand} onClear={() => setSelectedBrands([])}
-                    brandCompany={brandCompany} brandCounts={brandCounts} t={t} isMobile={isMobile} />
-                </div>
-              </div>
-
-              {/* Table */}
-              <div style={{ ...glassPanel, borderRadius: 12, overflow: 'hidden' }}>
-                {/* Table info bar */}
-                <div style={{ padding: '10px 18px', borderBottom: `1px solid ${t.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: t.surface, flexWrap: 'wrap', gap: 8 }}>
-                  <span style={{ fontSize: 13, color: t.muted, fontWeight: 500 }}>
-                    Showing <strong style={{ color: t.text, fontWeight: 700 }}>{filtered.length}</strong> of {rawData.length} products
-                    {isMobile && <span style={{ color: t.muted, fontSize: 11 }}> · แตะแถวเพื่อดูรายละเอียด</span>}
-                  </span>
-                  {!isMobile && (
-                    <div style={{ display: 'flex', gap: 16, fontSize: 13, color: t.muted, alignItems: 'center', fontWeight: 600 }}>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                        <span style={{ width: 9, height: 9, borderRadius: '50%', background: t.green, display: 'inline-block' }} />Active
-                      </span>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                        <span style={{ display: 'inline-block', width: 9, height: 9, borderRadius: '50%', background: `linear-gradient(to left,${t.yellow} 50%,transparent 50%)`, border: `1.5px solid ${t.yellow}` }} />Pending
-                      </span>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                        <span style={{ display: 'inline-block', width: 9, height: 9, borderRadius: '50%', background: `linear-gradient(to left,${t.blue} 50%,transparent 50%)`, border: `1.5px solid ${t.blue}` }} />On Process
-                      </span>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                        <span style={{ width: 9, height: 9, borderRadius: '50%', background: t.red, display: 'inline-block' }} />Discon
-                      </span>
-                    </div>
-                  )}
-                </div>
-                {/* Scrollable table — thead frozen */}
-                <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: isMobile ? 'calc(100dvh - 260px)' : 'calc(100vh - 300px)' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                    <thead>
-                      {isMobile ? (
-                        <tr style={{ background: t.surface2, boxShadow: `0 2px 0 ${t.accent}` }}>
-                          <th style={{ padding: '10px 8px', textAlign: 'center', color: t.text, fontWeight: 700, fontSize: 11, textTransform: 'uppercase', borderBottom: `2px solid ${t.border}`, position: 'sticky', top: 0, background: t.surface2, zIndex: 1, width: 52 }}>#</th>
-                          <th onClick={() => handleSort('product')} style={{ padding: '10px 12px', textAlign: 'left', color: sortCol === 'product' ? t.accent : t.text, fontWeight: 700, fontSize: 11, textTransform: 'uppercase', borderBottom: `2px solid ${t.border}`, position: 'sticky', top: 0, background: t.surface2, zIndex: 1, cursor: 'pointer', userSelect: 'none' }}>
-                            Brand / Product {SortIcon({ col: 'product' })}
-                          </th>
-                          <th onClick={() => handleSort('status')} style={{ padding: '10px 8px', textAlign: 'center', color: sortCol === 'status' ? t.accent : t.text, fontWeight: 700, fontSize: 11, textTransform: 'uppercase', borderBottom: `2px solid ${t.border}`, position: 'sticky', top: 0, background: t.surface2, zIndex: 1, width: 82, cursor: 'pointer', userSelect: 'none' }}>
-                            Status {SortIcon({ col: 'status' })}
-                          </th>
-                        </tr>
-                      ) : (
-                        <tr style={{ background: t.surface2, boxShadow: `0 2px 0 ${t.accent}` }}>
-                          {TABLE_COLS.map(({ label, key, align, w }) => (
-                            <th key={label} onClick={() => key && handleSort(key)} style={{
-                              padding: '12px 12px', textAlign: align, color: sortCol === key && key ? t.accent : t.text,
-                              fontWeight: 700, fontSize: 12, letterSpacing: 0.5,
-                              textTransform: 'uppercase', borderBottom: `2px solid ${t.border}`,
-                              width: w, whiteSpace: 'nowrap',
-                              position: 'sticky', top: 0, background: t.surface2, zIndex: 1,
-                              cursor: key ? 'pointer' : 'default', userSelect: 'none',
-                            }}>{label}{key && SortIcon({ col: key })}</th>
-                          ))}
-                          {visibleRetailers.map(r => (
-                            <th key={r} style={{
-                              padding: '10px 5px', textAlign: 'center', color: t.text,
-                              fontWeight: 700, fontSize: 10.5, whiteSpace: 'nowrap',
-                              borderBottom: `2px solid ${t.border}`,
-                              position: 'sticky', top: 0, background: t.surface2, zIndex: 1,
-                            }}><RetailerLogo name={r} h={32} maxW={84} dark={dark} fallbackStyle={{ fontSize: 10.5 }} /></th>
-                          ))}
-                        </tr>
-                      )}
-                    </thead>
-                    <tbody>
-                      {isMobile ? sortedFiltered.map((p, i) => (
-                        <tr key={p.barcode + i} className="rhover" onClick={() => setSelectedProduct(p)} style={{ borderBottom: `1px solid ${t.dim}`, cursor: 'pointer' }}>
-                          <td style={{ padding: '10px 8px', textAlign: 'center', verticalAlign: 'middle' }}>
-                            <div style={{ fontSize: 11, color: t.muted, fontWeight: 500 }}>{i + 1}</div>
-                            <div style={{ fontSize: 10, fontWeight: 800, color: p.company === 'Vcan' ? t.vcanClr : t.moolaClr, marginTop: 2 }}>{p.company}</div>
-                          </td>
-                          <td style={{ padding: '10px 12px', verticalAlign: 'middle' }}>
-                            <div style={{ fontSize: 11, fontWeight: 700, color: p.company === 'Vcan' ? t.vcanClr : t.moolaClr, marginBottom: 2 }}>{p.brand}</div>
-                            <div style={{ fontSize: 13, fontWeight: 600, color: t.text, lineHeight: 1.35 }}>{p.product}</div>
-                            <div style={{ fontSize: 10, fontFamily: 'monospace', color: t.muted, marginTop: 2 }}>
-                              {p.barcode}{p.rsp ? ` · ฿${p.rsp}` : ''}
-                            </div>
-                          </td>
-                          <td style={{ padding: '10px 8px', textAlign: 'center', verticalAlign: 'middle' }}>
-                            <span style={{ fontSize: 11, padding: '3px 8px', borderRadius: 20, fontWeight: 700, whiteSpace: 'nowrap', background: p.status === 'ขาย' ? `${t.green}28` : p.status === 'รอขาย' ? `${t.yellow}28` : `${t.red}28`, color: p.status === 'ขาย' ? t.green : p.status === 'รอขาย' ? t.yellow : t.red, border: `1px solid ${p.status === 'ขาย' ? t.green : p.status === 'รอขาย' ? t.yellow : t.red}44` }}>
-                              {p.status === 'ขาย' ? 'Active' : p.status === 'รอขาย' ? 'Pending' : 'Discon'}
-                            </span>
-                          </td>
-                        </tr>
-                      )) : sortedFiltered.map((p, i) => (
-                        <tr key={p.barcode + i} className="rhover" onClick={() => setSelectedProduct(p)} style={{ borderBottom: `1px solid ${t.dim}`, cursor: 'pointer' }}>
-                          <td style={{ padding: '9px 12px', color: t.muted, fontSize: 12, textAlign: 'center', fontWeight: 500 }}>{i + 1}</td>
-                          <td style={{ padding: '9px 8px', textAlign: 'center', whiteSpace: 'nowrap' }}>
-                            <span style={{ fontWeight: 800, fontSize: 11.5, color: p.company === 'Vcan' ? t.vcanClr : t.moolaClr }}>{p.company}</span>
-                          </td>
-                          <td style={{ padding: '9px 12px', fontWeight: 700, fontSize: 13, color: t.text, whiteSpace: 'nowrap' }}>{p.brand}</td>
-                          <td style={{ padding: '9px 12px', fontFamily: 'monospace', fontSize: 12, color: t.muted, whiteSpace: 'nowrap', letterSpacing: 0.4 }}>{p.barcode}</td>
-                          <td style={{ padding: '9px 12px', maxWidth: 300 }}>
-                            <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500, color: t.text }} title={p.product}>{p.product}</div>
-                          </td>
-                          <td style={{ padding: '9px 8px', textAlign: 'center', fontSize: 13, fontWeight: 700, color: t.text }}>{p.packSize || <span style={{ color: t.dim }}>—</span>}</td>
-                          <td style={{ padding: '9px 8px', textAlign: 'center', whiteSpace: 'nowrap', fontWeight: 700 }}>
-                            {p.rsp ? <span style={{ color: t.text, fontSize: 13 }}>฿{p.rsp}</span> : <span style={{ color: t.dim }}>—</span>}
-                          </td>
-                          <td style={{ padding: '9px 8px', textAlign: 'center' }}>
-                            <span style={{ fontSize: 11.5, padding: '3px 10px', borderRadius: 20, fontWeight: 700, background: p.status === 'ขาย' ? `${t.green}28` : p.status === 'รอขาย' ? `${t.yellow}28` : `${t.red}28`, color: p.status === 'ขาย' ? t.green : p.status === 'รอขาย' ? t.yellow : t.red, border: `1px solid ${p.status === 'ขาย' ? t.green : p.status === 'รอขาย' ? t.yellow : t.red}44` }}>
-                              {p.status === 'ขาย' ? 'Active' : p.status === 'รอขาย' ? 'Pending' : 'Discon'}
-                            </span>
-                          </td>
-                          {visibleRetailers.map(r => (
-                            <td key={r} style={{ padding: '9px 5px', textAlign: 'center' }}>
-                              <RetailerDot value={p.retailers[r]} />
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
-                      {filtered.length === 0 && (
-                        <tr>
-                          <td colSpan={isMobile ? 3 : 8 + visibleRetailers.length} style={{ padding: 56, textAlign: 'center', color: t.muted }}>
-                            <div style={{ fontSize: 32, marginBottom: 10 }}>🔍</div>
-                            <div style={{ fontWeight: 600 }}>ไม่พบสินค้าที่ตรงกับ filter</div>
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </>
+            <ProductsPage
+              t={t} dark={dark} isMobile={isMobile} glassPanel={glassPanel}
+              rows={sortedFiltered} totalCount={rawData.length} stats={stats}
+              search={search} setSearch={setSearch}
+              vendorFilter={vendorFilter} onVendorChange={handleVendorChange}
+              statusTab={statusTab} onToggleStatus={toggleStatus}
+              selectedRetailers={selectedRetailers} onToggleRetailer={toggleRetailer} retailerCounts={retailerTileCounts}
+              selectedBrands={selectedBrands} onToggleBrand={toggleBrand}
+              visibleBrands={visibleBrands} brandCompany={brandCompany} brandCounts={brandTileCounts}
+              hasActiveFilters={hasActiveFilters} onClearAll={clearAll}
+              sortCol={sortCol} sortDir={sortDir} onSort={setSort} onHeaderSort={handleSort}
+              onSelect={setSelectedProduct}
+              RetailerLogo={RetailerLogo} RetailerDot={RetailerDot} BrandPlaque={BrandPlaque} PackshotImg={PackshotImg}
+            />
           )}
 
           {/* ANALYTICS */}
@@ -2285,88 +2034,6 @@ export default function App() {
             </div>
           )}
 
-          {/* PACKSHOT GALLERY */}
-          {tab === 'packshot' && (
-            <>
-              {/* Sticky filter panel — search + customer + brand + legend stay pinned on scroll */}
-              <div style={{ position: 'sticky', top: 0, zIndex: 20, background: t.bg, marginLeft: isMobile ? -12 : -24, marginRight: isMobile ? -12 : -24, marginTop: isMobile ? -16 : -24, paddingLeft: isMobile ? 12 : 24, paddingRight: isMobile ? 12 : 24, paddingTop: isMobile ? 16 : 24, paddingBottom: 6, boxShadow: `0 6px 12px -6px ${dark ? 'rgba(0,0,0,0.5)' : 'rgba(0,0,0,0.12)'}` }}>
-              {/* ── Search bar ── */}
-              <div style={{ position: 'relative', marginBottom: 10 }}>
-                <span style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', color: t.muted, fontSize: 15, pointerEvents: 'none' }}>⌕</span>
-                <input value={psSearch} onChange={e => setPsSearch(e.target.value)} placeholder="ค้นหา product, brand, barcode..." style={{ width: '100%', background: t.surface, border: `1px solid ${t.border}`, borderRadius: 10, color: t.text, padding: '9px 36px 9px 38px', fontSize: 13, outline: 'none', boxShadow: dark ? 'none' : '0 1px 4px rgba(0,0,0,0.06)' }} />
-                {psSearch && <button onClick={() => setPsSearch('')} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: t.muted, cursor: 'pointer', fontSize: 18, lineHeight: 1 }}>×</button>}
-              </div>
-              {/* ── Customer (retailer) pills — logos (above brand) ── */}
-              <div className="rp-row" style={{ display: 'flex', gap: 9, marginBottom: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-                <span style={{ fontSize: 12, color: t.muted, fontWeight: 600, flexShrink: 0 }}>Customer:</span>
-                <button onClick={() => setPsRetailers([])} style={{ background: psRetailers.length === 0 ? t.accent : t.surface2, color: psRetailers.length === 0 ? '#000' : t.text, border: `1.5px solid ${psRetailers.length === 0 ? t.accent : t.border}`, borderRadius: 20, padding: '6px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>All</button>
-                {RETAILERS.map(r => {
-                  const sel = psRetailers.includes(r)
-                  return (
-                    <button key={r} onClick={() => togglePsRetailer(r)} title={r}
-                      className={`rp-btn${sel ? ' rp-sel' : ''}`}
-                      style={{
-                        '--g': t.accent, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                        background: 'transparent', border: 'none', borderRadius: 8, padding: 2, cursor: 'pointer',
-                        minHeight: isMobile ? 40 : 'unset',
-                      }}>
-                      <RetailerLogo name={r} h={isMobile ? 30 : 26} maxW={isMobile ? 76 : 66} dark={dark} fallbackStyle={{ fontSize: 11, fontWeight: 700, color: t.text }} />
-                    </button>
-                  )
-                })}
-                {psRetailers.length > 0 && (
-                  <button onClick={() => setPsRetailers([])} style={{ background: 'none', border: 'none', color: t.muted, fontSize: 11, fontWeight: 600, cursor: 'pointer', padding: '4px 6px', flexShrink: 0 }}>✕ Clear</button>
-                )}
-              </div>
-              {/* ── Brand category navigator (shared with Products tab) ── */}
-              <div style={{ marginBottom: 12 }}>
-                <BrandCategoryFilter idPrefix="pm-packshot" brandList={VENDOR_BRANDS.ALL}
-                  selectedBrands={selectedBrands} onToggle={toggleBrand} onClear={() => setSelectedBrands([])}
-                  brandCompany={brandCompany} brandCounts={brandCounts} t={t} isMobile={isMobile} />
-              </div>
-              {/* ── Legend + count bar ── */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 14, padding: '8px 14px', background: t.surface, border: `1px solid ${t.border}`, borderRadius: 10, flexWrap: 'wrap' }}>
-                {[
-                  { label: 'Active', color: t.green },
-                  { label: 'Pending', color: t.yellow },
-                  { label: 'Discontinued', color: t.red },
-                ].map(({ label, color }) => (
-                  <span key={label} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: t.muted, fontWeight: 600 }}>
-                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, display: 'inline-block', flexShrink: 0 }} />{label}
-                  </span>
-                ))}
-                <span style={{ marginLeft: 'auto', fontSize: 12, color: t.muted }}>
-                  Showing <strong style={{ color: t.text, fontWeight: 700 }}>{psFiltered.length}</strong> of {rawData.length} products
-                </span>
-              </div>
-              </div>{/* end sticky filter panel */}
-              {/* ── Grid ── */}
-              <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill, minmax(${isMobile ? '130px' : '160px'}, 1fr))`, gap: isMobile ? 10 : 12 }}>
-                {psFiltered.map((p, i) => (
-                  <div key={p.barcode + i} onClick={() => setSelectedProduct(p)} style={{ ...glassPanel, borderRadius: 12, overflow: 'hidden', cursor: 'pointer', transition: 'transform 0.18s, box-shadow 0.18s' }}
-                    onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-5px) scale(1.02)'; e.currentTarget.style.boxShadow = `0 16px 40px rgba(0,0,0,0.28), 0 0 0 2px ${t.accent}66` }}
-                    onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = glassPanel.boxShadow }}
-                  >
-                    <PackshotImg barcode={p.barcode} side="front" style={{ width: '100%', height: 150, background: dark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)' }} placeholderSize={40} />
-                    <div style={{ padding: '10px 12px' }}>
-                      <div style={{ fontSize: 11.5, fontWeight: 600, color: t.text, lineHeight: 1.35, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }} title={p.product}>{p.product}</div>
-                      <div style={{ marginTop: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: 12, fontWeight: 700, color: t.text }}>฿{p.rsp || '—'}</span>
-                        <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 12, fontWeight: 600, background: p.status === 'ขาย' ? `${t.green}22` : p.status === 'รอขาย' ? `${t.yellow}22` : `${t.red}22`, color: p.status === 'ขาย' ? t.green : p.status === 'รอขาย' ? t.yellow : t.red }}>{p.status === 'ขาย' ? 'Active' : p.status === 'รอขาย' ? 'Pending' : 'Discon'}</span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              {psFiltered.length === 0 && (
-                <div style={{ textAlign: 'center', padding: '60px 0', color: t.muted }}>
-                  <div style={{ fontSize: 32, marginBottom: 10 }}>🔍</div>
-                  <div style={{ fontWeight: 600 }}>ไม่พบสินค้าที่ตรงกับ filter</div>
-                </div>
-              )}
-            </>
-          )}
-
           {/* PROMOTION PLAN */}
           {tab === 'promotion' && (
             <PromoSection
@@ -2631,7 +2298,7 @@ export default function App() {
           dark={dark}
           isMobile={isMobile}
           pricing={retailerData[selectedProduct.barcode] || {}}
-          variant={tab === 'packshot' ? 'packshot' : 'products'}
+          variant="packshot"
           promoItems={promoData}
           promoMeta={PROMO_META}
         />
