@@ -102,7 +102,7 @@ function CustomerTiles({ selectedRetailers, onToggleRetailer, retailerCounts, Re
         return (
           <button key={r} type="button" title={r} className={`pp-tile${on ? ' pp-on' : ''}`} aria-pressed={on} onClick={() => onToggleRetailer(r)}>
             <span className="pp-tlg">
-              <RetailerLogo name={r} h={44} maxW="100%" dark={dark} noGlow cover={COVER_FIT_RETAILERS.has(r)} fallbackStyle={{ fontSize: 11, fontWeight: 700 }} />
+              <RetailerLogo name={r} h={50} maxW="100%" dark={dark} noGlow cover={COVER_FIT_RETAILERS.has(r)} fallbackStyle={{ fontSize: 11, fontWeight: 700 }} />
             </span>
             <span className="pp-ct"><b>{retailerCounts[r] || 0}</b> listed</span>
           </button>
@@ -138,7 +138,7 @@ function BrandBoxes({ visibleBrands, selectedBrands, onToggleBrand, brandCompany
           const name = keyBrand(b)
           return (
             <button key={b} type="button" title={name} className={`pp-tile${on ? ' pp-on' : ''}`} aria-pressed={on} onClick={() => onToggleBrand(b)}>
-              <BrandPlaque brand={name} company={brandCompany[b]} t={t} fixed={{ w: 76, h: 34 }} />
+              <BrandPlaque brand={name} company={brandCompany[b]} t={t} fixed={{ w: 104, h: 46 }} />
               <span className="pp-bnm">{name}</span>
               <span className="pp-ct"><b>{n}</b> {n === 1 ? 'item' : 'items'}</span>
             </button>

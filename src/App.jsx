@@ -8,6 +8,7 @@ import promoData, { PROMO_META } from './promo_data.js'
 import PromoSection from './PromoSection.jsx'
 import { knockOutWhite } from './cutout.js'
 import { upcomingWithin, bangkokToday, daysUntil } from './promoAlerts.js'
+import { periodRange, periodStatus } from './promoPlan.js'
 import { DEPT_PINS, canSeeRetailer, canViewAccessLog, logPricingAccess, getAccessLog, clearAccessLog } from './deptPins.js'
 
 // Bell-alert urgency → tone + plain-language countdown. Tones map to theme colors
@@ -98,7 +99,7 @@ function BrandPlaque({ brand, company, t, size = 'm', fixed = null }) {
   const [ar, setAr] = useState(1)
   const src = BRAND_LOGOS[brand]
   if (fixed) {
-    const box = { width: fixed.w, height: fixed.h, borderRadius: 7, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box' }
+    const box = { width: fixed.w, maxWidth: '100%', height: fixed.h, borderRadius: 7, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box' }
     return src && !err ? (
       <span style={{ ...box, background: '#fff', overflow: 'hidden', padding: '2px 6px' }}>
         <img src={src} alt={brand} loading="lazy" decoding="async" onError={() => setErr(true)}
@@ -612,7 +613,7 @@ function ProductPopup({ product, onClose, t, dark, isMobile = false, pricing = {
     el.addEventListener('wheel', onWheel, { passive: false })
     return () => el.removeEventListener('wheel', onWheel)
   }, [zoomed])
-  // Promo history: all periods with a salePrice for this barcode across all retailers.
+  // Promos running right now: periods with a salePrice for this barcode whose dates include today.
   // Kept above the `if (!product) return null` below — hooks must run unconditionally.
   const myPromos = useMemo(() => {
     if (!product) return []
@@ -622,6 +623,7 @@ function ProductPopup({ product, onClose, t, dark, isMobile = false, pricing = {
       Object.entries(it.periods || {}).forEach(([pName, pd]) => {
         if (!pd?.salePrice) return
         const pm = meta.find(m => m.name === pName)
+        if (periodStatus(periodRange(pm || { name: pName })) !== 'now') return
         entries.push({ retailer: it.retailer, period: pName, dateRange: pm?.dateRange || '', price: pd.salePrice, label: pd.saleLabel || '', activities: pd.activities || [] })
       })
     })
@@ -834,7 +836,7 @@ function ProductPopup({ product, onClose, t, dark, isMobile = false, pricing = {
   const promoBlock = (
     <div>
       {myPromos.length === 0
-        ? <div style={{ fontSize: 13, color: t.muted, padding: '20px 0', textAlign: 'center' }}>No promo entries found for this product.</div>
+        ? <div style={{ fontSize: 13, color: t.muted, padding: '20px 0', textAlign: 'center' }}>No promos running right now for this product.</div>
         : <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, minWidth: 400 }}>
               <thead>
@@ -846,8 +848,8 @@ function ProductPopup({ product, onClose, t, dark, isMobile = false, pricing = {
               </thead>
               <tbody>
                 {myPromos.map((e, i) => (
-                  <tr key={i} style={{ borderBottom: `1px solid ${t.border}`, opacity: 1 }}>
-                    <td style={{ padding: '5px 8px', fontWeight: 600, color: t.text, whiteSpace: 'nowrap' }}>{e.retailer}</td>
+                  <tr key={i} style={{ borderBottom: `1px solid ${t.border}` }}>
+                    <td style={{ padding: '6px 8px' }} title={e.retailer}><RetailerLogo name={e.retailer} h={26} maxW={76} dark={dark} noGlow /></td>
                     <td style={{ padding: '5px 8px', color: t.muted, fontFamily: 'ui-monospace,monospace', fontSize: 11 }}>{e.period}</td>
                     <td style={{ padding: '5px 8px', color: t.muted, whiteSpace: 'nowrap' }}>{e.dateRange || '—'}</td>
                     <td style={{ padding: '5px 8px', fontWeight: 700, color: t.accent, whiteSpace: 'nowrap' }}>฿{e.price}{e.label ? ` ${e.label}` : ''}</td>
@@ -1451,7 +1453,7 @@ export default function App() {
           borderRight: `1px solid ${t.border}`, display: 'flex', flexDirection: 'column', alignItems: 'center',
           gap: 4, padding: '12px 6px', overflow: 'hidden',
         }}>
-          <img src="/favicon.svg" alt="VCAN" style={{ width: 38, height: 38, display: 'block', margin: '2px 0 12px' }} />
+          <img src="/favicon.svg" alt="VCAN" style={{ width: 58, height: 58, display: 'block', margin: '2px 0 12px' }} />
           <nav style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
             {NAV_ITEMS.map(({ key, icon, label, title }) => {
               const active = tab === key
@@ -1514,7 +1516,7 @@ export default function App() {
             <div style={{ fontWeight: 800, fontSize: isMobile ? 14 : 17, color: t.text, letterSpacing: 0.2, whiteSpace: 'nowrap', flexShrink: 0 }}>
               Product Master
             </div>
-              <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v4.0.0</span>
+              <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v4.0.6</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: isMobile ? 11 : 13, background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, padding: isMobile ? '3px 8px' : '5px 12px', overflow: 'hidden', minWidth: 0, flexShrink: 1 }}>
               <span style={{ width: isMobile ? 6 : 7, height: isMobile ? 6 : 7, borderRadius: '50%', flexShrink: 0, background: dataSource === 'csv' ? t.blue : t.green }} />
               <span style={{ fontWeight: 800, color: dataSource === 'csv' ? t.blue : t.green, flexShrink: 0 }}>

@@ -39,7 +39,7 @@
 .pp-vc { color: var(--vc); } .pp-mo { color: var(--mo); }
 
 /* ---------- left filter panel ---------- */
-.pp-doors { width: 384px; flex: none; overflow-x: hidden; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 12px; border-right: 1px solid var(--bdr); scrollbar-color: var(--bdr) transparent; }
+.pp-doors { width: 456px; flex: none; overflow-x: hidden; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 12px; border-right: 1px solid var(--bdr); scrollbar-color: var(--bdr) transparent; }
 .pp-doors > * { flex: none; }
 .pp-card { border-radius: 14px; padding: 14px; min-width: 0; }
 .pp-card h2 { margin: 0; font-size: 15px; font-weight: 800; }
@@ -54,13 +54,13 @@
 .pp-tile:hover { border-color: var(--acc); background: var(--hov); }
 .pp-ct { font-size: 12px; color: var(--mu); font-weight: 600; font-variant-numeric: tabular-nums; }
 .pp-ct b { color: var(--tx); font-size: 15px; font-weight: 800; }
-.pp-tlg { width: 100%; max-width: 108px; height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 8px; overflow: hidden; flex: none; }
+.pp-tlg { width: 100%; max-width: 124px; height: 50px; display: flex; align-items: center; justify-content: center; border-radius: 8px; overflow: hidden; flex: none; }
 .pp-bcat { border: 1px solid var(--bdr); border-radius: 12px; background: var(--bg); padding: 12px 10px 10px; margin-top: 12px; }
 .pp-bch { display: flex; align-items: baseline; justify-content: space-between; margin: 0 4px 10px; font-size: 13.5px; color: var(--tx); }
 .pp-bch b { font-weight: 800; }
 .pp-bch i { font-style: normal; font-size: 11.5px; font-weight: 600; color: var(--mu); }
 .pp-bcat .pp-tile { background: var(--s); }
-.pp-bnm { font-size: 11.5px; font-weight: 700; line-height: 1.25; min-height: 29px; display: flex; align-items: center; justify-content: center; overflow-wrap: anywhere; }
+.pp-bnm { font-size: 13px; font-weight: 700; line-height: 1.25; min-height: 33px; display: flex; align-items: center; justify-content: center; overflow-wrap: anywhere; }
 
 /* ---------- results column ---------- */
 .pp-col { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
@@ -78,7 +78,7 @@
 .pp-empty { padding: 56px 20px; text-align: center; color: var(--mu); font-weight: 600; grid-column: 1 / -1; }
 
 /* ---------- cards ---------- */
-.pp-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(196px, 1fr)); gap: 14px; padding: 16px 18px; }
+.pp-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(max(196px, calc((100% - 56px) / 5)), 1fr)); gap: 14px; padding: 16px 18px; }
 .pp-pcard { display: flex; flex-direction: column; padding: 0; overflow: hidden; border-radius: 14px; border: 1px solid var(--bdr); background: var(--s); color: var(--tx); text-align: left; min-width: 0; }
 .pp-pcard:hover { border-color: var(--acc); }
 .pp-pcard .pp-im { position: relative; display: block; flex: none; aspect-ratio: 1; background: #fff; border-bottom: 1px solid var(--bdr); }
