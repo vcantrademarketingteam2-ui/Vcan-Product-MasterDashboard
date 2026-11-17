@@ -106,6 +106,11 @@ const RETAILER_DATA = {
       "costUnit": 205.6075,
       "costCase": 2467.2897,
       "gp": 0.2
+    },
+    "Foodland": {
+      "costUnit": 192.757,
+      "costCase": 1542.0561,
+      "gp": 0.25
     }
   },
   "3450601046834": {
@@ -128,6 +133,11 @@ const RETAILER_DATA = {
       "costUnit": 519.6262,
       "costCase": 3637.3832,
       "gp": 0.2
+    },
+    "Foodland": {
+      "costUnit": 487.1495,
+      "costCase": 3410.0467,
+      "gp": 0.25
     }
   },
   "3450601031656": {
@@ -145,6 +155,11 @@ const RETAILER_DATA = {
       "costUnit": 220.5607,
       "costCase": 2646.729,
       "gp": 0.2
+    },
+    "Foodland": {
+      "costUnit": 201.2617,
+      "costCase": 2415.1402,
+      "gp": 0.27
     }
   },
   "024200060572": {
