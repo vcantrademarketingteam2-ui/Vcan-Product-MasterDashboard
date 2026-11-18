@@ -334,5 +334,17 @@
       "combat"
     ],
     "title": "TWD Bro7"
+  },
+  {
+    "retailer": "The Mall",
+    "period": "Oct",
+    "startDate": "2026-10-01",
+    "activities": [
+      "media"
+    ],
+    "brands": [
+      "Sundae Bath Foam"
+    ],
+    "title": "The Mall Oct"
   }
 ]
