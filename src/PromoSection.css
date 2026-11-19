@@ -7,10 +7,6 @@
 .ps-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .12em; margin-right: 4px; }
 
 .ps-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 14px; row-gap: 10px; margin-bottom: 14px; }
-.ps-seg { display: inline-flex; gap: 3px; padding: 3px; border-radius: 10px; }
-.ps-seg button { border: 0; cursor: pointer; font-family: inherit; font-weight: 700; font-size: 12.5px;
-  padding: 6px 14px; border-radius: 8px; display: inline-flex; align-items: center; gap: 7px; transition: background .15s, color .15s; }
-.ps-seg button.on { font-weight: 700; }
 
 /* ---------- calculator modal ---------- */
 .ps-modal-backdrop { position: fixed; inset: 0; z-index: 3000; display: flex; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(3px); }
@@ -24,7 +20,6 @@
 
 @media (max-width: 767px) {
   .ps-toolbar { gap: 10px; row-gap: 10px; }
-  .ps-seg button { min-height: 40px; padding: 8px 14px; }
   .ps-pills { gap: 6px; }
 
 }
@@ -35,8 +30,6 @@
 .ps-glow:hover { box-shadow: 0 0 13px -2px var(--g, #d4a86a) !important; filter: brightness(1.07); }
 .ps-glow-on { box-shadow: 0 0 7px -1px var(--g, #d4a86a), 0 0 20px -4px var(--g, #d4a86a) !important; }
 .ps-glow-on:hover { box-shadow: 0 0 9px 0 var(--g, #d4a86a), 0 0 26px -4px var(--g, #d4a86a) !important; }
-@keyframes ps-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
-.ps-pulse { animation: ps-pulse 1.6s ease-in-out infinite; }
 
 /* period strip: no scrollbar, edges fade so a half-visible chip reads as "more this way" */
 

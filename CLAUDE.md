@@ -116,11 +116,11 @@ Implemented in [src/PromoSection.jsx](src/PromoSection.jsx) + [src/PromoSection.
 - `media` → `#22d3ee` (neon cyan)
 - `looks` → `#f061ff` (neon fuchsia)
 - `clearance` → `#f43f5e` (neon coral, `CLEAR_COLOR` constant) — moved off cyan so media owns it
-- **No-activity promos** get an **ice-silver frosted-glass pill** via `getBarStyle()` (`bs.ice` flag; since v3.15.0 only Spotlight's `FeedCard` consumes `getBarStyle`) — the old gold-gradient price pill is removed and must NOT come back
+- **No-activity promos** used an ice-silver pill via `getBarStyle()`; that helper went with Spotlight in v4.0.8. The old gold-gradient price pill must NOT come back
 - `GOLD_A`/`GOLD_B` are now **bronze** (`#d4a86a`/`#9c6b35`) and are chrome-accent only (selection states, NOW markers, Calc button) — never price pills
 - **Light-mode contrast:** the `neon(c)` helper (uses module map `NEON_DEEP`) maps each neon hue to a deeper variant in light mode — route ALL activity-color rendering through it, never use `ACT[a].color` raw
 - **Hover/active glow:** `.ps-glow` / `.ps-glow-on` CSS classes + inline `'--g'` custom property = the neon hover/selected system for buttons & filter pills; use these instead of hand-rolled hover handlers
-- Icons are inline SVG components (`IcoTimeline`/`IcoGrid`/`IcoCalc`, module scope; Timeline/Grid now only label the Plan/Spotlight mode switch) — don't reintroduce emoji glyphs
+- Icons are inline SVG components (`IcoCalc`, module scope; `IcoTimeline`/`IcoGrid` were removed with the Plan/Spotlight switch in v4.0.8) — don't reintroduce emoji glyphs
 
 **RetailerLogo:** passed as a prop from App.jsx (`RetailerLogo` component). Customer selector pills use logo images, not plain text. Do not replace with text.
 
@@ -128,7 +128,7 @@ Implemented in [src/PromoSection.jsx](src/PromoSection.jsx) + [src/PromoSection.
 
 **Product view (v3.15.0):** reached by a search suggestion (Enter picks the first), the product name in a Plan row, or the detail panel's "See across all stores" button (barcode identity; `productIndex` memo spans every retailer) — one product across every store, with a per-store row; a row click returns to that store's Plan view with the cell selected (`openStorePlan`).
 
-**Spotlight** is kept unchanged (Live now / Next up / Ended tiles). It owns the plain `ps-pulse` class (live-tile dot, the only `ps-pulse*` selector left) and shares `.ps-glow`; `.ps-prow` belongs to Product view.
+**Spotlight was removed in v4.0.8** (unused: the Plan view's NOW column already answers "what's live now", and it picked only one current period, so overlapping periods like TWD Bro + month or The Mall M Price + month were miscounted). No Plan/Spotlight switch, no `mode` state; Product view returns via its own "Back to <store>" button. Do not bring it back.
 
 **`src/promoPlan.js`:** `parseDR`/`inferPeriodDate` date parsing (end-date year, spaced dash, 62-day guard), `buildPlan`, quarter/month pick helpers (`colsForPick`, `defaultPick` — opens on the current quarter) and `productRows` (Product view); tested in `test/promoPlan.test.mjs` (run `node --test test/*.mjs`).
 
@@ -165,6 +165,7 @@ No pending tasks from this redesign.
 
 | Version | What changed |
 |---------|-------------|
+| v4.0.8 | **Spotlight removed** from the Promotion Plan ([PromoSection.jsx](src/PromoSection.jsx)/[.css](src/PromoSection.css)): `Spotlight()`, `FeedCard`, `BrandGroupHdr`, the `spot*`/`nextIdx`/`currentIdx`/`periodProgress`/grouped memos, `getBarStyle`, `periodIsCurrent`, `mode`/`spotTab` state, the Plan/Spotlight switch with `IcoTimeline`/`IcoGrid`, and the `.ps-seg`/`ps-pulse` CSS are deleted (−343 lines). The card header now shows the store (or "Product across stores") plus the planning date. |
 | v4.0.7 | **The Mall** added to the Promotion Plan: new `CONFIG['The Mall']` in [convert_promo.py](convert_promo.py) (header row 4, dates row 5; each month = monthly column + two 2-week "M Price" columns, all kept). `parseDR` gains a day-month-name branch ("8 Jan - 4 Feb", "23 Jul - 26-Aug", "3 Dec -6 Jan27") + test. promo_data.js regenerated (56 SKUs, 37 periods). Mall-only `mprice_names` config tidies the repeated "MPrice (Jan)" headers into "M Price Jan 1/2" (Oct has 3) so the columns read like TWD's Bro.N; on the old code the 24 M Price columns were undated and hidden. |
 | v4.0.6 | Product popup Promos tab lists only promos running today (`periodStatus(periodRange(...)) === "now"`; ended, upcoming and undated periods are hidden, the tab count is the live count) and shows the store logo (`RetailerLogo`) instead of the store name. Supersedes the v4.0.5 Status column, which is removed. |
 | v4.0.4 | Brand logo files in `public/brands/` trimmed of empty white/transparent margins (19 files; logos now fill their plate). L'Arbre Vert Rinse Aid (3450601031656) front packshot replaced with the new bottle design, back kept. The Y: drive still holds the old front — if that file is re-saved there, the daily pipeline will copy it back over. |

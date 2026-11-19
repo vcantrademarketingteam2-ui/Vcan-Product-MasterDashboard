@@ -3,7 +3,6 @@
  *
  *   - Plan:      one store's table, Year/Quarter/Month/Period selector, detail panel
  *   - Product:   one product (barcode) across every store, reached from search or a Plan row
- *   - Spotlight: live / next / ended feed for the selected store
  *   - Customer selector uses the RetailerLogo component (passed as prop) instead of plain text.
  *   - ACT.field color overridden to #f97316 (orange) to stay distinct from clearance.
  */
@@ -11,7 +10,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import promoData, { PROMO_META, PROMO_ACTIVITY, PROMO_RETAILERS } from './promo_data.js'
-import { MONTH_NAMES, parseDR, inferPeriodDate, buildPlan, defaultPick, colsForPick, quarterSpan, monthSpan, colsInSpan, pickLabel, pickYears, quarterBands, quarterLabel, dayDiff, periodRange, productRows, bestNow } from './promoPlan.js'
+import { MONTH_NAMES, buildPlan, defaultPick, colsForPick, quarterSpan, monthSpan, colsInSpan, pickLabel, pickYears, quarterBands, quarterLabel, dayDiff, productRows, bestNow } from './promoPlan.js'
 import { DEPT_PINS, canSeeRetailer, logPricingAccess } from './deptPins.js'
 import './PromoSection.css'
 import { brandKey } from './brandCategory.js'
@@ -41,17 +40,6 @@ const NEON_DEEP = {
 // Inline SVG icons — neon/glass friendly, replace the old emoji glyphs
 // ponytail: restrained neon glow keyed to the icon's own (current) colour
 const ICO_GLOW = { filter: 'drop-shadow(0 0 2px currentColor)' }
-const IcoTimeline = ({ size = 13 }) => (
-  <svg width={size} height={size} viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" style={ICO_GLOW}>
-    <path d="M1.5 3.5h6" /><path d="M4.5 7h8" /><path d="M2.5 10.5h5.5" />
-  </svg>
-)
-const IcoGrid = ({ size = 13 }) => (
-  <svg width={size} height={size} viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" style={ICO_GLOW}>
-    <rect x="1" y="1" width="5" height="5" rx="1.2" /><rect x="8" y="1" width="5" height="5" rx="1.2" />
-    <rect x="1" y="8" width="5" height="5" rx="1.2" /><rect x="8" y="8" width="5" height="5" rx="1.2" />
-  </svg>
-)
 const IcoCalc = ({ size = 14 }) => (
   <svg width={size} height={size} viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" style={ICO_GLOW}>
     <rect x="2.5" y="1" width="9" height="12" rx="2" />
@@ -65,11 +53,6 @@ const CUSTOMERS = PROMO_RETAILERS.includes('Watsons') ? PROMO_RETAILERS : [...PR
 const PV_COLS = '180px 1.2fr 1fr 1fr'
 const TODAY = new Date()
 const TODAY_ISO = `${TODAY.getFullYear()}-${String(TODAY.getMonth() + 1).padStart(2, '0')}-${String(TODAY.getDate()).padStart(2, '0')}`
-
-function periodIsCurrent(p) {
-  const r = periodRange(p, TODAY)   // null for undated / over-long (mis-keyed) ranges
-  return !!r && TODAY >= r.s && TODAY <= r.e
-}
 
 const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`
 const fmtDM = d => `${d.getDate()} ${MONTH_NAMES[d.getMonth()]}`
@@ -108,13 +91,11 @@ function enrich(items, rawData) {
 export default function PromoSection({ rawData, t, dark, isMobile, onSelect, RetailerLogo, MonogramTile, BrandCategoryFilter }) {
   const [retailer, setRetailer] = useState(CUSTOMERS[0] || '')
   const [brandFilter, setBrandFilter] = useState([])
-  const [spotTab, setSpotTab] = useState('live')
   const [unlocked, setUnlocked] = useState(null)
   const [pin, setPin] = useState('')
   const [pinErr, setPinErr] = useState(false)
   const [calcOpen, setCalcOpen] = useState(false)
   // Plan/Product redesign state
-  const [mode, setMode] = useState('plan')       // 'plan' | 'spot'
   const [view, setView] = useState('store')      // 'store' | 'product'
   const [pb, setPb] = useState(null)             // product-view barcode
   const [q, setQ] = useState('')
@@ -134,10 +115,8 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
 
   // ── derived data ────────────────────────────────────────────────────────────
   const periods = useMemo(() => {
-    return (PROMO_META[retailer]?.periods || []).map((p, i) => ({ ...p, idx: i, isCurrent: periodIsCurrent(p) }))
+    return (PROMO_META[retailer]?.periods || []).map((p, i) => ({ ...p, idx: i }))
   }, [retailer])
-
-  const currentIdx = useMemo(() => periods.findIndex(p => p.isCurrent), [periods])
 
   // Enriched once for every retailer (Product view spans all stores); per-store lists derive from it
   const allEnriched = useMemo(() => enrich(promoData, rawData), [rawData])
@@ -188,113 +167,11 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
     return allItems.filter(i => brandFilter.includes(brandKey(i.brand, i.product)))
   }, [allItems, brandFilter])
 
-  // Spotlight: products in current / next / past periods
-  const spotLive = useMemo(() => {
-    if (currentIdx < 0) return []
-    const pName = periods[currentIdx]?.name
-    if (!pName) return []
-    return items
-      .filter(it => it.periods?.[pName])
-      .map(it => ({ ...it, pd: it.periods[pName], offPct: offPctOf(it, it.periods[pName]) }))
-      .sort((a, b) => (b.offPct || 0) - (a.offPct || 0))
-  }, [items, periods, currentIdx])
-
-  // Next period: the one after current, or — when no period is current — the first
-  // period whose start date is still in the future (not blindly periods[0])
-  const nextIdx = useMemo(() => {
-    if (currentIdx >= 0) return currentIdx + 1 < periods.length ? currentIdx + 1 : -1
-    return periods.findIndex(p => {
-      const r = periodRange(p, TODAY)
-      return r && r.s > TODAY
-    })
-  }, [periods, currentIdx])
-
-  const spotNext = useMemo(() => {
-    const pName = nextIdx >= 0 ? periods[nextIdx]?.name : null
-    if (!pName) return []
-    return items
-      .filter(it => it.periods?.[pName])
-      .map(it => ({ ...it, pd: it.periods[pName], offPct: offPctOf(it, it.periods[pName]) }))
-      .sort((a, b) => (b.offPct || 0) - (a.offPct || 0))
-  }, [items, periods, nextIdx])
-
-  const spotEnded = useMemo(() => {
-    const cutoff = currentIdx >= 0 ? currentIdx : periods.length
-    const pastNames = periods.slice(0, cutoff).map(p => p.name)
-    if (!pastNames.length) return []
-    const seen = new Set()
-    return items
-      .flatMap(it =>
-        pastNames
-          .filter(n => it.periods?.[n])
-          .slice(-2) // at most 2 most recent ended periods per product
-          .map(n => ({ ...it, pd: it.periods[n], offPct: offPctOf(it, it.periods[n]), periodName: n }))
-      )
-      .filter(it => { const k = it.barcode + it.periodName; if (seen.has(k)) return false; seen.add(k); return true })
-      .sort((a, b) => (b.offPct || 0) - (a.offPct || 0))
-      .slice(0, 30)
-  }, [items, periods, currentIdx])
-
-  // Spotlight Ended: grouped by period name for tree view
-  const endedGrouped = useMemo(() => {
-    const groups = {}
-    spotEnded.forEach(it => {
-      if (!groups[it.periodName]) groups[it.periodName] = []
-      groups[it.periodName].push(it)
-    })
-    return Object.entries(groups)
-      .sort(([a], [b]) => {
-        const ia = periods.findIndex(p => p.name === a)
-        const ib = periods.findIndex(p => p.name === b)
-        return ib - ia
-      })
-      .map(([periodName, pItems]) => {
-        const period = periods.find(p => p.name === periodName)
-        const dr = parseDR(period?.dateRange || '') || inferPeriodDate(period || {})
-        const dateDisplay = period?.dateRange || (dr ? `${MONTH_NAMES[dr.s.getMonth()]} ${dr.s.getFullYear()}` : period?.name || '')
-        return { periodName, dateDisplay, items: pItems }
-      })
-  }, [spotEnded, periods])
-
-  // Spotlight Live/Next: grouped by brand for tree view
-  const liveGrouped = useMemo(() => {
-    const g = {}
-    spotLive.forEach(it => { (g[it.brand] = g[it.brand] || []).push(it) })
-    return Object.entries(g).sort((a, b) => b[1].length - a[1].length)
-  }, [spotLive])
-
-  const nextGrouped = useMemo(() => {
-    const g = {}
-    spotNext.forEach(it => { (g[it.brand] = g[it.brand] || []).push(it) })
-    return Object.entries(g).sort((a, b) => b[1].length - a[1].length)
-  }, [spotNext])
-
-  // Progress of the current period (0–100%)
-  const periodProgress = useMemo(() => {
-    if (currentIdx < 0) return null
-    const p = periods[currentIdx]
-    if (!p) return null
-    const dr = periodRange(p, TODAY)
-    if (!dr) return null
-    const pct = (TODAY.getTime() - dr.s.getTime()) / (dr.e.getTime() - dr.s.getTime()) * 100
-    const dateLabel = p.dateRange || (dr ? `${MONTH_NAMES[dr.s.getMonth()]} ${dr.s.getFullYear()}` : '')
-    return { name: p.name, dateRange: dateLabel, pct: Math.max(0, Math.min(100, pct)) }
-  }, [periods, currentIdx])
-
   // ── helpers ─────────────────────────────────────────────────────────────────
   const neon = c => dark ? c : (NEON_DEEP[c] || c)
   const gpColor = gp => gp == null ? t.muted : gp >= 0.30 ? t.green : gp >= 0.20 ? t.yellow : t.red
   const coColor = c => c === 'Vcan' ? t.vcanClr : t.moolaClr
   const priceTxt = pd => pd.salePrice != null ? '฿' + pd.salePrice.toLocaleString('th-TH') : (pd.saleLabel || '')
-
-  // Spotlight card accent: driven by activity type, with clearance override. `clr` = accent colour;
-  // `ice` = no-activity promo (neutral ice-silver accent, price text uses the theme text colour).
-  const getBarStyle = (activities, clearance, branch) => {
-    if (clearance) return { clr: neon(CLEAR_COLOR) }
-    for (const a of (activities || [])) if (ACT[a]) return { clr: neon(ACT[a].color) }
-    if (branch) return { clr: branchClr, branch: true }
-    return { clr: dark ? '#a8c5da' : '#8fa9bd', ice: true }
-  }
 
   // Open the product popup with the full master record (promo items lack the
   // retailers map / status fields the popup needs — passing them raw crashes it)
@@ -304,10 +181,10 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
   }
 
   const pickStore = r => { setRetailer(r); setPick(null); setSel(null); setBrandFilter([]); setView('store') }
-  const openProductView = bc => { setPb(bc); setView('product'); setMode('plan'); setSel(null) }
+  const openProductView = bc => { setPb(bc); setView('product'); setSel(null) }
   const chooseSug = bc => { setQ(''); setSugOpen(false); openProductView(bc) }
   const openStorePlan = (r, barcode, liveCol) => {
-    setRetailer(r); setBrandFilter([]); setPick(null); setQ(''); setView('store'); setMode('plan')
+    setRetailer(r); setBrandFilter([]); setPick(null); setQ(''); setView('store')
     setSel(liveCol ? { retailer: r, barcode, name: liveCol.name } : null)
   }
 
@@ -853,199 +730,7 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
     )
   }
 
-  // Reusable feed card for Spotlight (compact, brand shown in parent header).
-  // `ended` = past promo: use a more opaque card + full-contrast text so the
-  // history stays clearly legible instead of fading into the background.
-  function FeedCard({ it, ended }) {
-    const bs = getBarStyle(it.pd?.activities, it.clearance, it.pd?.branchExclusive)
-    const prClr = ended ? tx : (bs.ice ? tx : bs.clr)
-    return (
-      <div onClick={() => openProduct(it)}
-        style={{
-          display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px',
-          background: ended ? (dark ? 'rgba(255,255,255,.07)' : 'rgba(255,255,255,.78)')
-                            : (dark ? 'rgba(255,255,255,.04)' : 'rgba(255,255,255,.58)'),
-          backdropFilter: 'blur(10px) saturate(1.35)', WebkitBackdropFilter: 'blur(10px) saturate(1.35)',
-          border: `1px solid ${ended ? bdr : `${bs.clr}33`}`,
-          borderLeft: `3px solid ${bs.clr}`,
-          borderRadius: 9, cursor: 'pointer', transition: 'filter .14s, box-shadow .18s',
-        }}
-        onMouseEnter={e => { e.currentTarget.style.filter = 'brightness(1.06)'; e.currentTarget.style.boxShadow = `0 0 16px -6px ${bs.clr}` }}
-        onMouseLeave={e => { e.currentTarget.style.filter = ''; e.currentTarget.style.boxShadow = '' }}
-      >
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 12.5, fontWeight: 700, color: tx, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.3 }}>{it.product}</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3 }}>
-            <span style={{ fontSize: 10.5, color: ended ? tx : mu, fontWeight: 600 }}>RSP ฿{it.rspIncVat}</span>
-            {it.clearance && <span style={{ fontSize: 9, fontWeight: 800, color: neon(CLEAR_COLOR) }}>CLEAR</span>}
-            {it.pd?.branchExclusive && <span title="เฉพาะสาขาเควิลเลจ" style={{ fontSize: 8.5, fontWeight: 800, color: branchClr, background: `${branchClr}22`, border: `1px solid ${branchClr}55`, borderRadius: 4, padding: '0 4px' }}>K.Village</span>}
-            {(it.pd?.activities || []).map(a => ACT[a] ? (
-              <i key={a} style={{ width: 6, height: 6, borderRadius: 99, background: neon(ACT[a].color), display: 'inline-block', flexShrink: 0 }} />
-            ) : null)}
-          </div>
-        </div>
-        <div style={{ textAlign: 'right', flexShrink: 0 }}>
-          <div style={{ fontSize: 16, fontWeight: 800, fontFamily: 'ui-monospace,monospace', color: prClr, lineHeight: 1.1 }}>{priceTxt(it.pd)}</div>
-          {it.offPct != null && it.offPct > 0 && (
-            <div style={{ fontSize: 10.5, fontWeight: 700, color: ended ? (dark ? GOLD_A : GOLD_B) : (bs.ice ? mu : bs.clr) }}>−{it.offPct}%</div>
-          )}
-        </div>
-      </div>
-    )
-  }
-
-  // Brand group header for Spotlight tree view
-  function BrandGroupHdr({ brand, items }) {
-    const company = items[0]?.company || ''
-    const clr = coColor(company) || GOLD_A
-    return (
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 9,
-        padding: '6px 12px', marginBottom: 6,
-        background: `${clr}0d`,
-        border: `1px solid ${clr}22`, borderLeft: `3px solid ${clr}`,
-        borderRadius: '0 7px 7px 0',
-      }}>
-        <span style={{ fontSize: 12, fontWeight: 800, letterSpacing: '.05em', textTransform: 'uppercase', color: clr }}>{brand}</span>
-        {company && <span style={{ fontSize: 10, color: mu }}>{company}</span>}
-        <span style={{ marginLeft: 'auto', fontSize: 10.5, color: mu, fontFamily: 'ui-monospace,monospace' }}>
-          {items.length} SKU{items.length > 1 ? 's' : ''}
-        </span>
-      </div>
-    )
-  }
-
-  // Spotlight view — live feed: Live Now / Next Up / Ended tabs
-  function Spotlight() {
-    const liveOffs = spotLive.filter(i => i.offPct > 0)
-    const avgOff = liveOffs.length ? Math.round(liveOffs.reduce((a, i) => a + i.offPct, 0) / liveOffs.length) : null
-    const nextDate = nextIdx >= 0 ? (periods[nextIdx]?.dateRange || periods[nextIdx]?.name || '') : ''
-    // Status tiles — structured hierarchy (label / big count / period dates),
-    // double as the Live/Next/Ended tabs. Active tile lights up like a neon sign.
-    const tiles = [
-      { key: 'live', label: 'Live now', count: spotLive.length, c: t.green, pulse: true,
-        sub: periodProgress ? `${periodProgress.dateRange}${avgOff != null ? ` · −${avgOff}% avg` : ''}` : 'no active period' },
-      { key: 'next', label: 'Next up', count: spotNext.length, c: t.blue || '#58a6ff',
-        sub: nextDate || 'no upcoming period' },
-      { key: 'ended', label: 'Ended', count: spotEnded.length, c: dark ? GOLD_A : GOLD_B,
-        sub: 'recent past periods' },
-    ]
-    return (
-      <div style={{ padding: isMobile ? '12px 14px' : '16px 20px' }}>
-
-        {/* Status tiles */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8, marginBottom: 12 }}>
-          {tiles.map(({ key, label, count, c, sub, pulse }) => {
-            const isActive = spotTab === key
-            return (
-              <button key={key} onClick={() => setSpotTab(key)} className={`ps-glow${isActive ? ' ps-glow-on' : ''}`}
-                style={{
-                  '--g': c, textAlign: 'left', padding: isMobile ? '9px 10px' : '11px 14px', borderRadius: 12,
-                  cursor: 'pointer', fontFamily: 'inherit',
-                  border: `1.5px solid ${isActive ? c : bdr}`,
-                  background: isActive ? `${c}16` : (dark ? 'rgba(255,255,255,.035)' : 'rgba(255,255,255,.5)'),
-                  backdropFilter: 'blur(10px) saturate(1.35)', WebkitBackdropFilter: 'blur(10px) saturate(1.35)',
-                  transition: 'border-color .15s, background .15s',
-                }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span className={pulse && isActive ? 'ps-pulse' : ''} style={{ width: 7, height: 7, borderRadius: 99, flexShrink: 0,
-                    background: isActive ? c : mu, boxShadow: isActive ? `0 0 8px ${c}` : 'none' }} />
-                  <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: isActive ? c : mu }}>{label}</span>
-                </div>
-                <div style={{ fontSize: isMobile ? 18 : 22, fontWeight: 800, fontFamily: 'ui-monospace,monospace', lineHeight: 1.25,
-                  color: isActive ? c : tx, textShadow: isActive ? `0 0 16px ${c}66` : 'none' }}>{count}</div>
-                <div style={{ fontSize: 9.5, color: mu, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sub}</div>
-              </button>
-            )
-          })}
-        </div>
-
-        {/* Period progress bar */}
-        {periodProgress ? (
-          <div style={{ padding: '10px 14px',
-            background: dark ? 'rgba(255,255,255,.045)' : 'rgba(255,255,255,.55)',
-            backdropFilter: 'blur(12px) saturate(1.4)', WebkitBackdropFilter: 'blur(12px) saturate(1.4)',
-            border: `1px solid ${bdr}`, borderRadius: 10, marginBottom: 14 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-              <span style={{ fontSize: 12, fontWeight: 700, color: mu }}>Period {periodProgress.name} · {periodProgress.dateRange}</span>
-              <span style={{ fontSize: 12, fontWeight: 800, color: t.accent }}>
-                {periodProgress.pct >= 95 ? 'ends today' : `${Math.round(periodProgress.pct)}% through`}
-              </span>
-            </div>
-            <div style={{ height: 5, background: dark ? 'rgba(0,0,0,.45)' : dim, borderRadius: 99, overflow: 'visible' }}>
-              <div style={{ height: '100%', width: `${periodProgress.pct}%`, background: `linear-gradient(90deg,${GOLD_A},${GOLD_B})`, borderRadius: 99, transition: 'width .4s',
-                boxShadow: `0 0 7px ${GOLD_A}aa, 0 0 16px -2px ${GOLD_A}66` }} />
-            </div>
-          </div>
-        ) : (
-          <div style={{ padding: '10px 14px', background: s2, border: `1px solid ${bdr}`, borderRadius: 10, marginBottom: 14, fontSize: 12, color: mu }}>
-            ไม่มีช่วงโปรโมชันที่กำลังดำเนินอยู่ในขณะนี้
-          </div>
-        )}
-
-        {/* Live Now / Next Up — brand tree view, 2-column grid per brand */}
-        {spotTab !== 'ended' && (() => {
-          const grouped = spotTab === 'live' ? liveGrouped : nextGrouped
-          const emptyMsg = spotTab === 'live' ? 'ไม่มีโปรโมชันที่กำลังดำเนินอยู่' : 'ไม่มีโปรโมชันที่กำลังจะมาถึง'
-          return grouped.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px 0', color: mu, fontSize: 13 }}>{emptyMsg}</div>
-          ) : (
-            <>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                {grouped.map(([brand, items]) => (
-                  <div key={brand}>
-                    <BrandGroupHdr brand={brand} items={items} />
-                    <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 6, paddingLeft: isMobile ? 0 : 12 }}>
-                      {items.map((it, idx) => <FeedCard key={it.barcode + idx} it={it} />)}
-                    </div>
-                  </div>
-                ))}
-              </div>
-              {spotTab === 'live' && spotNext.length > 0 && (
-                <div style={{ marginTop: 12, padding: '8px 14px', border: `1px dashed ${dim}`, borderRadius: 9, display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11, color: mu }}>
-                  <span>↓ NEXT — {(nextIdx >= 0 && periods[nextIdx]?.dateRange) || 'coming soon'}{(() => { const np = nextIdx >= 0 ? periods[nextIdx] : null; const r = np && periodRange(np, TODAY); const d = r && Math.ceil((r.s - TODAY) / 86400000); return d > 0 ? <span style={{ color: GOLD_A, fontWeight: 700, marginLeft: 4 }}>· in {d}d</span> : null })()}</span>
-                  <span style={{ color: dim }}>{[...new Set(spotNext.map(i => i.brand))].slice(0, 3).join(' · ')}</span>
-                </div>
-              )}
-            </>
-          )
-        })()}
-
-        {/* Ended — tree view grouped by period */}
-        {spotTab === 'ended' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            {endedGrouped.length === 0 && (
-              <div style={{ textAlign: 'center', padding: '40px 0', color: mu, fontSize: 13 }}>ไม่มีประวัติโปรโมชัน</div>
-            )}
-            {endedGrouped.map(group => (
-              <div key={group.periodName}>
-                <div style={{
-                  display: 'flex', alignItems: 'center', gap: 10,
-                  padding: '7px 12px', marginBottom: 6,
-                  background: dark ? 'rgba(255,255,255,.04)' : 'rgba(255,255,255,.5)',
-                  border: `1px solid ${bdr}`,
-                  borderLeft: `3px solid ${GOLD_A}`, borderRadius: 9,
-                }}>
-                  <span style={{ fontSize: 12.5, fontWeight: 800, color: dark ? GOLD_A : GOLD_B, fontFamily: 'ui-monospace,monospace' }}>{group.periodName}</span>
-                  {group.dateDisplay && <span style={{ fontSize: 10.5, color: dark ? mu : tx, fontWeight: 600 }}>{group.dateDisplay}</span>}
-                  <span style={{ marginLeft: 'auto', fontSize: 10.5, color: mu }}>
-                    {group.items.length} SKU{group.items.length > 1 ? 's' : ''}
-                  </span>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 6, paddingLeft: isMobile ? 0 : 12 }}>
-                  {group.items.map((it, idx) => <FeedCard key={it.barcode + idx} it={it} ended />)}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    )
-  }
-
-  const onProductView = mode === 'plan' && view === 'product'
-  // Plan tab lights only on the store plan: in Product view it is the way back, not the current tab
-  const lit = k => mode === k && !(k === 'plan' && onProductView)
+  const onProductView = view === 'product'
 
   // ── render ───────────────────────────────────────────────────────────────────
   return (
@@ -1151,16 +836,6 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
         borderRadius: 12, overflow: 'hidden',
         boxShadow: dark ? '0 8px 28px rgba(0,0,0,.35)' : '0 8px 28px rgba(82,62,40,.10), inset 0 1px 0 rgba(255,255,255,.7)' }}>
         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px 14px', padding: '8px 14px', borderBottom: `1px solid ${bdr}`, background: dark ? 'rgba(255,255,255,.025)' : 'rgba(0,0,0,.02)' }}>
-          <div className="ps-seg" style={{ background: s2, border: `1px solid ${bdr}` }}>
-          {[['plan', 'Plan', IcoGrid], ['spot', 'Spotlight', IcoTimeline]].map(([k, l, Ico]) => (
-            <button key={k} className={`ps-glow${lit(k) ? ' on' : ''}`} onClick={() => { setMode(k); if (k === 'plan') setView('store') }} style={{
-              '--g': GOLD_A,
-              background: lit(k) ? `${GOLD_A}22` : 'none',
-              color: lit(k) ? accentTx : mu,
-              boxShadow: lit(k) ? `inset 0 0 0 1px ${GOLD_A}88` : 'none',
-            }}><Ico size={13} />{l}</button>
-          ))}
-          </div>
           <span style={{ fontSize: 16, fontWeight: 700, letterSpacing: '-.02em', color: tx }}>{onProductView ? 'Product across stores' : retailer}</span>
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'baseline', gap: 8, whiteSpace: 'nowrap' }}>
             {!isMobile && <span style={{ fontSize: 9.5, fontWeight: 800, color: mu, textTransform: 'uppercase', letterSpacing: '.12em' }}>Planning date</span>}
@@ -1170,12 +845,7 @@ export default function PromoSection({ rawData, t, dark, isMobile, onSelect, Ret
         {/* views are invoked as functions (not JSX components) — they are re-defined on
             every render, and rendering them as <Component /> would remount the whole
             subtree on each state change, resetting scroll position and hover state */}
-        {mode === 'spot'
-          ? (items.length === 0
-              ? <div style={{ padding: '56px 0', textAlign: 'center', color: mu }}>ไม่พบข้อมูลที่ตรงกับ filter</div>
-              : Spotlight())
-          : view === 'product' ? ProductView() : PlanView()
-        }
+        {onProductView ? ProductView() : PlanView()}
       </div>
       )}
 
