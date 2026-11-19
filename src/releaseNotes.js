@@ -20,8 +20,8 @@ export const RELEASES = [
       },
       {
         img: '/whatsnew/4.1/png-export.webp', ring: [51.4, 82.2, 25.3, 16.5],
-        th: ['PNG พื้นหลังโปร่งใส', 'กด PNG ในหน้ารายละเอียดสินค้า ได้รูปตัดพื้นขาวพร้อมทำอาร์ตเวิร์ก'],
-        en: ['Transparent PNG', 'Tap PNG on a product to download it with the white background removed.'],
+        th: ['PNG พื้นหลังโปร่งใส', 'ตอนนี้ดาวน์โหลดรูปเป็นไฟล์ PNG พื้นหลังโปร่งใสได้แล้ว'],
+        en: ['Transparent PNG', 'Now you can download the picture as a PNG with a transparent background.'],
       },
       {
         img: '/whatsnew/4.1/the-mall.webp', ring: [75.9, 62.1, 23.0, 6.8],
@@ -30,8 +30,8 @@ export const RELEASES = [
       },
       {
         img: '/whatsnew/4.1/now-column.webp', ring: [37.9, 62.1, 16.0, 37.9],
-        th: ['นำ Spotlight ออก', 'ดูโปรที่กำลังจัดอยู่ได้จากคอลัมน์ NOW'],
-        en: ['Spotlight removed', "The NOW column shows what's running today."],
+        th: ['นำ Spotlight ออก', 'ดูโปรโมชั่นที่กำลังเล่น ณ ปัจจุบันได้ที่ไฮไลท์เหลือง คอลัมน์ NOW'],
+        en: ['Spotlight removed', 'Look at the current promotions in play in the highlighted NOW line.'],
       },
     ],
   },

@@ -7,7 +7,7 @@ import retailerData from './retailer_data.js'
 import promoData, { PROMO_META } from './promo_data.js'
 import PromoSection from './PromoSection.jsx'
 import WhatsNew from './WhatsNew.jsx'
-import { useWhatsNew } from './releaseNotes.js'
+import { useWhatsNew, RELEASES } from './releaseNotes.js'
 import { knockOutWhite } from './cutout.js'
 import { upcomingWithin, bangkokToday, daysUntil } from './promoAlerts.js'
 import { periodRange, periodStatus } from './promoPlan.js'
@@ -1550,6 +1550,20 @@ export default function App() {
               </button>
               {alertsOpen && (
                 <div style={{ position: 'absolute', right: 0, top: 'calc(100% + 8px)', width: 280, maxHeight: 360, overflowY: 'auto', background: t.surface, border: `1px solid ${t.border}`, borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,.3)', zIndex: 60, padding: 8 }}>
+                  {RELEASES[0] && (
+                    <button onClick={() => { setAlertsOpen(false); whatsNew.reopen() }} style={{
+                      display: 'flex', alignItems: 'center', gap: 10, width: '100%', minHeight: 44, marginBottom: 8, padding: '8px 10px',
+                      border: `1px solid ${t.accent}66`, borderRadius: 10, background: `${t.accent}14`, color: t.text,
+                      fontFamily: 'inherit', textAlign: 'left', cursor: 'pointer',
+                    }}>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={t.accent} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3l1.9 5.6L19.5 10l-5.6 1.9L12 17.5l-1.9-5.6L4.5 10l5.6-1.4z" /></svg>
+                      <span style={{ flex: 1, minWidth: 0 }}>
+                        <span style={{ display: 'block', fontSize: 13, fontWeight: 800 }}>มีอะไรใหม่ · What's new</span>
+                        <span style={{ display: 'block', fontSize: 11.5, color: t.muted }}>v{RELEASES[0].v} · {RELEASES[0].slides.length} updates</span>
+                      </span>
+                      <span aria-hidden="true" style={{ color: t.accent, fontWeight: 800 }}>›</span>
+                    </button>
+                  )}
                   <div style={{ fontSize: 12, fontWeight: 800, color: t.muted, padding: '4px 8px 8px' }}>Upcoming promos (≤5 days)</div>
                   {alerts.length === 0 && <div style={{ fontSize: 12, color: t.muted, padding: '4px 8px 8px' }}>Nothing in the next 5 days.</div>}
                   {alerts.map((e, i) => {
