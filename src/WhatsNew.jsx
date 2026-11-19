@@ -1,66 +1,96 @@
 // "What's new" popup (content lives in releaseNotes.js). Shown once per announced release.
+// One slide per change: real screenshot + bronze ring on the changed spot + short TH/EN caption.
 import { useState, useEffect } from 'react'
-import { RELEASES, LANG_KEY, store } from './releaseNotes.js'
+import { RELEASES, UI, LANG_KEY, store } from './releaseNotes.js'
+
+const BRONZE = '#d4a86a'
 
 export default function WhatsNew({ onClose, t, dark, isMobile }) {
   const [lang, setLang] = useState(() => store.get(LANG_KEY) || 'th')
+  const [i, setI] = useState(0)
   const pick = l => { setLang(l); store.set(LANG_KEY, l) }
-  const rel = RELEASES[0], c = rel[lang]
+  const rel = RELEASES[0], ui = UI[lang], slides = rel.slides
+  const s = slides[i], [head, body] = s[lang], last = i === slides.length - 1
+  const go = n => setI(Math.max(0, Math.min(slides.length - 1, n)))
 
   useEffect(() => {
-    const onKey = e => { if (e.key === 'Escape') onClose() }
+    const onKey = e => {
+      if (e.key === 'Escape') onClose()
+      else if (e.key === 'ArrowRight') setI(n => Math.min(slides.length - 1, n + 1))
+      else if (e.key === 'ArrowLeft') setI(n => Math.max(0, n - 1))
+    }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
+  }, [onClose, slides.length])
 
-  const accentTx = dark ? '#d4a86a' : '#7d5530'
+  const accentTx = dark ? BRONZE : '#7d5530'
   const segBtn = on => ({
     border: 0, cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: 700,
     minWidth: 44, height: 32, borderRadius: 7, padding: '0 10px',
     background: on ? t.surface : 'transparent', color: on ? t.text : t.muted,
     boxShadow: on ? `0 0 0 1px ${t.accent}88` : 'none',
   })
+  const btn = primary => ({
+    height: 44, minWidth: 96, padding: '0 18px', borderRadius: 10, cursor: 'pointer',
+    fontFamily: 'inherit', fontSize: 14, fontWeight: 700,
+    border: primary ? 0 : `1px solid ${t.border}`,
+    background: primary ? 'linear-gradient(135deg,#d4a86a,#9c6b35)' : 'transparent',
+    color: primary ? '#fff' : t.text,
+  })
+  const [rx, ry, rw, rh] = s.ring
 
   return (
     <div onClick={onClose} style={{
-      position: 'fixed', inset: 0, zIndex: 2500, background: 'rgba(0,0,0,.45)',
+      position: 'fixed', inset: 0, zIndex: 2500, background: 'rgba(0,0,0,.5)',
       display: 'flex', alignItems: isMobile ? 'flex-end' : 'center', justifyContent: 'center',
       padding: isMobile ? 0 : 20,
     }}>
       <div role="dialog" aria-modal="true" aria-labelledby="wn-title" onClick={e => e.stopPropagation()} style={{
-        width: isMobile ? '100%' : 480, maxHeight: isMobile ? '88dvh' : '85vh', overflowY: 'auto',
+        width: isMobile ? '100%' : 680, maxHeight: isMobile ? '92dvh' : '90vh', overflowY: 'auto',
         background: t.surface, color: t.text, border: `1px solid ${t.border}`,
         borderRadius: isMobile ? '16px 16px 0 0' : 16, boxShadow: '0 24px 60px rgba(0,0,0,.4)',
-        padding: isMobile ? '18px 18px 24px' : '22px 24px 24px', boxSizing: 'border-box',
+        padding: isMobile ? '16px 14px 20px' : '20px 22px 22px', boxSizing: 'border-box',
       }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: accentTx }}>v{rel.v}</div>
-            <h2 id="wn-title" style={{ margin: '4px 0 0', fontSize: 20, fontWeight: 800 }}>{c.title}</h2>
-          </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <h2 id="wn-title" style={{ flex: 1, margin: 0, fontSize: 18, fontWeight: 800 }}>
+            {ui.title} <span style={{ fontSize: 12, fontWeight: 800, color: accentTx, marginLeft: 4 }}>v{rel.v}</span>
+          </h2>
           <div role="group" aria-label="Language" style={{ display: 'flex', gap: 3, padding: 3, borderRadius: 10, background: t.surface2, border: `1px solid ${t.border}` }}>
             <button onClick={() => pick('th')} aria-pressed={lang === 'th'} style={segBtn(lang === 'th')}>TH</button>
             <button onClick={() => pick('en')} aria-pressed={lang === 'en'} style={segBtn(lang === 'en')}>EN</button>
           </div>
         </div>
 
-        <ol style={{ listStyle: 'none', margin: '18px 0 0', padding: 0, display: 'flex', flexDirection: 'column', gap: 14 }}>
-          {c.items.map(([head, body], i) => (
-            <li key={i} style={{ display: 'flex', gap: 12 }}>
-              <span aria-hidden="true" style={{ flexShrink: 0, width: 24, height: 24, borderRadius: 99, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800, color: accentTx, background: `${t.accent}22` }}>{i + 1}</span>
-              <div>
-                <div style={{ fontSize: 14.5, fontWeight: 700, lineHeight: 1.35 }}>{head}</div>
-                <div style={{ fontSize: 13, color: t.muted, lineHeight: 1.5, marginTop: 2 }}>{body}</div>
-              </div>
-            </li>
-          ))}
-        </ol>
+        {/* screenshot + ring; overflow hidden clips the dimming shadow to the image */}
+        <div style={{ position: 'relative', marginTop: 14, aspectRatio: '1128 / 705', borderRadius: 12, overflow: 'hidden', border: `1px solid ${t.border}`, background: '#0d1117' }}>
+          <img key={s.img} src={s.img} alt={head} style={{ display: 'block', width: '100%', height: '100%', objectFit: 'cover' }} />
+          <div aria-hidden="true" style={{
+            position: 'absolute', left: `${rx}%`, top: `${ry}%`, width: `${rw}%`, height: `${rh}%`,
+            border: `3px solid ${BRONZE}`, borderRadius: 10, boxSizing: 'border-box',
+            boxShadow: `0 0 0 9999px rgba(0,0,0,.42), 0 0 18px ${BRONZE}`,
+            transition: 'left .3s, top .3s, width .3s, height .3s',
+          }} />
+        </div>
 
-        <button onClick={onClose} autoFocus={!isMobile} style={{
-          marginTop: 22, width: '100%', height: 44, border: 0, borderRadius: 10, cursor: 'pointer',
-          fontFamily: 'inherit', fontSize: 14, fontWeight: 700, color: '#fff',
-          background: 'linear-gradient(135deg,#d4a86a,#9c6b35)',
-        }}>{c.close}</button>
+        <div style={{ marginTop: 14, minHeight: 64 }}>
+          <div style={{ fontSize: 16, fontWeight: 800, lineHeight: 1.35 }}>{head}</div>
+          <div style={{ fontSize: 13.5, color: t.muted, lineHeight: 1.5, marginTop: 3 }}>{body}</div>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 14 }}>
+          <div style={{ display: 'flex', gap: 2, flex: 1 }}>
+            {slides.map((sl, k) => (
+              <button key={k} onClick={() => go(k)} aria-label={`${k + 1} / ${slides.length}: ${sl[lang][0]}`} aria-current={k === i}
+                style={{ width: 28, height: 28, padding: 0, border: 0, background: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <span style={{ width: k === i ? 18 : 8, height: 8, borderRadius: 99, background: k === i ? BRONZE : t.border, transition: 'width .2s' }} />
+              </button>
+            ))}
+          </div>
+          {i > 0 && <button onClick={() => go(i - 1)} style={btn(false)}>{ui.back}</button>}
+          <button onClick={last ? onClose : () => go(i + 1)} autoFocus={!isMobile} style={btn(true)}>
+            {last ? ui.done : ui.next}
+          </button>
+        </div>
       </div>
     </div>
   )
