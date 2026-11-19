@@ -165,6 +165,7 @@ No pending tasks from this redesign.
 
 | Version | What changed |
 |---------|-------------|
+| v4.0.7 | **The Mall** added to the Promotion Plan: new `CONFIG['The Mall']` in [convert_promo.py](convert_promo.py) (header row 4, dates row 5; each month = monthly column + two 2-week "M Price" columns, all kept). `parseDR` gains a day-month-name branch ("8 Jan - 4 Feb", "23 Jul - 26-Aug", "3 Dec -6 Jan27") + test. promo_data.js regenerated (56 SKUs, 37 periods). Mall-only `mprice_names` config tidies the repeated "MPrice (Jan)" headers into "M Price Jan 1/2" (Oct has 3) so the columns read like TWD's Bro.N; on the old code the 24 M Price columns were undated and hidden. |
 | v4.0.6 | Product popup Promos tab lists only promos running today (`periodStatus(periodRange(...)) === "now"`; ended, upcoming and undated periods are hidden, the tab count is the live count) and shows the store logo (`RetailerLogo`) instead of the store name. Supersedes the v4.0.5 Status column, which is removed. |
 | v4.0.4 | Brand logo files in `public/brands/` trimmed of empty white/transparent margins (19 files; logos now fill their plate). L'Arbre Vert Rinse Aid (3450601031656) front packshot replaced with the new bottle design, back kept. The Y: drive still holds the old front — if that file is re-saved there, the daily pipeline will copy it back over. |
 | v4.0.3 | Brand tiles in the Products filter panel: logo plate 76x34 → 104x46 (`maxWidth: 100%` so it never overflows a phone-sheet tile), brand name 11.5 → 13px. |

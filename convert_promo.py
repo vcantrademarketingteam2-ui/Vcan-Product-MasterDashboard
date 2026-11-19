@@ -338,6 +338,15 @@ CONFIG = {
         # A=No, B=Barcode, C=Code, D=Product, E=Pack, F=Cost, G=RSP, H=GP%, I+=periods
         'cols': {'barcode': 2, 'product': 4, 'pack': 5, 'cost': 6, 'rsp': 7, 'gp': 8, 'period_start': 9},
     },
+    'The Mall': {
+        'file': 'The Mall - Activity Promotion 2026.xlsx',
+        'sheets': None,
+        'header_row': 4,
+        'mprice_names': True,  # tidy "MPrice (Jan)" duplicates into "M Price Jan 1/2"
+        # A=Barcode, B=Item Code, C=Product, D=Pack, E=Cost, F=RSP, G=GP%, H+=periods.
+        # Each month = monthly column + two 2-week "M Price" columns; dates on the row below.
+        'cols': {'barcode': 1, 'product': 3, 'pack': 4, 'cost': 5, 'rsp': 6, 'gp': 7, 'period_start': 8},
+    },
     # Central: add path when available
     # 'Central Department': {
     #     'file': 'Central - Activity Promotion 2026.xlsx',
@@ -511,6 +520,14 @@ def parse_sheet(ws, cfg, retailer, non_vat=frozenset()):
             continue
         if not looks_like_period(name, date_range):
             continue  # skip junk columns (promo values, calc columns)
+        # The Mall: "MPrice (Jan)", "Mprice  (Oct)" repeated per 2-week slot -> "M Price Jan 1", "Jan 2", ...
+        mp = cfg.get('mprice_names') and re.match(r'm\s*price\s*\(\s*(\w+)\s*\)', name, re.I)
+        if mp:
+            mon = mp.group(1)[:3].title()
+            n = 1
+            while f'M Price {mon} {n}' in seen_names:
+                n += 1
+            name = f'M Price {mon} {n}'
         if name in seen_names:
             name = f'{name}_{ci}'  # deduplicate
         seen_names.add(name)

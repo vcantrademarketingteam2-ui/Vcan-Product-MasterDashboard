@@ -29,6 +29,16 @@ export function parseDR(dr = '', today = new Date()) {
     const e = new Date(yearOf(md[6]), parseInt(md[5]) - 1, parseInt(md[4]), 23, 59, 59, 999)
     return { s, e }
   }
+  // The Mall month names: "8 Jan - 4 Feb", "23 Jul - 26-Aug", "3 Dec -6 Jan27" (year optional, on end)
+  const mn = s0.match(/^(\d+)\s*([A-Za-z]{3})[A-Za-z]*\s*[–-]\s*(\d+)[\s-]*([A-Za-z]{3})[A-Za-z]*\s*(\d{2,4})?$/)
+  const mi = k => MONTH_NAMES.findIndex(x => x.toLowerCase() === k.toLowerCase())
+  if (mn && mi(mn[2]) >= 0 && mi(mn[4]) >= 0) {
+    const yr = mn[5] ? yearOf(mn[5]) : today.getFullYear()
+    const s = new Date(yr, mi(mn[2]), parseInt(mn[1]))
+    const e = new Date(yr, mi(mn[4]), parseInt(mn[3]), 23, 59, 59, 999)
+    if (e < s) { if (mn[5]) s.setFullYear(yr - 1); else e.setFullYear(yr + 1) }
+    return { s, e }
+  }
   // "27/05-9/06/26"  or  "7/01-20/01/26"
   const m = s0.match(/^(\d+)\/(\d+)\s*[–-]\s*(\d+)\/(\d+)(?:\/(\d+))?$/)
   if (!m) return null

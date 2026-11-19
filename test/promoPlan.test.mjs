@@ -195,3 +195,12 @@ test('next / upcoming skip past periods', () => {
   assert.equal(rows[0].next.pd.salePrice, 85);
   assert.equal(rows[0].upcoming.col.name, 'Jan');
 });
+
+test('parseDR The Mall month-name ranges', () => {
+  const T = new Date(2026, 10, 17);
+  const d = s => { const r = parseDR(s, T); return r && [r.s.toDateString(), r.e.toDateString()]; };
+  assert.deepEqual(d('8 Jan - 4 Feb'), ['Thu Jan 08 2026', 'Wed Feb 04 2026']);
+  assert.deepEqual(d('23 Jul - 26-Aug'), ['Thu Jul 23 2026', 'Wed Aug 26 2026']);
+  assert.deepEqual(d('11 Jun-24 Jun'), ['Thu Jun 11 2026', 'Wed Jun 24 2026']);
+  assert.deepEqual(d('3 Dec -6 Jan27'), ['Thu Dec 03 2026', 'Wed Jan 06 2027']);
+});
