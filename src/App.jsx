@@ -6,6 +6,8 @@ import fallbackData, { GENERATED_AT } from './data.js'
 import retailerData from './retailer_data.js'
 import promoData, { PROMO_META } from './promo_data.js'
 import PromoSection from './PromoSection.jsx'
+import WhatsNew from './WhatsNew.jsx'
+import { useWhatsNew } from './releaseNotes.js'
 import { knockOutWhite } from './cutout.js'
 import { upcomingWithin, bangkokToday, daysUntil } from './promoAlerts.js'
 import { periodRange, periodStatus } from './promoPlan.js'
@@ -1077,6 +1079,7 @@ export default function App() {
   const [statusTab, setStatusTab] = useState('ALL')
   const [selectedProduct, setSelectedProduct] = useState(null)
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768)
+  const whatsNew = useWhatsNew()
   const [sortCol, setSortCol] = useState(null)
   const [sortDir, setSortDir] = useState('asc')
   const [matrixPopover, setMatrixPopover] = useState(null)
@@ -1516,7 +1519,8 @@ export default function App() {
             <div style={{ fontWeight: 800, fontSize: isMobile ? 14 : 17, color: t.text, letterSpacing: 0.2, whiteSpace: 'nowrap', flexShrink: 0 }}>
               Product Master
             </div>
-              <span style={{ color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>v4.0.8</span>
+              <button onClick={whatsNew.reopen} title="What's new" aria-label="What's new in this version"
+                style={{ background: 'none', border: 0, padding: 0, cursor: 'pointer', fontFamily: 'inherit', color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0, textDecoration: 'underline dotted', textUnderlineOffset: 3 }}>v4.1.0</button>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: isMobile ? 11 : 13, background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, padding: isMobile ? '3px 8px' : '5px 12px', overflow: 'hidden', minWidth: 0, flexShrink: 1 }}>
               <span style={{ width: isMobile ? 6 : 7, height: isMobile ? 6 : 7, borderRadius: '50%', flexShrink: 0, background: dataSource === 'csv' ? t.blue : t.green }} />
               <span style={{ fontWeight: 800, color: dataSource === 'csv' ? t.blue : t.green, flexShrink: 0 }}>
@@ -2289,6 +2293,8 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {whatsNew.open && <WhatsNew onClose={whatsNew.close} t={t} dark={dark} isMobile={isMobile} />}
 
       {/* ── PRODUCT POPUP ── */}
       {selectedProduct && (
