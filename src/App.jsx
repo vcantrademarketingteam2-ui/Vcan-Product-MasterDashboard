@@ -1383,9 +1383,9 @@ export default function App() {
   )
 
   const NAV_ITEMS = [
-    { key: 'products', icon: <IconGrid size={20} />, label: 'Products', title: 'Products' },
-    { key: 'analytics', icon: <IconBarChart size={20} />, label: 'Analytics', title: 'Analytics' },
-    { key: 'promotion', icon: <IconCalendar size={20} />, label: 'Promo', title: 'Promotion Plan' },
+    { key: 'products', Icon: IconGrid, label: 'Products', title: 'Products' },
+    { key: 'analytics', Icon: IconBarChart, label: 'Analytics', title: 'Analytics' },
+    { key: 'promotion', Icon: IconCalendar, label: 'Promo', title: 'Promotion Plan' },
   ]
 
   // Desktop Products tab = height-bounded two-column shell (filter panel + results scroll
@@ -1450,32 +1450,32 @@ export default function App() {
       {/* rail height divided by the root zoom (1.05) so the pinned credit isn't pushed off-screen */}
       {!isMobile && (
         <aside style={{
-          width: 78, flexShrink: 0, position: 'sticky', top: 0, height: 'calc(100vh / 1.05)', zIndex: 100,
+          width: 104, flexShrink: 0, position: 'sticky', top: 0, height: 'calc(100vh / 1.05)', zIndex: 100,
           background: dark ? 'rgba(1,4,9,.72)' : 'rgba(239,231,220,.72)',
           backdropFilter: 'blur(18px) saturate(1.3)', WebkitBackdropFilter: 'blur(18px) saturate(1.3)',
           borderRight: `1px solid ${t.border}`, display: 'flex', flexDirection: 'column', alignItems: 'center',
-          gap: 4, padding: '12px 6px', overflow: 'hidden',
+          gap: 4, padding: '14px 8px', overflow: 'hidden',
         }}>
-          <img src="/favicon.svg" alt="VCAN" style={{ width: 58, height: 58, display: 'block', margin: '2px 0 12px' }} />
-          <nav style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-            {NAV_ITEMS.map(({ key, icon, label, title }) => {
+          <img src="/favicon.svg" alt="VCAN" style={{ width: 64, height: 64, display: 'block', margin: '2px 0 14px' }} />
+          <nav style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+            {NAV_ITEMS.map(({ key, Icon, label, title }) => {
               const active = tab === key
               return (
                 <button key={key} onClick={() => setTab(key)} className="nav-item" title={title} aria-label={title} aria-current={active ? 'page' : undefined} style={{
-                  width: 66, padding: '9px 2px 7px', border: 'none', borderRadius: 10, display: 'flex', flexDirection: 'column',
-                  alignItems: 'center', gap: 5, fontSize: 10.5, fontWeight: 700, fontFamily: 'inherit',
+                  width: 88, padding: '11px 2px 9px', border: 'none', borderRadius: 12, display: 'flex', flexDirection: 'column',
+                  alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 700, fontFamily: 'inherit',
                   color: active ? t.text : t.muted,
                   background: active ? `${t.accent}24` : 'none',
                   boxShadow: active ? `inset 0 0 0 1px ${t.accent}8c` : 'none',
                 }}>
-                  <span className="neon-ico" style={{ display: 'inline-flex', lineHeight: 1 }}>{icon}</span>
+                  <span className="neon-ico" style={{ display: 'inline-flex', lineHeight: 1 }}><Icon size={24} /></span>
                   <span style={{ whiteSpace: 'nowrap' }}>{label}</span>
                 </button>
               )
             })}
           </nav>
           <div style={{ flex: 1 }} />
-          <div style={{ fontSize: 9.5, color: dark ? '#8d96a3' : t.muted, lineHeight: 1.5, textAlign: 'center', fontWeight: 500 }}>
+          <div style={{ fontSize: 10.5, color: dark ? '#8d96a3' : t.muted, lineHeight: 1.5, textAlign: 'center', fontWeight: 500 }}>
             Made by Meth<br />Trade Marketing
           </div>
         </aside>
@@ -1485,7 +1485,7 @@ export default function App() {
           position: 'fixed', left: 0, right: 0, bottom: 0, height: 56, zIndex: 100, display: 'flex', alignItems: 'stretch',
           background: t.surface, borderTop: `1px solid ${t.border}`, padding: 4, gap: 4,
         }}>
-          {NAV_ITEMS.map(({ key, icon, label, title }) => {
+          {NAV_ITEMS.map(({ key, Icon, label, title }) => {
             const active = tab === key
             return (
               <button key={key} onClick={() => setTab(key)} title={title} aria-label={title} aria-current={active ? 'page' : undefined} style={{
@@ -1495,7 +1495,7 @@ export default function App() {
                 background: active ? `${t.accent}24` : 'none',
                 boxShadow: active ? `inset 0 0 0 1px ${t.accent}8c` : 'none',
               }}>
-                <span style={{ display: 'inline-flex', lineHeight: 1 }}>{icon}</span>
+                <span style={{ display: 'inline-flex', lineHeight: 1 }}><Icon size={20} /></span>
                 <span>{label}</span>
               </button>
             )
@@ -1520,7 +1520,7 @@ export default function App() {
               Product Master
             </div>
               <button onClick={whatsNew.reopen} title="What's new" aria-label="What's new in this version"
-                style={{ background: 'none', border: 0, padding: 0, cursor: 'pointer', fontFamily: 'inherit', color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0, textDecoration: 'underline dotted', textUnderlineOffset: 3 }}>v4.1.0</button>
+                style={{ background: 'none', border: 0, padding: 0, cursor: 'pointer', fontFamily: 'inherit', color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0, textDecoration: 'underline dotted', textUnderlineOffset: 3 }}>v4.1.1</button>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: isMobile ? 11 : 13, background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, padding: isMobile ? '3px 8px' : '5px 12px', overflow: 'hidden', minWidth: 0, flexShrink: 1 }}>
               <span style={{ width: isMobile ? 6 : 7, height: isMobile ? 6 : 7, borderRadius: '50%', flexShrink: 0, background: dataSource === 'csv' ? t.blue : t.green }} />
               <span style={{ fontWeight: 800, color: dataSource === 'csv' ? t.blue : t.green, flexShrink: 0 }}>
