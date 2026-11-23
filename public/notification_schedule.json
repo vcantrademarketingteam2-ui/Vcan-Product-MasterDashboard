@@ -204,6 +204,184 @@
     "title": "Tops 2701/02"
   },
   {
+    "retailer": "Tops",
+    "period": "2709/10",
+    "startDate": "2027-02-17",
+    "activities": [
+      "media"
+    ],
+    "brands": [
+      "Dove Bar Soap"
+    ],
+    "title": "Tops 2709/10"
+  },
+  {
+    "retailer": "Tops",
+    "period": "2711/12",
+    "startDate": "2027-03-03",
+    "activities": [
+      "media"
+    ],
+    "brands": [
+      "Dove Bar Soap",
+      "Malizia Bath Foam 1L"
+    ],
+    "title": "Tops 2711/12"
+  },
+  {
+    "retailer": "Tops",
+    "period": "2719/20",
+    "startDate": "2027-04-28",
+    "activities": [
+      "media"
+    ],
+    "brands": [
+      "Tempo"
+    ],
+    "title": "Tops 2719/20"
+  },
+  {
+    "retailer": "Tops",
+    "period": "2727/28",
+    "startDate": "2027-06-23",
+    "activities": [
+      "looks"
+    ],
+    "brands": [
+      "PEARS SOAP",
+      "Sundae Bath Foam"
+    ],
+    "title": "Tops 2727/28"
+  },
+  {
+    "retailer": "Tops",
+    "period": "2729/30",
+    "startDate": "2027-07-07",
+    "activities": [
+      "looks"
+    ],
+    "brands": [
+      "Sundae Bath Foam"
+    ],
+    "title": "Tops 2729/30"
+  },
+  {
+    "retailer": "Tops",
+    "period": "2733/34",
+    "startDate": "2027-08-04",
+    "activities": [
+      "media"
+    ],
+    "brands": [
+      "General Fresh"
+    ],
+    "title": "Tops 2733/34"
+  },
+  {
+    "retailer": "Tops",
+    "period": "2735/36",
+    "startDate": "2027-08-18",
+    "activities": [
+      "field",
+      "looks",
+      "media"
+    ],
+    "brands": [
+      "L'Arbre Vert Body Wash",
+      "Sundae Bath Foam"
+    ],
+    "title": "Tops 2735/36"
+  },
+  {
+    "retailer": "Tops",
+    "period": "2739/40",
+    "startDate": "2027-09-15",
+    "activities": [
+      "media"
+    ],
+    "brands": [
+      "General Fresh"
+    ],
+    "title": "Tops 2739/40"
+  },
+  {
+    "retailer": "Tops",
+    "period": "2741/42",
+    "startDate": "2027-09-29",
+    "activities": [
+      "field",
+      "media"
+    ],
+    "brands": [
+      "PEARS BODY WASH"
+    ],
+    "title": "Tops 2741/42"
+  },
+  {
+    "retailer": "Tops",
+    "period": "2743/44",
+    "startDate": "2027-10-13",
+    "activities": [
+      "looks",
+      "media"
+    ],
+    "brands": [
+      "Sundae Bath Foam",
+      "Vnew"
+    ],
+    "title": "Tops 2743/44"
+  },
+  {
+    "retailer": "Tops",
+    "period": "2745/46",
+    "startDate": "2027-10-27",
+    "activities": [
+      "media"
+    ],
+    "brands": [
+      "L'Arbre Vert"
+    ],
+    "title": "Tops 2745/46"
+  },
+  {
+    "retailer": "Tops",
+    "period": "2747/48",
+    "startDate": "2027-11-10",
+    "activities": [
+      "media"
+    ],
+    "brands": [
+      "Brilly"
+    ],
+    "title": "Tops 2747/48"
+  },
+  {
+    "retailer": "Tops",
+    "period": "2749/50",
+    "startDate": "2027-11-24",
+    "activities": [
+      "field"
+    ],
+    "brands": [
+      "Tempo"
+    ],
+    "title": "Tops 2749/50"
+  },
+  {
+    "retailer": "Tops",
+    "period": "2801/02",
+    "startDate": "2027-12-22",
+    "activities": [
+      "field",
+      "media"
+    ],
+    "brands": [
+      "L'Arbre Vert",
+      "Sundae Bath Foam"
+    ],
+    "title": "Tops 2801/02"
+  },
+  {
     "retailer": "Villa",
     "period": "Monthly4",
     "startDate": "2026-04-23",
@@ -334,6 +512,46 @@
       "combat"
     ],
     "title": "TWD Bro7"
+  },
+  {
+    "retailer": "TWD",
+    "period": "Bro.1 2027",
+    "startDate": "2027-01-08",
+    "activities": [
+      "media"
+    ],
+    "brands": [
+      "General Fresh",
+      "Sofix"
+    ],
+    "title": "TWD Bro.1 2027"
+  },
+  {
+    "retailer": "TWD",
+    "period": "Bro.2 2027",
+    "startDate": "2027-01-29",
+    "activities": [
+      "media"
+    ],
+    "brands": [
+      "Purex",
+      "Sofix",
+      "combat"
+    ],
+    "title": "TWD Bro.2 2027"
+  },
+  {
+    "retailer": "TWD",
+    "period": "Bro.3 2027",
+    "startDate": "2027-02-26",
+    "activities": [
+      "media"
+    ],
+    "brands": [
+      "Somat",
+      "combat"
+    ],
+    "title": "TWD Bro.3 2027"
   },
   {
     "retailer": "The Mall",

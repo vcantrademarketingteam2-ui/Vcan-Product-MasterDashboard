@@ -2,9 +2,10 @@
 """
 convert_promo.py — Parse promotion plan xlsx files into src/promo_data.js
 Usage: python convert_promo.py
-Reads from Y:\\MARKETING\\Promotion Plan ทุกห้าง\\2026\\
+Reads every year folder (FIRST_YEAR .. next year) under Y:\\MARKETING\\Promotion Plan ทุกห้าง\\
 Writes to src/promo_data.js
 """
+import calendar
 import json
 import argparse
 import re
@@ -12,7 +13,56 @@ from datetime import datetime
 from pathlib import Path
 import openpyxl
 
-BASE_DIR = Path(r'Y:\MARKETING\Promotion Plan ทุกห้าง\2026')
+PROMO_ROOT = Path(r'Y:\MARKETING\Promotion Plan ทุกห้าง')
+FIRST_YEAR = 2026  # CONFIG file names carry this year; later folders swap it (2027, 2028, ...)
+
+
+def year_files(cfg):
+    """(year, path) for FIRST_YEAR plus every later year folder up to next year that holds
+    the store's file. Later years swap the year in the name and collapse double spaces
+    (Boots 'promotion  2026' vs 'promotion 2027')."""
+    out = [(FIRST_YEAR, PROMO_ROOT / str(FIRST_YEAR) / cfg['file'])]
+    for y in range(FIRST_YEAR + 1, datetime.now().year + 2):
+        f = PROMO_ROOT / str(y) / ' '.join(cfg['file'].replace(str(FIRST_YEAR), str(y)).split())
+        if f.exists():
+            out.append((y, f))
+    return out
+
+
+def end_token(dr):
+    """End side of a date range, spaces removed: '26/06 - 30/07/26' -> '30/07/26'."""
+    return re.sub(r'\s', '', dr or '').split('-')[-1]
+
+
+def end_year(dr):
+    """Year written on the END of a range ('24/12/26-20/01/27' -> 2027, '4Feb27' -> 2027)."""
+    m = re.search(r'(?:\d+[/.]\d+[/.]|[A-Za-z])(\d{2,4})$', end_token(dr))
+    return _year_of(int(m.group(1))) if m else None
+
+
+def pin_year(name, dr, year):
+    """Give a period of a `year` file an explicit year, so the frontend never falls back to
+    today's year (which shifts every column when the calendar flips). Returns the range."""
+    dr = (dr or '').strip()
+    # Tops typo '03/02-16-02/27' -> '03/02-16/02/27'
+    dr = re.sub(r'^(\d+/\d+)-(\d+)-(\d+/\d+)$', r'\1-\2/\3', dr)
+    # The Mall '7 Jan - 4 Feb' (no year): append the END year (Dec -> Jan ends next year)
+    mm = re.match(r'^(\d+\s*([A-Za-z]{3})[A-Za-z]*\s*-\s*\d+[\s-]*([A-Za-z]{3})[A-Za-z]*)\s*(\d{2,4})?$', dr)
+    if mm and mm.group(2).lower() in MONTH_NAMES and mm.group(3).lower() in MONTH_NAMES:
+        wrap = MONTH_NAMES.index(mm.group(3).lower()) < MONTH_NAMES.index(mm.group(2).lower())
+        if not mm.group(4):
+            return f'{dr} {(year + wrap) % 100:02d}'
+        # A year-Y plan's Nov/Dec -> Jan slot ends in Y+1; '25 Nov - 5 Jan27' in the 2027 file
+        # is a copied-over year typo that would drop the column into the previous year.
+        if wrap and _year_of(int(mm.group(4))) == year:
+            print(f'    (!)  "{name}" {dr!r}: end year looks one short, read as {year + 1}')
+            return f'{mm.group(1)} {(year + 1) % 100:02d}'
+    # Bare month name (Homepro 'Jan') with no date, or a garbage year (Foodland '1-31/10/202')
+    n = name.strip().lower()
+    if n in MONTH_NAMES and end_year(dr) not in (year - 1, year, year + 1):
+        mo = MONTH_NAMES.index(n) + 1
+        return f'1/{mo:02d}-{calendar.monthrange(year, mo)[1]}/{mo:02d}/{year % 100:02d}'
+    return dr
 OUT = Path('src/promo_data.js')
 
 
@@ -169,6 +219,22 @@ def _selftest_parse_start_date():
         got = parse_start_date(date_range, year_hint=year_hint)
         assert got == expected, f'parse_start_date({date_range!r}, year_hint={year_hint}) = {got!r}, expected {expected!r}'
     print(f'_selftest_parse_start_date: {len(cases)} cases OK')
+    pins = [  # (name, dateRange, file year, expected pinned range)
+        ('Jan', '', 2027, '1/01-31/01/27'),                         # Homepro: no date row
+        ('Oct', '1-31/10/202', 2027, '1/10-31/10/27'),              # Foodland truncated year
+        ('Jan', '1-31/01/26', 2027, '1-31/01/26'),                  # stale copy: left, then dropped
+        ('2707/08', '03/02-16-02/27', 2027, '03/02-16/02/27'),      # Tops dash typo
+        ('Jan', '7 Jan - 4 Feb', 2027, '7 Jan - 4 Feb 27'),         # The Mall, no year
+        ('Dec', '25 Nov - 5 Jan', 2027, '25 Nov - 5 Jan 28'),       # The Mall, crosses new year
+        ('Dec', '25 Nov - 5 Jan27', 2027, '25 Nov - 5 Jan 28'),     # The Mall, year one short
+        ('Dec', '3 Dec -6 Jan27', 2026, '3 Dec -6 Jan27'),          # already right
+    ]
+    for name, dr, y, expected in pins:
+        got = pin_year(name, dr, y)
+        assert got == expected, f'pin_year({name!r}, {dr!r}, {y}) = {got!r}, expected {expected!r}'
+    assert end_year('24/12/26-20/01/27') == 2027 and end_year('7/01-20/01') is None
+    assert end_token('26/06 - 30/07/26') == end_token('26/06-30/07/26')
+    print(f'_selftest_pin_year: {len(pins)} cases OK')
 
 
 def load_barcode_brands():
@@ -187,7 +253,7 @@ def load_barcode_brands():
 def build_notification_schedule(promo_meta, all_products, barcode_brand):
     """One entry per (retailer, period) that has >=1 item with a non-empty activities list
     and a parseable start date."""
-    year_hint = int(BASE_DIR.name) if BASE_DIR.name.isdigit() else datetime.now().year
+    year_hint = FIRST_YEAR
     sched = []
     for retailer, meta in promo_meta.items():
         for p in meta['periods']:
@@ -720,52 +786,84 @@ def main(retailer_filter=None):
         kept_stale.append(retailer)
         print(f'    (!)  {retailer}: KEPT PREVIOUS DATA ({len(old)} products) — fix the sheet/CONFIG')
 
+    later_failed = []  # later-year files that did not parse (base year still shown)
+
     for retailer, cfg in configs:
-        fpath = BASE_DIR / cfg['file']
-        if not fpath.exists():
-            print(f'  (!)  Skipping {retailer}: not found at {fpath}')
-            keep_previous(retailer)
-            continue
-
-        print(f'  Parsing {retailer}...')
-        try:
-            wb = openpyxl.load_workbook(fpath, read_only=False, data_only=True)
-        except Exception as e:
-            print(f'    FAIL Failed to open: {e}')
-            keep_previous(retailer)
-            continue
-
-        sheets = cfg.get('sheets') or [wb.sheetnames[0]]
         retailer_periods = []
         retailer_products = []
+        by_barcode = {}    # dedup within a retailer: same barcode -> merge period dicts
+        period_year = {}   # period name -> year of the file it first came from
+        base_ok = True
 
-        by_barcode = {}  # dedup within a retailer: same barcode -> merge period dicts
-        for sheet_name in sheets:
-            if sheet_name not in wb.sheetnames:
-                # Try first sheet as fallback
-                print(f'    (!)  Sheet "{sheet_name}" not found — trying first sheet')
-                sheet_name = wb.sheetnames[0]
-            ws = wb[sheet_name]
-            products, periods = parse_sheet(ws, cfg, retailer, non_vat_barcodes)
-            for prod in products:
-                bc = prod['barcode']
-                if bc in by_barcode:
-                    # merge: keep existing fields, fold in any periods it doesn't have yet
-                    for pname, pdata in prod['periods'].items():
-                        by_barcode[bc]['periods'].setdefault(pname, pdata)
-                    if prod.get('disconFrom') and not by_barcode[bc].get('disconFrom'):
-                        by_barcode[bc]['disconFrom'] = prod['disconFrom']
-                else:
-                    by_barcode[bc] = prod
-                    retailer_products.append(prod)
-            # Merge periods (union, preserve order)
-            existing = {p['name'] for p in retailer_periods}
-            for p in periods:
-                if p['name'] not in existing:
-                    retailer_periods.append({'name': p['name'], 'dateRange': p['dateRange']})
-                    existing.add(p['name'])
+        for year, fpath in year_files(cfg):
+            base = year == FIRST_YEAR
+            if not fpath.exists():
+                print(f'  (!)  Skipping {retailer}: not found at {fpath}')
+                base_ok = False
+                break
+            print(f'  Parsing {retailer} {year}...')
+            try:
+                wb = openpyxl.load_workbook(fpath, read_only=False, data_only=True)
+            except Exception as e:
+                print(f'    FAIL Failed to open: {e}')
+                if base:
+                    base_ok = False
+                    break
+                later_failed.append(f'{retailer} {year}')
+                continue
 
-        wb.close()
+            got = 0
+            for sheet_name in cfg.get('sheets') or [wb.sheetnames[0]]:
+                if sheet_name not in wb.sheetnames:
+                    # Try first sheet as fallback
+                    print(f'    (!)  Sheet "{sheet_name}" not found — trying first sheet')
+                    sheet_name = wb.sheetnames[0]
+                products, periods = parse_sheet(wb[sheet_name], cfg, retailer, non_vat_barcodes)
+                got += len(products)
+
+                # Periods: pin the year, drop columns a later-year file still carries from the
+                # year before (planners copy last year's sheet; Tops 2027 pet sheet, TWD Apr-Dec
+                # are all /26 dates), and suffix a name that a different year already used for
+                # a different range ('Jan' -> 'Jan 2027'). Same name + same end date = same period.
+                rename = {}  # source name -> new name, or None = dropped stale column
+                for pr in periods:
+                    name, dr = pr['name'], pin_year(pr['name'], pr['dateRange'], year)
+                    ey = end_year(dr)
+                    if not base and ey is not None and ey < year:
+                        rename[name] = None
+                        continue
+                    old = next((q for q in retailer_periods if q['name'] == name), None)
+                    if old and period_year[name] != year and end_token(old['dateRange']) != end_token(dr):
+                        rename[name] = name = f'{name} {year}'
+                        old = next((q for q in retailer_periods if q['name'] == name), None)
+                    if not old:  # union, first seen wins, source order kept
+                        retailer_periods.append({'name': name, 'dateRange': dr})
+                        period_year[name] = year
+
+                for prod in products:
+                    prod['periods'] = {rename.get(k, k): v for k, v in prod['periods'].items()
+                                       if rename.get(k, k) is not None}
+                    if prod.get('disconFrom') in rename:
+                        prod['disconFrom'] = rename[prod['disconFrom']]
+                    bc = prod['barcode']
+                    if bc in by_barcode:
+                        # merge: keep existing fields, fold in any periods it doesn't have yet
+                        for pname, pdata in prod['periods'].items():
+                            by_barcode[bc]['periods'].setdefault(pname, pdata)
+                        if prod.get('disconFrom') and not by_barcode[bc].get('disconFrom'):
+                            by_barcode[bc]['disconFrom'] = prod['disconFrom']
+                    else:
+                        by_barcode[bc] = prod
+                        retailer_products.append(prod)
+
+            wb.close()
+            if not got and not base:
+                print(f'    FAIL {retailer} {year}: no products parsed — {year} plan NOT shown')
+                later_failed.append(f'{retailer} {year}')
+
+        if not base_ok:
+            keep_previous(retailer)
+            continue
 
         if retailer_products:
             all_products.extend(retailer_products)
@@ -835,6 +933,10 @@ def main(retailer_filter=None):
     # update_dashboard.bat forwards this file's one line in its LINE status message.
     warn_path = Path('logs/promo_warnings.txt')
     warn_path.unlink(missing_ok=True)
+    if later_failed:
+        print(f'\n   WARNING: these later-year plans did not parse: {", ".join(later_failed)}')
+        warn_path.parent.mkdir(exist_ok=True)
+        warn_path.write_text(f'Warning: plan not loaded for {", ".join(later_failed)}', encoding='utf-8')
     if kept_stale:
         print()
         print(f'   WARNING: stale data kept for {", ".join(kept_stale)} — their sheets did not parse.')
@@ -842,7 +944,7 @@ def main(retailer_filter=None):
         warn_path.write_text(f'Warning: old data kept for {", ".join(kept_stale)} (sheet did not parse)', encoding='utf-8')
 
     if not all_products:
-        print('   Tip: If all retailers were skipped, check BASE_DIR path and CONFIG header_row values.')
+        print('   Tip: If all retailers were skipped, check PROMO_ROOT path and CONFIG header_row values.')
 
 
 if __name__ == '__main__':
