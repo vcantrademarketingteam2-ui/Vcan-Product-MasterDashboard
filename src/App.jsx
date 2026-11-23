@@ -1520,7 +1520,7 @@ export default function App() {
               Product Master
             </div>
               <button onClick={whatsNew.reopen} title="What's new" aria-label="What's new in this version"
-                style={{ background: 'none', border: 0, padding: 0, cursor: 'pointer', fontFamily: 'inherit', color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0, textDecoration: 'underline dotted', textUnderlineOffset: 3 }}>v4.1.1</button>
+                style={{ background: 'none', border: 0, padding: 0, cursor: 'pointer', fontFamily: 'inherit', color: t.accent, fontSize: isMobile ? 11 : 14, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0, textDecoration: 'underline dotted', textUnderlineOffset: 3 }}>v4.1.2</button>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: isMobile ? 11 : 13, background: t.surface2, border: `1px solid ${t.border}`, borderRadius: 8, padding: isMobile ? '3px 8px' : '5px 12px', overflow: 'hidden', minWidth: 0, flexShrink: 1 }}>
               <span style={{ width: isMobile ? 6 : 7, height: isMobile ? 6 : 7, borderRadius: '50%', flexShrink: 0, background: dataSource === 'csv' ? t.blue : t.green }} />
               <span style={{ fontWeight: 800, color: dataSource === 'csv' ? t.blue : t.green, flexShrink: 0 }}>
