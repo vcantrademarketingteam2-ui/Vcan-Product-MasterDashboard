@@ -418,6 +418,42 @@
     "title": "Villa Monthly7"
   },
   {
+    "retailer": "Villa",
+    "period": "Monthly4 2027",
+    "startDate": "2027-04-22",
+    "activities": [
+      "field"
+    ],
+    "brands": [
+      "L'Arbre Vert"
+    ],
+    "title": "Villa Monthly4 2027"
+  },
+  {
+    "retailer": "Villa",
+    "period": "Monthly5 2027",
+    "startDate": "2027-05-27",
+    "activities": [
+      "field"
+    ],
+    "brands": [
+      "Malizia Bath Foam 1L"
+    ],
+    "title": "Villa Monthly5 2027"
+  },
+  {
+    "retailer": "Villa",
+    "period": "Monthly7 2027",
+    "startDate": "2027-07-22",
+    "activities": [
+      "field"
+    ],
+    "brands": [
+      "Vnew"
+    ],
+    "title": "Villa Monthly7 2027"
+  },
+  {
     "retailer": "Big C",
     "period": "Bro5",
     "startDate": "2023-03-30",

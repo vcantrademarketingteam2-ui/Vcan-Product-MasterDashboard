@@ -1037,9 +1037,9 @@ const RETAILER_DATA = {
       "gp": 0.25
     },
     "Foodland": {
-      "costUnit": 115.6542,
-      "costCase": 3469.6262,
-      "gp": 0.25
+      "costUnit": 107.9439,
+      "costCase": 3238.3178,
+      "gp": 0.3
     }
   },
   "6947509910086": {
@@ -1069,9 +1069,9 @@ const RETAILER_DATA = {
       "gp": 0.25
     },
     "Foodland": {
-      "costUnit": 115.6542,
-      "costCase": 3469.6262,
-      "gp": 0.25
+      "costUnit": 107.9439,
+      "costCase": 3238.3178,
+      "gp": 0.3
     }
   },
   "5900785450005": {
@@ -1197,6 +1197,11 @@ const RETAILER_DATA = {
       "costUnit": 97.5701,
       "costCase": 585.4206,
       "gp": 0.28
+    },
+    "The Mall": {
+      "costUnit": 101.6355,
+      "costCase": 609.8131,
+      "gp": 0.25
     }
   },
   "3450601100383": {
@@ -1209,6 +1214,16 @@ const RETAILER_DATA = {
       "costUnit": 108.4112,
       "costCase": 650.4673,
       "gp": 0.2
+    },
+    "The Mall": {
+      "costUnit": 101.6355,
+      "costCase": 609.8131,
+      "gp": 0.25
+    },
+    "Foodland": {
+      "costUnit": 94.8598,
+      "costCase": 569.1589,
+      "gp": 0.3
     }
   },
   "3450601100413": {
@@ -1221,6 +1236,16 @@ const RETAILER_DATA = {
       "costUnit": 108.4112,
       "costCase": 650.4673,
       "gp": 0.2
+    },
+    "The Mall": {
+      "costUnit": 101.6355,
+      "costCase": 609.8131,
+      "gp": 0.25
+    },
+    "Foodland": {
+      "costUnit": 94.8598,
+      "costCase": 569.1589,
+      "gp": 0.3
     }
   },
   "3450601100420": {
@@ -1233,6 +1258,16 @@ const RETAILER_DATA = {
       "costUnit": 108.4112,
       "costCase": 650.4673,
       "gp": 0.2
+    },
+    "The Mall": {
+      "costUnit": 101.6355,
+      "costCase": 609.8131,
+      "gp": 0.25
+    },
+    "Foodland": {
+      "costUnit": 94.8598,
+      "costCase": 569.1589,
+      "gp": 0.3
     }
   },
   "017000024103": {
